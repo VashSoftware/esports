@@ -366,6 +366,7 @@ export async function submitGameScores(
 		countMiss?: number;
 		mods?: string[];
 		passed?: boolean;
+		pp?: number | null;
 	}[]
 ) {
 	const game = await db.query.matchGame.findFirst({
@@ -387,7 +388,8 @@ export async function submitGameScores(
 			count50: s.count50 ?? 0,
 			countMiss: s.countMiss ?? 0,
 			mods: s.mods ?? [],
-			passed: s.passed ?? true
+			passed: s.passed ?? true,
+			pp: s.pp ?? null
 		});
 	}
 

@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { match, matchGame, mappoolSlot, user } from '$lib/server/db/schema';
+import { match, matchGame, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, type MatchConfig } from './types';
 import { getMatchFull, submitRoll, pickMap, submitGameScores } from './engine';
@@ -10,6 +10,8 @@ import {
 	removeLobby,
 	getActiveLobbyCount
 } from '../bancho/client';
+import { getOsuMatch } from '../osu/api';
+import { account } from '../db/auth.schema';
 
 function sleep(ms: number) {
 	return new Promise<void>((r) => setTimeout(r, ms));
@@ -305,7 +307,6 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 
 	const slot = game.slot;
 	const m = await getMatchFull(matchId);
-	const config = m.config as MatchConfig;
 	const score = m.participants.map((p) => `${p.team.name} ${p.score}`).join(' - ');
 
 	// Set beatmap
@@ -331,6 +332,10 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		try {
 			await lobby.chat('Timed out waiting for ready. Ready up and the game will start, or an admin can force start from the web UI.');
 		} catch { /* lobby may be dead */ }
+		// Still set up score collection — force start will trigger the game
+		collectScores(matchId, matchGameId, lobby).catch((err) =>
+			console.error('[Orchestrator] Score collection failed:', err)
+		);
 		return;
 	}
 
@@ -361,7 +366,22 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 
 	// Map IRC usernames → matchParticipantPlayer IDs
 	const m = await getMatchFull(matchId);
-	const scores: { playerId: string; score: number; passed: boolean }[] = [];
+	const scores: {
+		playerId: string;
+		score: number;
+		passed: boolean;
+		accuracy?: number;
+		maxCombo?: number;
+		count300?: number;
+		count100?: number;
+		count50?: number;
+		countMiss?: number;
+		mods?: string[];
+		pp?: number | null;
+	}[] = [];
+
+	// Build userId → osu accountId map for API enrichment
+	const userOsuIdMap = new Map<string, number>(); // userId → osu numeric ID
 
 	for (const irc of ircScores) {
 		for (const participant of m.participants) {
@@ -371,6 +391,15 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 				const dbName = u?.name?.toLowerCase();
 				if (dbName && (dbName === ircName || dbName === irc.username.toLowerCase())) {
 					scores.push({ playerId: player.id, score: irc.score, passed: irc.passed });
+					// Cache the osu account ID for enrichment
+					if (u && !userOsuIdMap.has(player.userId)) {
+						const acc = await db.query.account.findFirst({
+							where: and(eq(account.userId, player.userId), eq(account.providerId, 'osu'))
+						});
+						if (acc?.accountId) {
+							userOsuIdMap.set(player.userId, parseInt(acc.accountId));
+						}
+					}
 				}
 			}
 		}
@@ -379,6 +408,59 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	if (scores.length === 0) {
 		console.warn('[Orchestrator] No scores matched any IRC usernames');
 		return;
+	}
+
+	// Enrich scores with osu! API data (300/100/50/miss/accuracy/maxCombo/pp)
+	if (m.osuLobbyId) {
+		try {
+			const osuMatchData = await getOsuMatch(m.osuLobbyId);
+			// Find the most recent game event matching our beatmap
+			const gameRecord = await db.query.matchGame.findFirst({
+				where: eq(matchGame.id, matchGameId),
+				with: { slot: true }
+			});
+			const beatmapId = gameRecord?.slot?.beatmapId ? parseInt(gameRecord.slot.beatmapId) : null;
+
+			if (beatmapId && osuMatchData?.events) {
+				// Find game events in reverse (most recent first) matching our beatmap
+				const gameEvents = [...osuMatchData.events]
+					.reverse()
+					.filter((e: any) => e.game?.beatmap_id === beatmapId);
+
+				const osuGame = gameEvents[0]?.game;
+				if (osuGame?.scores) {
+					// Build osu userID → score stats map
+					const osuScoreMap = new Map<number, any>();
+					for (const os of osuGame.scores) {
+						osuScoreMap.set(os.user_id, os);
+					}
+
+					// Enrich each score
+					for (const s of scores) {
+						const playerOsuId = userOsuIdMap.get(s.playerId);
+						if (playerOsuId === undefined) continue;
+						const osuScore = osuScoreMap.get(playerOsuId);
+						if (!osuScore) continue;
+
+						s.accuracy = osuScore.accuracy ?? undefined;
+						s.maxCombo = osuScore.max_combo ?? undefined;
+						s.count300 = osuScore.statistics?.count_300 ?? undefined;
+						s.count100 = osuScore.statistics?.count_100 ?? undefined;
+						s.count50 = osuScore.statistics?.count_50 ?? undefined;
+						s.countMiss = osuScore.statistics?.count_miss ?? undefined;
+						s.pp = osuScore.pp ?? null;
+						if (osuScore.mods?.length) {
+							s.mods = osuScore.mods.map((mod: any) =>
+								typeof mod === 'string' ? mod : mod.acronym ?? mod
+							);
+						}
+					}
+					console.log(`[Orchestrator] Enriched scores from osu! API for game ${matchGameId}`);
+				}
+			}
+		} catch (err: any) {
+			console.warn('[Orchestrator] Failed to enrich scores from osu! API:', err.message);
+		}
 	}
 
 	await submitGameScores(matchGameId, scores);

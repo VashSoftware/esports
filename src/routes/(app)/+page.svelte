@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+
 	let { data } = $props();
 
 	const liveStates = ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'];
@@ -26,11 +28,12 @@
 			const res = await fetch('/api/queue');
 			if (res.ok) {
 				const status = await res.json();
+				const wasInQueue = queueStatus?.inQueue;
 				queueStatus = status;
 
-				// If we were in queue and now got matched, redirect to the match
-				if (!status.inQueue && status.matchedMatchId) {
-					window.location.href = `/matches/${status.matchedMatchId}`;
+				// If we were in queue and now got matched, refresh the layout to show the active match banner
+				if (wasInQueue && !status.inQueue && status.matchedMatchId) {
+					await invalidateAll();
 				}
 			}
 		} catch {}
@@ -42,7 +45,10 @@
 			const res = await fetch('/api/queue', { method: 'POST' });
 			const result = await res.json();
 			if (result.matched && result.match) {
-				window.location.href = `/matches/${result.match.id}`;
+				// Refresh layout to show banner instead of hard redirecting
+				await invalidateAll();
+				queueStatus = { inQueue: false, queueSize: 0, matchedMatchId: result.match.id };
+				queueLoading = false;
 				return;
 			}
 			await fetchQueueStatus();

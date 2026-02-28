@@ -2,7 +2,7 @@ import { user } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { getMatchFull, submitRoll, pickMap, cancelMatch } from '$lib/server/match/engine';
 import { playPickedMap, closeLobby, forceStartGame } from '$lib/server/match/orchestrator';
-import { getLobby } from '$lib/server/bancho/client';
+import { getLobby, getLobbyStatus } from '$lib/server/bancho/client';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
 import { hasRole } from '$lib/server/permissions';
@@ -45,7 +45,18 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const isStaff = hasRole(locals.user.role, 'referee');
 
-	return { match: m, beatmapCache, userId: locals.user.id, isStaff };
+	// Fetch player usernames for lobby status display
+	const playerNames: Record<string, string> = {};
+	for (const p of m.participants) {
+		for (const pl of p.players) {
+			const u = await db.query.user.findFirst({ where: eq(user.id, pl.userId) });
+			if (u?.name) playerNames[pl.userId] = u.name;
+		}
+	}
+
+	const lobbyStatus = getLobbyStatus(params.id);
+
+	return { match: m, beatmapCache, userId: locals.user.id, isStaff, lobbyStatus, playerNames };
 };
 
 export const actions: Actions = {
