@@ -13,6 +13,49 @@
 		CANCELLED: { label: 'Cancelled', color: 'text-red-400' }
 	};
 
+	// Queue state
+	let queueStatus = $state<{ inQueue: boolean; queueSize: number } | null>(null);
+	let queueLoading = $state(false);
+
+	async function fetchQueueStatus() {
+		try {
+			const res = await fetch('/api/queue');
+			if (res.ok) queueStatus = await res.json();
+		} catch {}
+	}
+
+	async function joinQueue() {
+		queueLoading = true;
+		try {
+			const res = await fetch('/api/queue', { method: 'POST' });
+			const data = await res.json();
+			if (data.matched && data.match) {
+				window.location.href = `/matches/${data.match.id}`;
+				return;
+			}
+			await fetchQueueStatus();
+		} catch {}
+		queueLoading = false;
+	}
+
+	async function leaveQueue() {
+		queueLoading = true;
+		try {
+			await fetch('/api/queue', { method: 'DELETE' });
+			await fetchQueueStatus();
+		} catch {}
+		queueLoading = false;
+	}
+
+	// Poll queue status while on dashboard
+	$effect(() => {
+		if (data.user) {
+			fetchQueueStatus();
+			const interval = setInterval(fetchQueueStatus, 5000);
+			return () => clearInterval(interval);
+		}
+	});
+
 	function timeAgo(date: string | Date) {
 		const d = new Date(date);
 		const diff = Date.now() - d.getTime();
@@ -129,6 +172,39 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Queue -->
+		<div class="mt-6 rounded-lg border border-border bg-surface-800 p-5">
+			<div class="flex items-center justify-between">
+				<div>
+					<h2 class="text-sm font-600">Ranked Queue</h2>
+					<p class="mt-0.5 text-xs text-text-secondary">Find a match at your skill level</p>
+				</div>
+				{#if queueStatus?.inQueue}
+					<div class="flex items-center gap-3">
+						<span class="flex items-center gap-2 text-xs text-yellow-400">
+							<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400"></span>
+							In queue ({queueStatus.queueSize} searching)
+						</span>
+						<button
+							onclick={leaveQueue}
+							disabled={queueLoading}
+							class="rounded-md border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+						>
+							Leave Queue
+						</button>
+					</div>
+				{:else}
+					<button
+						onclick={joinQueue}
+						disabled={queueLoading}
+						class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+					>
+						{queueLoading ? 'Joining...' : 'Find Match'}
+					</button>
+				{/if}
+			</div>
+		</div>
 
 		<div class="mt-8 grid gap-4 lg:grid-cols-3">
 			<!-- Quick Actions -->
