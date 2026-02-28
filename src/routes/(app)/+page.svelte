@@ -14,13 +14,25 @@
 	};
 
 	// Queue state
-	let queueStatus = $state<{ inQueue: boolean; queueSize: number } | null>(null);
+	let queueStatus = $state<{
+		inQueue: boolean;
+		queueSize: number;
+		matchedMatchId?: string | null;
+	} | null>(null);
 	let queueLoading = $state(false);
 
 	async function fetchQueueStatus() {
 		try {
 			const res = await fetch('/api/queue');
-			if (res.ok) queueStatus = await res.json();
+			if (res.ok) {
+				const status = await res.json();
+				queueStatus = status;
+
+				// If we were in queue and now got matched, redirect to the match
+				if (!status.inQueue && status.matchedMatchId) {
+					window.location.href = `/matches/${status.matchedMatchId}`;
+				}
+			}
 		} catch {}
 	}
 
@@ -28,9 +40,9 @@
 		queueLoading = true;
 		try {
 			const res = await fetch('/api/queue', { method: 'POST' });
-			const data = await res.json();
-			if (data.matched && data.match) {
-				window.location.href = `/matches/${data.match.id}`;
+			const result = await res.json();
+			if (result.matched && result.match) {
+				window.location.href = `/matches/${result.match.id}`;
 				return;
 			}
 			await fetchQueueStatus();
@@ -47,11 +59,11 @@
 		queueLoading = false;
 	}
 
-	// Poll queue status while on dashboard
+	// Poll queue status while on dashboard (faster when in queue)
 	$effect(() => {
 		if (data.user) {
 			fetchQueueStatus();
-			const interval = setInterval(fetchQueueStatus, 5000);
+			const interval = setInterval(fetchQueueStatus, queueStatus?.inQueue ? 2000 : 5000);
 			return () => clearInterval(interval);
 		}
 	});
@@ -81,8 +93,8 @@
 			Welcome to <span class="text-accent">Vash Esports</span>
 		</h1>
 		<p class="mt-3 max-w-md text-text-secondary">
-			Automated tournament match management for osu! — lobbies, mappools, picks, bans, and
-			ELO tracking all in one place.
+			Automated tournament match management for osu! — lobbies, mappools, picks, bans, and ELO
+			tracking all in one place.
 		</p>
 		<a
 			href="/login"
@@ -95,7 +107,7 @@
 		</p>
 	</div>
 
-<!-- ── DASHBOARD (logged in) ── -->
+	<!-- ── DASHBOARD (logged in) ── -->
 {:else}
 	<div class="mx-auto max-w-5xl">
 		<div>
@@ -215,12 +227,13 @@
 						href="/matches"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
 					>
-						<span class="flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent"
+						<span
+							class="flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent"
 							>⚔</span
 						>
 						<div>
-							<p class="text-sm font-600">New Match</p>
-							<p class="text-xs text-text-secondary">Start a 1v1</p>
+							<p class="text-sm font-600">Matches</p>
+							<p class="text-xs text-text-secondary">View all matches</p>
 						</div>
 					</a>
 					<a
@@ -247,6 +260,19 @@
 						<div>
 							<p class="text-sm font-600">Teams</p>
 							<p class="text-xs text-text-secondary">Manage rosters</p>
+						</div>
+					</a>
+					<a
+						href="/leaderboard"
+						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
+					>
+						<span
+							class="flex h-8 w-8 items-center justify-center rounded-md bg-yellow-500/10 text-yellow-400"
+							>🏆</span
+						>
+						<div>
+							<p class="text-sm font-600">Leaderboard</p>
+							<p class="text-xs text-text-secondary">Rankings & stats</p>
 						</div>
 					</a>
 				</div>
@@ -301,7 +327,9 @@
 					{:else}
 						<div class="rounded-lg border border-dashed border-border py-8 text-center">
 							<p class="text-sm text-text-secondary">
-								No matches yet. <a href="/matches" class="text-accent hover:underline">Create one</a>
+								No matches yet. <a href="/matches" class="text-accent hover:underline"
+									>Create one</a
+								>
 							</p>
 						</div>
 					{/each}

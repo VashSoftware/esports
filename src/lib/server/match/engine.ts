@@ -7,9 +7,9 @@ import {
 	matchGameScore,
 	matchQueue,
 	playerRating,
-	teamMember,
+	teamMember
 } from '$lib/server/db/schema';
-import { eq, asc, sql } from 'drizzle-orm';
+import { eq, asc, sql, desc, and, inArray } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 
 // ── Queue ───────────────────────────────────────────────────────────────
@@ -54,11 +54,53 @@ export async function getQueueStatus(userId: string) {
 		.select({ count: sql<number>`count(*)` })
 		.from(matchQueue);
 
+	// If NOT in queue, check if there's a recent active match for this user
+	// (they may have been matched while polling)
+	let matchedMatchId: string | null = null;
+	if (!entry) {
+		matchedMatchId = await findRecentActiveMatch(userId);
+	}
+
 	return {
 		inQueue: !!entry,
 		queueSize: Number(count[0].count),
-		joinedAt: entry?.joinedAt ?? null
+		joinedAt: entry?.joinedAt ?? null,
+		matchedMatchId
 	};
+}
+
+/**
+ * Find a recent active (non-finished) match for this user.
+ * Used to redirect players who were matched via queue while polling.
+ */
+async function findRecentActiveMatch(userId: string): Promise<string | null> {
+	// Find matchParticipantPlayer records for this user
+	const playerEntries = await db.query.matchParticipantPlayer.findMany({
+		where: eq(matchParticipantPlayer.userId, userId),
+		with: {
+			participant: {
+				with: {
+					match: true
+				}
+			}
+		}
+	});
+
+	// Find the most recent match that's still active (not finished/cancelled)
+	const activeStates = [
+		MATCH_STATES.CREATED,
+		MATCH_STATES.LOBBY,
+		MATCH_STATES.ROLLING,
+		MATCH_STATES.PICKING,
+		MATCH_STATES.PLAYING
+	];
+
+	const activeMatches = playerEntries
+		.filter((pe) => activeStates.includes(pe.participant.match.state as any))
+		.map((pe) => pe.participant.match)
+		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+	return activeMatches[0]?.id ?? null;
 }
 
 async function tryMatchFromQueue() {
@@ -69,7 +111,7 @@ async function tryMatchFromQueue() {
 	if (queue.length < 2) return null;
 
 	// Find closest ELO pair
-	let bestPair: [typeof queue[0], typeof queue[0]] | null = null;
+	let bestPair: [(typeof queue)[0], (typeof queue)[0]] | null = null;
 	let smallestGap = Infinity;
 
 	for (let i = 0; i < queue.length - 1; i++) {
@@ -100,6 +142,17 @@ async function tryMatchFromQueue() {
 		createdBy: 'system'
 	});
 
+	// Start the IRC lobby in the background
+	// Import dynamically to avoid circular dependency
+	try {
+		const { initMatchLobby } = await import('./orchestrator');
+		initMatchLobby(created.id).catch((err) => {
+			console.error('[Queue] IRC lobby creation failed:', err.message);
+		});
+	} catch (err: any) {
+		console.error('[Queue] Failed to import orchestrator:', err.message);
+	}
+
 	return created;
 }
 
@@ -112,7 +165,6 @@ async function selectMappoolForRating(avgElo: number) {
 	if (pools.length === 0) return null;
 
 	// Map ELO range (e.g. 800-1200) to star rating range (e.g. 3-7)
-	// Simple linear: ELO 800 → 3★, ELO 1200 → 7★
 	const targetStars = 3 + ((avgElo - 800) / 400) * 4;
 	const clampedTarget = Math.max(2, Math.min(8, targetStars));
 
@@ -413,10 +465,7 @@ export async function submitGameScores(
 
 // ── ELO ─────────────────────────────────────────────────────────────────
 
-async function updateElo(
-	participants: { id: string; teamId: string }[],
-	winnerId: string
-) {
+async function updateElo(participants: { id: string; teamId: string }[], winnerId: string) {
 	for (const p of participants) {
 		const players = await db.query.matchParticipantPlayer.findMany({
 			where: eq(matchParticipantPlayer.participantId, p.id)
