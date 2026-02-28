@@ -1,5 +1,6 @@
 // src/routes/(app)/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
+import { isRootAdmin } from '$lib/server/permissions';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	return {
@@ -9,7 +10,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 					name: locals.user.name,
 					email: locals.user.email,
 					image: locals.user.image,
-					role: locals.user.role ?? 'player'
+					role: locals.user.role ?? 'player',
+					isRootAdmin: isRootAdmin(locals.user.email)
 				}
 			: null
 	};

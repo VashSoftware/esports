@@ -2,10 +2,11 @@ import { db } from '$lib/server/db';
 import { team, teamMember, user } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
+import { requireAuth, requireOwnerOrAdmin } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) redirect(302, '/');
+	const u = requireAuth(locals);
 
 	const teams = await db.query.team.findMany({
 		with: {
@@ -19,22 +20,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 		teams.map(async (t) => {
 			const membersWithUsers = await Promise.all(
 				t.members.map(async (m) => {
-					const u = await db.query.user.findFirst({
+					const usr = await db.query.user.findFirst({
 						where: eq(user.id, m.userId)
 					});
-					return { ...m, user: u ? { id: u.id, name: u.name, image: u.image } : null };
+					return { ...m, user: usr ? { id: usr.id, name: usr.name, image: usr.image } : null };
 				})
 			);
 			return { ...t, members: membersWithUsers };
 		})
 	);
 
-	return { teams: teamsWithUsers, userId: locals.user.id };
+	return { teams: teamsWithUsers, userId: u.id };
 };
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
-		if (!locals.user) redirect(302, '/');
+		const u = requireAuth(locals);
 
 		const form = await request.formData();
 		const name = form.get('name')?.toString()?.trim();
@@ -45,7 +46,7 @@ export const actions: Actions = {
 			.insert(team)
 			.values({
 				name,
-				ownerId: locals.user.id,
+				ownerId: u.id,
 				isPersonal: false
 			})
 			.returning();
@@ -53,21 +54,43 @@ export const actions: Actions = {
 		// Add creator as captain
 		await db.insert(teamMember).values({
 			teamId: created.id,
-			userId: locals.user.id,
+			userId: u.id,
 			role: 'captain'
 		});
 
 		return { success: true };
 	},
 
+	rename: async ({ request, locals }) => {
+		const form = await request.formData();
+		const teamId = form.get('teamId')?.toString();
+		const name = form.get('name')?.toString()?.trim();
+
+		if (!teamId || !name) return { error: 'Team ID and name are required' };
+
+		const t = await db.query.team.findFirst({ where: eq(team.id, teamId) });
+		if (!t) return { error: 'Team not found' };
+		if (t.isPersonal) return { error: 'Cannot rename personal team' };
+
+		requireOwnerOrAdmin(locals, t.ownerId);
+
+		await db.update(team).set({ name }).where(eq(team.id, teamId));
+		return { success: true };
+	},
+
 	addMember: async ({ request, locals }) => {
-		if (!locals.user) redirect(302, '/');
+		requireAuth(locals);
 
 		const form = await request.formData();
 		const teamId = form.get('teamId')?.toString();
 		const username = form.get('username')?.toString()?.trim();
 
 		if (!teamId || !username) return { error: 'Team and username are required' };
+
+		// Only owner or admin can add members
+		const t = await db.query.team.findFirst({ where: eq(team.id, teamId) });
+		if (!t) return { error: 'Team not found' };
+		requireOwnerOrAdmin(locals, t.ownerId);
 
 		// Find user by osu! username
 		const u = await db.query.user.findFirst({
@@ -93,26 +116,34 @@ export const actions: Actions = {
 	},
 
 	removeMember: async ({ request, locals }) => {
-		if (!locals.user) redirect(302, '/');
+		requireAuth(locals);
 
 		const form = await request.formData();
 		const memberId = form.get('memberId')?.toString();
 		if (!memberId) return { error: 'Missing member ID' };
+
+		// Look up the member to find the team, then check ownership
+		const member = await db.query.teamMember.findFirst({
+			where: eq(teamMember.id, memberId),
+			with: { team: true }
+		});
+		if (!member) return { error: 'Member not found' };
+		requireOwnerOrAdmin(locals, member.team.ownerId);
 
 		await db.delete(teamMember).where(eq(teamMember.id, memberId));
 		return { success: true };
 	},
 
 	deleteTeam: async ({ request, locals }) => {
-		if (!locals.user) redirect(302, '/');
-
 		const form = await request.formData();
 		const teamId = form.get('teamId')?.toString();
 		if (!teamId) return { error: 'Missing team ID' };
 
-		// Only allow owner to delete
 		const t = await db.query.team.findFirst({ where: eq(team.id, teamId) });
-		if (!t || t.ownerId !== locals.user.id) return { error: 'Not authorized' };
+		if (!t) return { error: 'Team not found' };
+		if (t.isPersonal) return { error: 'Cannot delete personal team' };
+
+		requireOwnerOrAdmin(locals, t.ownerId);
 
 		await db.delete(team).where(eq(team.id, teamId));
 		return { success: true };

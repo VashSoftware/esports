@@ -9,9 +9,21 @@
 	const stateConfig: Record<string, { label: string; color: string; dot?: string }> = {
 		CREATED: { label: 'Created', color: 'text-text-secondary border-border' },
 		LOBBY: { label: 'In Lobby', color: 'text-yellow-400 border-yellow-500/30' },
-		ROLLING: { label: 'Rolling', color: 'text-yellow-400 border-yellow-500/30', dot: 'bg-yellow-400' },
-		PICKING: { label: 'Picking', color: 'text-blue-400 border-blue-500/30', dot: 'bg-blue-400' },
-		PLAYING: { label: 'Live', color: 'text-green-400 border-green-500/30', dot: 'bg-green-400' },
+		ROLLING: {
+			label: 'Rolling',
+			color: 'text-yellow-400 border-yellow-500/30',
+			dot: 'bg-yellow-400'
+		},
+		PICKING: {
+			label: 'Picking',
+			color: 'text-blue-400 border-blue-500/30',
+			dot: 'bg-blue-400'
+		},
+		PLAYING: {
+			label: 'Live',
+			color: 'text-green-400 border-green-500/30',
+			dot: 'bg-green-400'
+		},
 		FINISHED: { label: 'Finished', color: 'text-text-secondary border-border' },
 		CANCELLED: { label: 'Cancelled', color: 'text-red-400 border-red-500/30' }
 	};
@@ -52,23 +64,28 @@
 				{/if}
 			</p>
 		</div>
-		<button
-			onclick={() => (showCreate = !showCreate)}
-			class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
-		>
-			{showCreate ? 'Cancel' : 'New Match'}
-		</button>
+		{#if data.canCreateMatch}
+			<button
+				onclick={() => (showCreate = !showCreate)}
+				class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+			>
+				{showCreate ? 'Cancel' : 'New Match'}
+			</button>
+		{/if}
 	</div>
 
 	<!-- Create Match Modal -->
-	{#if showCreate}
+	{#if showCreate && data.canCreateMatch}
 		<form
 			method="post"
 			action="?/createMatch"
 			use:enhance={() => {
 				createError = '';
 				return async ({ result, update }) => {
-					if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
+					if (
+						result.type === 'failure' ||
+						(result.type === 'success' && (result.data as any)?.error)
+					) {
 						createError = (result.data as any)?.error ?? 'Failed to create match';
 					} else {
 						await update();
@@ -166,7 +183,7 @@
 	{/if}
 
 	<!-- Live Matches -->
-{#if liveMatches.length > 0}
+	{#if liveMatches.length > 0}
 		<div class="mt-6">
 			<h2 class="flex items-center gap-2 text-sm font-600">
 				<div class="relative h-2 w-2">
@@ -203,7 +220,10 @@
 							{/if}
 						</div>
 
-						<span class="flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}">
+						<span
+							class="flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-500 {sc?.color ??
+								'border-border'}"
+						>
 							{#if sc?.dot}
 								<span class="h-1.5 w-1.5 rounded-full {sc.dot}"></span>
 							{/if}
@@ -234,9 +254,17 @@
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
 							{#if m.state === 'FINISHED'}
-								<span class="text-xs font-700 tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p1?.score ?? 0}</span>
+								<span
+									class="text-xs font-700 tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0)
+										? 'text-green-400'
+										: 'text-text-secondary'}">{p1?.score ?? 0}</span
+								>
 								<span class="text-xs text-text-secondary">-</span>
-								<span class="text-xs font-700 tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p2?.score ?? 0}</span>
+								<span
+									class="text-xs font-700 tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0)
+										? 'text-green-400'
+										: 'text-text-secondary'}">{p2?.score ?? 0}</span
+								>
 							{:else}
 								<span class="text-xs text-text-secondary">vs</span>
 							{/if}
@@ -259,14 +287,23 @@
 					{/if}
 
 					<!-- State -->
-					<span class="rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}">
+					<span
+						class="rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}"
+					>
 						{sc?.label ?? m.state}
 					</span>
 				</a>
 			{:else}
 				{#if liveMatches.length === 0}
 					<div class="rounded-lg border border-dashed border-border py-12 text-center">
-						<p class="text-sm text-text-secondary">No matches yet. Create one to get started.</p>
+						<p class="text-sm text-text-secondary">
+							No matches yet.
+							{#if data.canCreateMatch}
+								Create one to get started.
+							{:else}
+								Join the ranked queue from the dashboard!
+							{/if}
+						</p>
 					</div>
 				{/if}
 			{/each}

@@ -1,4 +1,3 @@
-// src/hooks.server.ts
 import type { Handle } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { auth } from '$lib/server/auth';
@@ -6,6 +5,7 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { db } from '$lib/server/db';
 import { user as userTable } from '$lib/server/db/auth.schema';
 import { eq } from 'drizzle-orm';
+import { ensureRootAdminRole } from '$lib/server/permissions';
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });
@@ -18,9 +18,20 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 			where: eq(userTable.id, session.user.id)
 		});
 
+		let role = dbUser?.role ?? 'player';
+
+		// Auto-promote root admin if env var is set and they're not admin yet
+		if (dbUser) {
+			role = await ensureRootAdminRole({
+				id: dbUser.id,
+				email: dbUser.email,
+				role
+			});
+		}
+
 		event.locals.user = {
 			...session.user,
-			role: dbUser?.role ?? 'player'
+			role
 		};
 	}
 

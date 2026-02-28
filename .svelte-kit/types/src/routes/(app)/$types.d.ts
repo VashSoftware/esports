@@ -13,7 +13,7 @@ type OptionalUnion<U extends Record<string, any>, A extends keyof U = U extends 
 export type Snapshot<T = any> = Kit.Snapshot<T>;
 type PageServerParentData = Omit<EnsureDefined<import('../$types.js').LayoutServerData>, keyof LayoutServerData> & EnsureDefined<LayoutServerData>;
 type PageParentData = Omit<EnsureDefined<import('../$types.js').LayoutData>, keyof LayoutData> & EnsureDefined<LayoutData>;
-type LayoutRouteId = RouteId | "/(app)" | "/(app)/admin" | "/(app)/mappools" | "/(app)/mappools/[id]" | "/(app)/matches" | "/(app)/matches/[id]" | "/(app)/settings" | "/(app)/teams"
+type LayoutRouteId = RouteId | "/(app)" | "/(app)/admin" | "/(app)/leaderboard" | "/(app)/mappools" | "/(app)/mappools/[id]" | "/(app)/matches" | "/(app)/matches/[id]" | "/(app)/settings" | "/(app)/teams"
 type LayoutParams = RouteParams & { id?: string }
 type LayoutServerParentData = EnsureDefined<import('../$types.js').LayoutServerData>;
 type LayoutParentData = EnsureDefined<import('../$types.js').LayoutData>;

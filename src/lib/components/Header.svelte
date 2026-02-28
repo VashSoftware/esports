@@ -20,7 +20,11 @@
 	<div class="flex items-center gap-4">
 		{#if user}
 			<div class="flex items-center gap-3">
-				{#if badge}
+				{#if user.isRootAdmin}
+					<span class="rounded px-1.5 py-0.5 text-[10px] font-700 bg-red-500/20 text-red-400">
+						ROOT
+					</span>
+				{:else if badge}
 					<span class="rounded px-1.5 py-0.5 text-[10px] font-700 {badge.color}">
 						{badge.label}
 					</span>
