@@ -20,6 +20,16 @@
 	const expectedPickerIdx = $derived(m.games.length % sortedByPick.length);
 	const expectedPicker = $derived(sortedByPick[expectedPickerIdx]);
 
+	// Is the logged-in user on the expected picker's team?
+	const isMyTurnToPick = $derived(
+		expectedPicker?.players?.some((pl: any) => pl.userId === data.userId) ?? false
+	);
+
+	// TB restriction: only pickable at match point (e.g. 2-2 in BO5)
+	const isTiebreakerAllowed = $derived(
+		m.participants.every((p: any) => p.score === winsNeeded - 1)
+	);
+
 	const canRoll = $derived(
 		m.state === 'ROLLING' && m.participants.some((p: any) => p.rollValue === null)
 	);
@@ -94,7 +104,7 @@
 		</div>
 		<span class="rounded border px-2.5 py-1 text-xs font-600 {stateBorder(m.state)}">{stateLabel(m.state)}</span>
 
-		{#if !['FINISHED', 'CANCELLED'].includes(m.state)}
+		{#if !['FINISHED', 'CANCELLED'].includes(m.state) && data.isStaff}
 			<form method="post" action="?/cancel" use:enhance>
 				<button type="submit" onclick={(e) => { if (!confirm('Cancel this match?')) e.preventDefault() }} class="rounded-md border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10">Cancel</button>
 			</form>
@@ -136,13 +146,12 @@
 		</div>
 	{/if}
 
-	<!-- Re-invite players -->
+	<!-- Re-invite (self only) — visible during LOBBY, ROLLING, PICKING, PLAYING -->
 	{#if ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'].includes(m.state)}
 		<div class="mt-3 flex justify-center">
 			<form method="post" action="?/reinvite" use:enhance={() => {
 				return async ({ result, update }) => {
 					if (result.type === 'success' && (result.data as any)?.reinvited) {
-						// Brief visual feedback — just reload
 						await update();
 					}
 				};
@@ -151,7 +160,7 @@
 					type="submit"
 					class="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-accent"
 				>
-					📨 Re-invite players to lobby
+					📨 Re-invite me to lobby
 				</button>
 			</form>
 		</div>
@@ -202,6 +211,9 @@
 					<h2 class="text-lg font-700">🎯 Pick a Map</h2>
 					<p class="mt-1 text-sm">
 						<span class="font-600 text-accent">{expectedPicker?.team.name}</span>'s turn to pick
+						{#if !isMyTurnToPick && !data.isStaff}
+							<span class="text-text-secondary">(waiting...)</span>
+						{/if}
 					</p>
 					<p class="mt-1 text-xs text-text-secondary">
 						or type <code class="rounded bg-surface-700 px-1.5 py-0.5 font-mono text-accent">!pick NM1</code> in osu! chat
@@ -222,6 +234,9 @@
 								{#each slots as slot, i}
 									{@const bm = data.beatmapCache[slot.beatmapId]}
 									{@const isPlayed = playedSlotIds.has(slot.id)}
+									{@const isTB = slot.category === 'TB'}
+									{@const tbLocked = isTB && !isTiebreakerAllowed}
+									{@const cantPick = !isMyTurnToPick && !data.isStaff}
 
 									<form method="post" action="?/pick" use:enhance={() => {
 										picking = true;
@@ -238,10 +253,12 @@
 										<input type="hidden" name="slotId" value={slot.id} />
 										<button
 											type="submit"
-											disabled={isPlayed || picking}
-											class="flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-all {isPlayed
+											disabled={isPlayed || picking || tbLocked || cantPick}
+											class="flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-all {isPlayed || tbLocked
 												? 'border-border/50 bg-surface-900 opacity-30 cursor-not-allowed'
-												: 'border-border bg-surface-700 hover:border-accent hover:bg-surface-600 cursor-pointer'}"
+												: cantPick
+													? 'border-border bg-surface-700 opacity-60 cursor-not-allowed'
+													: 'border-border bg-surface-700 hover:border-accent hover:bg-surface-600 cursor-pointer'}"
 										>
 											{#if bm?.listCoverUrl}
 												<img src={bm.listCoverUrl} alt="" class="h-10 w-20 rounded object-cover" />
@@ -257,7 +274,11 @@
 												{/if}
 											</div>
 											<span class="text-xs font-600 text-text-secondary">{category}{slot.orderInCategory}</span>
-											{#if isPlayed}<span class="text-xs text-text-secondary">✓</span>{/if}
+											{#if isPlayed}
+												<span class="text-xs text-text-secondary">✓</span>
+											{:else if tbLocked}
+												<span class="text-[10px] text-pink-400/60">🔒</span>
+											{/if}
 										</button>
 									</form>
 								{/each}
@@ -289,19 +310,21 @@
 				Waiting for players to ready up &amp; play in osu!...
 			</p>
 
-			<!-- Force Start button -->
-			<form method="post" action="?/forceStart" use:enhance={() => {
-				forceStarting = true;
-				return async ({ update }) => { forceStarting = false; await update(); };
-			}}>
-				<button
-					type="submit"
-					disabled={forceStarting}
-					class="mt-4 rounded-md border border-yellow-500/30 px-4 py-2 text-xs font-600 text-yellow-400 transition-colors hover:bg-yellow-500/10 disabled:opacity-50"
-				>
-					{forceStarting ? 'Starting...' : 'Force Start (skip ready)'}
-				</button>
-			</form>
+			<!-- Force Start button — staff only -->
+			{#if data.isStaff}
+				<form method="post" action="?/forceStart" use:enhance={() => {
+					forceStarting = true;
+					return async ({ update }) => { forceStarting = false; await update(); };
+				}}>
+					<button
+						type="submit"
+						disabled={forceStarting}
+						class="mt-4 rounded-md border border-yellow-500/30 px-4 py-2 text-xs font-600 text-yellow-400 transition-colors hover:bg-yellow-500/10 disabled:opacity-50"
+					>
+						{forceStarting ? 'Starting...' : 'Force Start (skip ready)'}
+					</button>
+				</form>
+			{/if}
 		</div>
 	{/if}
 

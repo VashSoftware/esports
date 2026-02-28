@@ -1,3 +1,4 @@
+// src/routes/api/health/+server.ts
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { sql } from 'drizzle-orm';

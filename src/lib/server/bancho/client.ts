@@ -9,6 +9,7 @@ function sleep(ms: number) {
 let client: any = null;
 let connecting: Promise<void> | null = null;
 let reconnecting = false;
+let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
 async function getClient() {
 	if (client?.isConnected?.()) return client;
@@ -29,18 +30,13 @@ async function getClient() {
 
 	client = new BanchoClient({
 		username: env.OSU_IRC_USERNAME,
-		password: env.OSU_IRC_PASSWORD,
-		// bancho.js has built-in reconnect but we need to handle channel rejoin
-		apiKey: undefined
+		password: env.OSU_IRC_PASSWORD
 	});
 
 	// ── Lifecycle logging ──
-	client.on('connected', () => {
-		console.log('[Bancho] Connected as', env.OSU_IRC_USERNAME);
-	});
-
 	client.on('disconnected', () => {
 		console.warn('[Bancho] Disconnected from IRC');
+		stopKeepalive();
 	});
 
 	client.on('error', (err: any) => {
@@ -48,16 +44,18 @@ async function getClient() {
 	});
 
 	// ── Reconnect: re-join all active lobby channels ──
-	// bancho.js fires 'connected' again after an auto-reconnect
 	let initialConnect = true;
 	client.on('connected', async () => {
 		if (initialConnect) {
 			initialConnect = false;
-			return; // skip the first connect, lobbies haven't been created yet
+			console.log('[Bancho] Connected as', env.OSU_IRC_USERNAME);
+			startKeepalive();
+			return;
 		}
 
 		reconnecting = true;
 		console.log('[Bancho] Reconnected — re-joining', lobbies.size, 'active lobby channels');
+		startKeepalive();
 
 		for (const [matchId, lobby] of lobbies.entries()) {
 			try {
@@ -65,8 +63,6 @@ async function getClient() {
 				console.log(`[Bancho] Re-joined channel for match ${matchId}`);
 			} catch (err: any) {
 				console.error(`[Bancho] Failed to re-join channel for match ${matchId}:`, err.message);
-				// Channel may have been closed by Bancho while we were offline
-				// Mark it as dead so orchestrator knows
 				lobby._dead = true;
 			}
 		}
@@ -81,6 +77,36 @@ async function getClient() {
 	return client;
 }
 
+// ── Keepalive: prevent IRC timeout by pinging BanchoBot periodically ────
+
+function startKeepalive() {
+	stopKeepalive();
+	keepaliveTimer = setInterval(async () => {
+		try {
+			if (client?.isConnected?.()) {
+				// Send a silent PING via raw IRC to keep the connection alive.
+				// bancho.js exposes the underlying IRC socket for raw writes,
+				// but the simplest approach is just sending a stats request to BanchoBot.
+				// This generates minimal traffic but keeps TCP alive.
+				const banchoBot = client.getUser('BanchoBot');
+				if (banchoBot) {
+					// WHOIS is lightweight and doesn't produce visible output in channels
+					client.send?.(`PING :keepalive-${Date.now()}`);
+				}
+			}
+		} catch {
+			// Ignore keepalive errors — if connection is dead, the reconnect handler will fire
+		}
+	}, 30_000); // every 30 seconds
+}
+
+function stopKeepalive() {
+	if (keepaliveTimer) {
+		clearInterval(keepaliveTimer);
+		keepaliveTimer = null;
+	}
+}
+
 /**
  * Check if the IRC client is currently connected.
  */
@@ -89,7 +115,7 @@ export function isBanchoConnected(): boolean {
 }
 
 /**
- * Check if we're in the middle of a reconnect (channels may be temporarily unavailable).
+ * Check if we're in the middle of a reconnect.
  */
 export function isBanchoReconnecting(): boolean {
 	return reconnecting;
@@ -113,7 +139,7 @@ export class TournamentLobby {
 	/** Set to true if the channel couldn't be re-joined after reconnect */
 	public _dead = false;
 
-	// The message handler function (stored so we can re-attach after reconnect)
+	// Stored so we can re-attach after reconnect
 	private messageHandler: ((msg: any) => void) | null = null;
 
 	// Score collection
@@ -170,18 +196,14 @@ export class TournamentLobby {
 
 	/**
 	 * Re-join the channel after a reconnect.
-	 * Called internally by the reconnect handler.
 	 */
 	async _rejoinChannel(c: any) {
 		if (!this.channelName) return;
 
-		// Remove old listener if any
 		if (this.channel && this.messageHandler) {
 			try {
 				this.channel.removeListener('message', this.messageHandler);
-			} catch {
-				/* old channel may be completely dead */
-			}
+			} catch { /* old channel may be dead */ }
 		}
 
 		this.channel = c.getChannel(this.channelName);
@@ -193,13 +215,10 @@ export class TournamentLobby {
 	private attachMessageHandler() {
 		if (!this.channel) return;
 
-		// Remove previous handler if exists (prevent duplicates)
 		if (this.messageHandler) {
 			try {
 				this.channel.removeListener('message', this.messageHandler);
-			} catch {
-				/* ignore */
-			}
+			} catch { /* ignore */ }
 		}
 
 		this.messageHandler = (msg: any) => {
@@ -219,7 +238,6 @@ export class TournamentLobby {
 	// ── Message Parsing ─────────────────────────────────────────────────
 
 	private parseBanchoMessage(text: string) {
-		// Player score: "<user> finished playing (Score: 1,234,567, ... PASSED)"
 		const scoreMatch = text.match(
 			/^(.+?) finished playing \(Score: ([\d,]+).*?(PASSED|FAILED)\)/i
 		);
@@ -233,7 +251,6 @@ export class TournamentLobby {
 			return;
 		}
 
-		// Game finished
 		if (text.includes('The match has finished!')) {
 			console.log('[Bancho] Game finished. Scores:', this.collectedScores);
 			if (this.matchFinishedResolve) {
@@ -244,7 +261,6 @@ export class TournamentLobby {
 			return;
 		}
 
-		// Roll result: "Stan rolls 42 point(s)"
 		const rollMatch = text.match(/^(.+?) rolls (\d+) point\(s\)/);
 		if (rollMatch) {
 			const username = rollMatch[1].trim();
@@ -256,7 +272,6 @@ export class TournamentLobby {
 			return;
 		}
 
-		// All players ready
 		if (text.includes('All players are ready')) {
 			console.log('[Bancho] All players ready');
 			if (this.allReadyResolve) {
@@ -266,7 +281,6 @@ export class TournamentLobby {
 			return;
 		}
 
-		// Room closed (by Bancho or timeout)
 		if (text.includes('Closed the match')) {
 			console.log(`[Bancho] Room ${this.channelName} was closed`);
 			this._dead = true;
@@ -275,7 +289,6 @@ export class TournamentLobby {
 	}
 
 	private parsePlayerMessage(sender: string, text: string) {
-		// !pick NM1, !pick HD2, !pick TB, etc.
 		const pickMatch = text.match(/^!pick\s+([A-Z]{2})(\d*)/i);
 		if (pickMatch) {
 			const category = pickMatch[1].toUpperCase();
@@ -303,7 +316,6 @@ export class TournamentLobby {
 	async send(cmd: string) {
 		this.ensureAlive();
 
-		// If we're in the middle of reconnecting, wait a bit
 		if (reconnecting) {
 			console.log(`[Bancho] Waiting for reconnect before sending to ${this.channelName}...`);
 			const start = Date.now();
@@ -362,19 +374,12 @@ export class TournamentLobby {
 		await this.send(message);
 	}
 
-	/**
-	 * Check if this lobby is still usable.
-	 */
 	get isAlive(): boolean {
 		return !this._dead && this.channel != null;
 	}
 
 	// ── Async Waiters ───────────────────────────────────────────────────
 
-	/**
-	 * Wait for all players to click "Ready" in osu! client.
-	 * BanchoBot sends "All players are ready" when they do.
-	 */
 	waitForReady(timeoutMs = 180_000): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const t = setTimeout(() => {
@@ -388,9 +393,6 @@ export class TournamentLobby {
 		});
 	}
 
-	/**
-	 * Wait for "The match has finished!" and return all player scores.
-	 */
 	waitForScores(timeoutMs = 600_000): Promise<PlayerScore[]> {
 		this.collectedScores = [];
 		return new Promise((resolve, reject) => {
@@ -406,7 +408,7 @@ export class TournamentLobby {
 	}
 }
 
-// ── Active lobby registry (in-memory, per server instance) ──────────────
+// ── Active lobby registry ───────────────────────────────────────────────
 
 const lobbies = new Map<string, TournamentLobby>();
 
@@ -428,10 +430,6 @@ export function removeLobby(matchId: string) {
 	lobbies.delete(matchId);
 }
 
-/**
- * Get count of active (non-dead) lobbies.
- * Useful for checking against the 4-lobby limit for non-bot accounts.
- */
 export function getActiveLobbyCount(): number {
 	let count = 0;
 	for (const [id, lobby] of lobbies.entries()) {
@@ -444,9 +442,6 @@ export function getActiveLobbyCount(): number {
 	return count;
 }
 
-/**
- * Close all active lobbies. Useful for graceful shutdown.
- */
 export async function closeAllLobbies() {
 	console.log(`[Bancho] Closing all ${lobbies.size} active lobbies...`);
 	for (const [matchId, lobby] of lobbies.entries()) {
