@@ -1,0 +1,44 @@
+# docker-compose.yml
+# Production deployment: SvelteKit app + PostgreSQL
+# Usage: docker compose up -d
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vash
+      POSTGRES_USER: vash
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_in_production}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432" # Only accessible from host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vash -d vash"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000" # Only accessible from host (nginx proxies)
+    environment:
+      DATABASE_URL: postgresql://vash:${DB_PASSWORD:-changeme_in_production}@db:5432/vash
+      ORIGIN: ${ORIGIN:-https://vash.yourdomain.com}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      OSU_CLIENT_ID: ${OSU_CLIENT_ID}
+      OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
+      OSU_IRC_USERNAME: ${OSU_IRC_USERNAME}
+      OSU_IRC_PASSWORD: ${OSU_IRC_PASSWORD}
+      NODE_ENV: production
+    env_file:
+      - .env
+
+volumes:
+  pgdata:
