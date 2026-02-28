@@ -54,6 +54,7 @@
 		"vitest-browser-svelte": "^2.0.2"
 	},
 	"dependencies": {
+		"bancho.js": "^0.12.3",
 		"postgres": "^3.4.8"
 	}
 }

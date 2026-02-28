@@ -63,19 +63,18 @@ export const actions: Actions = {
 		return { error: 'Beatmap ID and category are required' };
 	}
 
-    // Parse URL if needed
-    const urlMatch = beatmapId.match(/beatmaps\/(\d+)/);
-    const setMatch = beatmapId.match(/beatmapsets\/\d+#\w+\/(\d+)/);
-    if (urlMatch) beatmapId = urlMatch[1];
-    else if (setMatch) beatmapId = setMatch[1];
+	const urlMatch = beatmapId.match(/beatmaps\/(\d+)/);
+	const setMatch = beatmapId.match(/beatmapsets\/\d+#\w+\/(\d+)/);
+	if (urlMatch) beatmapId = urlMatch[1];
+	else if (setMatch) beatmapId = setMatch[1];
 
-	// Strip non-numeric
 	if (!/^\d+$/.test(beatmapId)) {
 		return { error: 'Invalid beatmap ID' };
 	}
 
+	let beatmap;
 	try {
-		await getBeatmap(beatmapId);
+		beatmap = await getBeatmap(beatmapId);
 	} catch {
 		return { error: 'Beatmap not found on osu!' };
 	}
@@ -92,6 +91,7 @@ export const actions: Actions = {
 		beatmapId,
 		category,
 		orderInCategory: existing.length + 1,
+		starRating: beatmap.difficulty_rating,
 		mods: category === 'NM' || category === 'TB' || category === 'FM' ? [] : [category]
 	});
 

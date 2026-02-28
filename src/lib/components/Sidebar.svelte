@@ -24,7 +24,7 @@
 		>
 			V
 		</div>
-		<span class="font-700 text-base tracking-tight text-text-primary">VASH</span>
+		<span class="font-700 text-base tracking-tight text-text-primary">Vash Esports</span>
 	</a>
 
 	<!-- Nav -->

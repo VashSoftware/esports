@@ -10,6 +10,7 @@ import {
 	uniqueIndex,
 	real
 } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 export * from './auth.schema';
 
@@ -51,6 +52,7 @@ export const mappoolSlot = pgTable('mappool_slot', {
 	category: text('category').notNull(),
 	orderInCategory: integer('order_in_category').notNull(),
 	beatmapId: text('beatmap_id').notNull(),
+	starRating: real('star_rating'),
 	mods: text('mods').array().default([]).notNull()
 });
 
@@ -91,7 +93,7 @@ export const matchParticipant = pgTable(
 		pickOrder: integer('pick_order')
 	},
 	(t) => [
-		uniqueIndex('idx_mp_match_team').on(t.matchId, t.teamId),
+		index('idx_mp_match_team').on(t.matchId, t.teamId),
 		uniqueIndex('idx_mp_match_slot').on(t.matchId, t.slot),
 		index('idx_mp_match').on(t.matchId)
 	]
@@ -158,7 +160,33 @@ export const matchGameScore = pgTable(
 	(t) => [index('idx_mgs_game').on(t.matchGameId)]
 );
 
-import { relations } from 'drizzle-orm';
+// ── Match Queue ─────────────────────────────────────────────────────────
+export const matchQueue = pgTable(
+	'match_queue',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: text('user_id').notNull(),
+		teamId: uuid('team_id')
+			.notNull()
+			.references(() => team.id),
+		elo: integer('elo').default(1000).notNull(),
+		joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('idx_queue_user').on(t.userId),
+		index('idx_queue_elo').on(t.elo)
+	]
+);
+
+// ── Player ELO ──────────────────────────────────────────────────────────
+export const playerRating = pgTable('player_rating', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: text('user_id').notNull().unique(),
+	elo: integer('elo').default(1000).notNull(),
+	wins: integer('wins').default(0).notNull(),
+	losses: integer('losses').default(0).notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+});
 
 // ── Relations ───────────────────────────────────────────────────────────
 
@@ -209,4 +237,8 @@ export const matchGameScoreRelations = relations(matchGameScore, ({ one }) => ({
 		fields: [matchGameScore.playerId],
 		references: [matchParticipantPlayer.id]
 	})
+}));
+
+export const matchQueueRelations = relations(matchQueue, ({ one }) => ({
+	team: one(team, { fields: [matchQueue.teamId], references: [team.id] })
 }));
