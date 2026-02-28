@@ -7,7 +7,8 @@
 		{ href: '/', label: 'Dashboard', icon: '⌂' },
 		{ href: '/matches', label: 'Matches', icon: '⚔' },
 		{ href: '/mappools', label: 'Mappools', icon: '♫' },
-		{ href: '/teams', label: 'Teams', icon: '⚑' }
+		{ href: '/teams', label: 'Teams', icon: '⚑' },
+		{ href: '/leaderboard', label: 'Leaderboard', icon: '🏆' }
 	];
 
 	function isActive(href: string) {

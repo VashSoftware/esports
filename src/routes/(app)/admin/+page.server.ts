@@ -3,8 +3,7 @@ import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/auth.schema';
 import { playerRating } from '$lib/server/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { redirect, error } from '@sveltejs/kit';
-import { requireRole, setUserRole } from '$lib/server/permissions';
+import { requireRole, setUserRole, isRootAdmin } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -14,7 +13,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		orderBy: desc(user.createdAt)
 	});
 
-	// Fetch ratings for all users
 	const usersWithRatings = await Promise.all(
 		users.map(async (u) => {
 			const rating = await db.query.playerRating.findFirst({
@@ -29,12 +27,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 				createdAt: u.createdAt,
 				elo: rating?.elo ?? 1000,
 				wins: rating?.wins ?? 0,
-				losses: rating?.losses ?? 0
+				losses: rating?.losses ?? 0,
+				isRootAdmin: isRootAdmin(u.email)
 			};
 		})
 	);
 
-	return { users: usersWithRatings };
+	return {
+		users: usersWithRatings,
+		actorIsRootAdmin: isRootAdmin(locals.user!.email)
+	};
 };
 
 export const actions: Actions = {
@@ -50,12 +52,13 @@ export const actions: Actions = {
 			return { error: 'Invalid role' };
 		}
 
-		// Prevent demoting yourself
-		if (userId === locals.user!.id && role !== 'admin') {
-			return { error: "You can't demote yourself" };
+		try {
+			await setUserRole(locals, userId, role as any);
+		} catch (e: any) {
+			// setUserRole throws SvelteKit errors; extract the message
+			return { error: e.body?.message ?? e.message ?? 'Failed to update role' };
 		}
 
-		await setUserRole(userId, role as any);
 		return { success: true };
 	}
 };

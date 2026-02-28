@@ -5,10 +5,11 @@ import { redirect } from '@sveltejs/kit';
 import { desc } from 'drizzle-orm';
 import { createMatch } from '$lib/server/match/engine';
 import { initMatchLobby } from '$lib/server/match/orchestrator';
+import { requireAuth, requireRole, hasRole } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load = async ({ locals }: Parameters<PageServerLoad>[0]) => {
-	if (!locals.user) redirect(302, '/');
+	requireAuth(locals);
 
 	const matches = await db.query.match.findMany({
 		with: { participants: { with: { team: true } } },
@@ -25,12 +26,18 @@ export const load = async ({ locals }: Parameters<PageServerLoad>[0]) => {
 		orderBy: (m, { desc }) => [desc(m.createdAt)]
 	});
 
-	return { matches, teams, mappools };
+	return {
+		matches,
+		teams,
+		mappools,
+		canCreateMatch: hasRole(locals.user!.role, 'referee')
+	};
 };
 
 export const actions = {
 	createMatch: async ({ request, locals }: import('./$types').RequestEvent) => {
-		if (!locals.user) redirect(302, '/');
+		// Only referees and admins can create matches manually
+		requireRole(locals, 'referee', 'Only referees and admins can create matches');
 
 		const form = await request.formData();
 		const name = form.get('name')?.toString()?.trim() || 'Custom Match';
@@ -45,8 +52,6 @@ export const actions = {
 			return { error: 'All fields are required' };
 		}
 
-		// Same team is allowed for testing/dev
-
 		let result;
 		try {
 			result = await createMatch({
@@ -54,7 +59,7 @@ export const actions = {
 				config: { bestOf, teamSize: 1, scoringType: 'score' },
 				mappoolId,
 				teams: [team1Id, team2Id],
-				createdBy: locals.user.id
+				createdBy: locals.user!.id
 			});
 			console.log('[Matches] Created:', result.id);
 		} catch (e: any) {
@@ -62,7 +67,7 @@ export const actions = {
 			return { error: e.message };
 		}
 
-		// Create IRC lobby in background (don't block redirect)
+		// Create IRC lobby in background
 		initMatchLobby(result.id).catch((err) => {
 			console.error('[Matches] IRC lobby failed:', err.message);
 		});

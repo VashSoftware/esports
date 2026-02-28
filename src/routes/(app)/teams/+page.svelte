@@ -7,15 +7,17 @@
 	let creating = $state(false);
 	let expandedTeam = $state<string | null>(null);
 	let addingMemberTo = $state<string | null>(null);
+	let renamingTeam = $state<string | null>(null);
+	let renameValue = $state('');
 	let memberUsername = $state('');
 	let actionError = $state('');
 
-	const myTeams = $derived(data.teams.filter((t: any) =>
-		t.members.some((m: any) => m.userId === data.userId)
-	));
-	const otherTeams = $derived(data.teams.filter((t: any) =>
-		!t.members.some((m: any) => m.userId === data.userId)
-	));
+	const myTeams = $derived(
+		data.teams.filter((t: any) => t.members.some((m: any) => m.userId === data.userId))
+	);
+	const otherTeams = $derived(
+		data.teams.filter((t: any) => !t.members.some((m: any) => m.userId === data.userId))
+	);
 
 	function isOwner(t: any) {
 		return t.ownerId === data.userId;
@@ -89,7 +91,9 @@
 							{#if t.avatarUrl}
 								<img src={t.avatarUrl} alt="" class="h-10 w-10 rounded-full" />
 							{:else}
-								<div class="flex h-10 w-10 items-center justify-center rounded-full bg-surface-600 text-sm font-700 text-text-secondary">
+								<div
+									class="flex h-10 w-10 items-center justify-center rounded-full bg-surface-600 text-sm font-700 text-text-secondary"
+								>
 									{t.name.charAt(0).toUpperCase()}
 								</div>
 							{/if}
@@ -97,19 +101,81 @@
 								<div class="flex items-center gap-2">
 									<span class="text-sm font-600">{t.name}</span>
 									{#if t.isPersonal}
-										<span class="rounded bg-surface-600 px-1.5 py-0.5 text-[10px] font-500 text-text-secondary">solo</span>
+										<span
+											class="rounded bg-surface-600 px-1.5 py-0.5 text-[10px] font-500 text-text-secondary"
+											>solo</span
+										>
 									{/if}
 								</div>
 								<p class="mt-0.5 text-xs text-text-secondary">
 									{t.members.length} member{t.members.length !== 1 ? 's' : ''}
 								</p>
 							</div>
-							<span class="text-sm text-text-secondary transition-transform {expandedTeam === t.id ? 'rotate-90' : ''}">&rsaquo;</span>
+							<span
+								class="text-sm text-text-secondary transition-transform {expandedTeam === t.id
+									? 'rotate-90'
+									: ''}">&rsaquo;</span
+							>
 						</button>
 
 						<!-- Expanded: members -->
 						{#if expandedTeam === t.id}
 							<div class="border-t border-border px-4 pb-4 pt-3">
+								<!-- Rename team -->
+								{#if isOwner(t) && !t.isPersonal}
+									{#if renamingTeam === t.id}
+										<form
+											method="post"
+											action="?/rename"
+											use:enhance={() => {
+												actionError = '';
+												return async ({ result, update }) => {
+													if (result.type === 'success' && (result.data as any)?.success) {
+														renamingTeam = null;
+														await update();
+													} else if (
+														result.type === 'success' &&
+														(result.data as any)?.error
+													) {
+														actionError = (result.data as any).error;
+													}
+												};
+											}}
+											class="mb-3 flex items-center gap-2"
+										>
+											<input type="hidden" name="teamId" value={t.id} />
+											<input
+												type="text"
+												name="name"
+												bind:value={renameValue}
+												class="flex-1 rounded-md border border-accent bg-surface-700 px-3 py-1.5 text-sm text-text-primary focus:outline-none"
+												autofocus
+											/>
+											<button
+												type="submit"
+												class="rounded-md bg-accent px-3 py-1.5 text-xs font-600 text-surface-900 hover:bg-accent-hover"
+												>Save</button
+											>
+											<button
+												type="button"
+												onclick={() => (renamingTeam = null)}
+												class="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-600"
+												>Cancel</button
+											>
+										</form>
+									{:else}
+										<button
+											onclick={() => {
+												renamingTeam = t.id;
+												renameValue = t.name;
+											}}
+											class="mb-3 text-xs text-text-secondary transition-colors hover:text-accent"
+										>
+											✎ Rename team
+										</button>
+									{/if}
+								{/if}
+
 								<!-- Member list -->
 								<div class="flex flex-col gap-2">
 									{#each t.members as member}
@@ -122,11 +188,21 @@
 											<span class="flex-1 text-sm">{member.user?.name ?? 'Unknown'}</span>
 											<span class="text-xs text-text-secondary">{member.role}</span>
 											{#if isOwner(t) && member.userId !== data.userId}
-												<form method="post" action="?/removeMember" use:enhance={() => {
-													return async ({ update }) => { await update(); };
-												}}>
+												<form
+													method="post"
+													action="?/removeMember"
+													use:enhance={() => {
+														return async ({ update }) => {
+															await update();
+														};
+													}}
+												>
 													<input type="hidden" name="memberId" value={member.id} />
-													<button type="submit" class="text-xs text-red-400 opacity-50 transition-opacity hover:opacity-100">&times;</button>
+													<button
+														type="submit"
+														class="text-xs text-red-400 opacity-50 transition-opacity hover:opacity-100"
+														>&times;</button
+													>
 												</form>
 											{/if}
 										</div>
@@ -146,7 +222,10 @@
 														memberUsername = '';
 														addingMemberTo = null;
 														await update();
-													} else if (result.type === 'success' && (result.data as any)?.error) {
+													} else if (
+														result.type === 'success' &&
+														(result.data as any)?.error
+													) {
 														actionError = (result.data as any).error;
 													}
 												};
@@ -162,8 +241,17 @@
 												required
 												class="flex-1 rounded-md border border-border bg-surface-600 px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
 											/>
-											<button type="submit" class="rounded-md bg-accent px-3 py-1.5 text-xs font-600 text-surface-900 hover:bg-accent-hover">Add</button>
-											<button type="button" onclick={() => (addingMemberTo = null)} class="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-600">Cancel</button>
+											<button
+												type="submit"
+												class="rounded-md bg-accent px-3 py-1.5 text-xs font-600 text-surface-900 hover:bg-accent-hover"
+												>Add</button
+											>
+											<button
+												type="button"
+												onclick={() => (addingMemberTo = null)}
+												class="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-600"
+												>Cancel</button
+											>
 										</form>
 									{:else}
 										<button
@@ -181,7 +269,9 @@
 										<input type="hidden" name="teamId" value={t.id} />
 										<button
 											type="submit"
-											onclick={(e) => { if (!confirm(`Delete ${t.name}?`)) e.preventDefault() }}
+											onclick={(e) => {
+												if (!confirm(`Delete ${t.name}?`)) e.preventDefault();
+											}}
 											class="mt-3 text-xs text-red-400 opacity-50 transition-opacity hover:opacity-100"
 										>
 											Delete team
@@ -206,13 +296,17 @@
 						{#if t.avatarUrl}
 							<img src={t.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
 						{:else}
-							<div class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs font-700 text-text-secondary">
+							<div
+								class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs font-700 text-text-secondary"
+							>
 								{t.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
 						<div class="flex-1">
 							<span class="text-sm font-600">{t.name}</span>
-							<p class="text-xs text-text-secondary">{t.members.length} member{t.members.length !== 1 ? 's' : ''}</p>
+							<p class="text-xs text-text-secondary">
+								{t.members.length} member{t.members.length !== 1 ? 's' : ''}
+							</p>
 						</div>
 					</div>
 				{/each}
@@ -223,7 +317,9 @@
 	<!-- Empty state -->
 	{#if data.teams.length === 0}
 		<div class="mt-6 rounded-lg border border-dashed border-border py-12 text-center">
-			<p class="text-sm text-text-secondary">No teams yet. Your personal team is created when you sign in.</p>
+			<p class="text-sm text-text-secondary">
+				No teams yet. Your personal team is created when you sign in.
+			</p>
 		</div>
 	{/if}
 </div>

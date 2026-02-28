@@ -58,6 +58,10 @@
 	"/demo/better-auth/login": [
 		"src/routes/demo/better-auth/login/+page.server.ts"
 	],
+	"/(app)/leaderboard": [
+		"src/routes/(app)/leaderboard/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts"
+	],
 	"/login": [
 		"src/routes/login/+page.server.ts"
 	],
