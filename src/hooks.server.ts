@@ -1,3 +1,4 @@
+// src/hooks.server.ts
 import type { Handle } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { auth } from '$lib/server/auth';
@@ -6,6 +7,15 @@ import { db } from '$lib/server/db';
 import { user as userTable } from '$lib/server/db/auth.schema';
 import { eq } from 'drizzle-orm';
 import { ensureRootAdminRole } from '$lib/server/permissions';
+
+// ── Initialize the IRC DM handler once on server startup ──
+// This runs when the module is first imported (server boot).
+// The dynamic import prevents build-time issues if bancho.js isn't available.
+if (!building) {
+	import('$lib/server/bancho/dm-handler')
+		.then(({ initDMHandler }) => initDMHandler())
+		.catch((err) => console.warn('[Hooks] DM handler init skipped:', err.message));
+}
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });

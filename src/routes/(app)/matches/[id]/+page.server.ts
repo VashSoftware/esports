@@ -131,12 +131,11 @@ export const actions: Actions = {
 		if (!expectedPicker) return { error: 'Cannot determine picker' };
 
 		// ── Verify the logged-in user is on the expected picker's team ──
+		// No staff bypass here — even admins can't pick for another team
 		const isOnPickerTeam = expectedPicker.players.some(
 			(pl) => pl.userId === locals.user!.id
 		);
-		// Allow staff to pick on behalf of anyone
-		const isStaff = hasRole(locals.user!.role, 'referee');
-		if (!isOnPickerTeam && !isStaff) {
+		if (!isOnPickerTeam) {
 			return { error: "It's not your turn to pick" };
 		}
 

@@ -11,7 +11,14 @@ let connecting: Promise<void> | null = null;
 let reconnecting = false;
 let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
-async function getClient() {
+/** Global DM handler — set by dm-handler.ts on startup */
+let dmHandler: ((username: string, message: string) => void) | null = null;
+
+export function setDMHandler(handler: (username: string, message: string) => void) {
+	dmHandler = handler;
+}
+
+export async function getClient() {
 	if (client?.isConnected?.()) return client;
 	if (connecting) {
 		await connecting;
@@ -41,6 +48,15 @@ async function getClient() {
 
 	client.on('error', (err: any) => {
 		console.error('[Bancho] IRC error:', err?.message ?? err);
+	});
+
+	// ── DM listener: route private messages to dmHandler ──
+	client.on('PM', (msg: any) => {
+		const sender: string = msg.user?.ircUsername ?? '';
+		const text: string = msg.message ?? String(msg);
+		if (sender && sender !== 'BanchoBot' && dmHandler) {
+			dmHandler(sender, text);
+		}
 	});
 
 	// ── Reconnect: re-join all active lobby channels ──
@@ -77,27 +93,28 @@ async function getClient() {
 	return client;
 }
 
-// ── Keepalive: prevent IRC timeout by pinging BanchoBot periodically ────
+/**
+ * Send a DM to a user via IRC.
+ */
+export async function sendDM(username: string, message: string) {
+	const c = await getClient();
+	const user = c.getUser(username.replace(/ /g, '_'));
+	await user.sendMessage(message);
+}
+
+// ── Keepalive: prevent IRC timeout ──────────────────────────────────────
 
 function startKeepalive() {
 	stopKeepalive();
 	keepaliveTimer = setInterval(async () => {
 		try {
 			if (client?.isConnected?.()) {
-				// Send a silent PING via raw IRC to keep the connection alive.
-				// bancho.js exposes the underlying IRC socket for raw writes,
-				// but the simplest approach is just sending a stats request to BanchoBot.
-				// This generates minimal traffic but keeps TCP alive.
-				const banchoBot = client.getUser('BanchoBot');
-				if (banchoBot) {
-					// WHOIS is lightweight and doesn't produce visible output in channels
-					client.send?.(`PING :keepalive-${Date.now()}`);
-				}
+				client.send?.(`PING :keepalive-${Date.now()}`);
 			}
 		} catch {
-			// Ignore keepalive errors — if connection is dead, the reconnect handler will fire
+			// If connection is dead, the reconnect handler will fire
 		}
-	}, 30_000); // every 30 seconds
+	}, 30_000);
 }
 
 function stopKeepalive() {
@@ -107,16 +124,10 @@ function stopKeepalive() {
 	}
 }
 
-/**
- * Check if the IRC client is currently connected.
- */
 export function isBanchoConnected(): boolean {
 	return client?.isConnected?.() ?? false;
 }
 
-/**
- * Check if we're in the middle of a reconnect.
- */
 export function isBanchoReconnecting(): boolean {
 	return reconnecting;
 }
@@ -152,6 +163,8 @@ export class TournamentLobby {
 	// Event callbacks (set by orchestrator)
 	public onRollResult: ((username: string, value: number) => void) | null = null;
 	public onPickCommand: ((username: string, slotLabel: string) => void) | null = null;
+	/** Called when BanchoBot reports a player joined the lobby slot */
+	public onPlayerJoined: ((username: string) => void) | null = null;
 
 	/**
 	 * Create a new multiplayer lobby via !mp make.
@@ -194,9 +207,6 @@ export class TournamentLobby {
 		this.attachMessageHandler();
 	}
 
-	/**
-	 * Re-join the channel after a reconnect.
-	 */
 	async _rejoinChannel(c: any) {
 		if (!this.channelName) return;
 
@@ -238,6 +248,7 @@ export class TournamentLobby {
 	// ── Message Parsing ─────────────────────────────────────────────────
 
 	private parseBanchoMessage(text: string) {
+		// Player score: "<user> finished playing (Score: 1,234,567, ... PASSED)"
 		const scoreMatch = text.match(
 			/^(.+?) finished playing \(Score: ([\d,]+).*?(PASSED|FAILED)\)/i
 		);
@@ -251,6 +262,7 @@ export class TournamentLobby {
 			return;
 		}
 
+		// Game finished
 		if (text.includes('The match has finished!')) {
 			console.log('[Bancho] Game finished. Scores:', this.collectedScores);
 			if (this.matchFinishedResolve) {
@@ -261,6 +273,7 @@ export class TournamentLobby {
 			return;
 		}
 
+		// Roll result: "Stan rolls 42 point(s)"
 		const rollMatch = text.match(/^(.+?) rolls (\d+) point\(s\)/);
 		if (rollMatch) {
 			const username = rollMatch[1].trim();
@@ -272,6 +285,18 @@ export class TournamentLobby {
 			return;
 		}
 
+		// Player joined: "Stan joined in slot 1."
+		const joinMatch = text.match(/^(.+?) joined in slot \d+/);
+		if (joinMatch) {
+			const username = joinMatch[1].trim();
+			console.log(`[Bancho] Player joined: ${username}`);
+			if (this.onPlayerJoined) {
+				this.onPlayerJoined(username);
+			}
+			return;
+		}
+
+		// All players ready
 		if (text.includes('All players are ready')) {
 			console.log('[Bancho] All players ready');
 			if (this.allReadyResolve) {
@@ -281,6 +306,7 @@ export class TournamentLobby {
 			return;
 		}
 
+		// Room closed
 		if (text.includes('Closed the match')) {
 			console.log(`[Bancho] Room ${this.channelName} was closed`);
 			this._dead = true;
@@ -289,6 +315,7 @@ export class TournamentLobby {
 	}
 
 	private parsePlayerMessage(sender: string, text: string) {
+		// !pick NM1, !pick HD2, etc.
 		const pickMatch = text.match(/^!pick\s+([A-Z]{2})(\d*)/i);
 		if (pickMatch) {
 			const category = pickMatch[1].toUpperCase();

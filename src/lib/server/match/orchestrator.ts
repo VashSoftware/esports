@@ -79,25 +79,65 @@ export async function initMatchLobby(matchId: string) {
 		}
 	}
 
-	// Wire up IRC chat handlers for rolls and picks
+	// Wire up IRC chat handlers for rolls, picks, and player joins
 	setupChatHandlers(matchId, lobby);
 
-	// ── Send welcome AFTER invites with a delay so players have time to join ──
-	await sleep(5000);
-	await lobby.chat(
-		`Welcome! BO${config.bestOf}. Type !roll to decide pick order, or use the web UI.`
-	);
-
-	// LOBBY → ROLLING
+	// LOBBY → ROLLING (we'll greet players individually when they join)
 	await db.update(match).set({ state: MATCH_STATES.ROLLING }).where(eq(match.id, matchId));
 
 	return { osuMatchId: osuId, channel };
 }
 
 /**
- * Wire up IRC event callbacks so players can !roll and !pick from osu! chat.
+ * Wire up IRC event callbacks for the full match lifecycle.
+ *
+ * Design principle: players may join late and have NO chat history.
+ * Every phase transition message should give enough context to know what to do.
+ * We also greet each player individually when they join, telling them the current state.
  */
 function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
+
+	// ── Welcome players when they JOIN the channel ──────────────────────
+	// This is the key fix: osu! doesn't show chat history, so players
+	// only see messages sent AFTER they join. We greet each one individually.
+	lobby.onPlayerJoined = async (username: string) => {
+		try {
+			const m = await getMatchFull(matchId);
+			const config = m.config as MatchConfig;
+
+			if (m.state === MATCH_STATES.ROLLING) {
+				// Tell them what's happening and what they need to do
+				const unrolled = m.participants.filter((p) => p.rollValue === null);
+				if (unrolled.length > 0) {
+					await sleep(1000); // small delay so they see it after join message
+					await lobby.chat(
+						`Welcome ${username}! This is a BO${config.bestOf} match. ` +
+						`Type !roll to decide pick order.`
+					);
+				} else {
+					await lobby.chat(`Welcome ${username}! Waiting for rolls to finish...`);
+				}
+			} else if (m.state === MATCH_STATES.PICKING) {
+				const sorted = [...m.participants].sort(
+					(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
+				);
+				const nextIdx = m.games.length % sorted.length;
+				const picker = sorted[nextIdx];
+				const score = m.participants.map((p) => `${p.team.name}: ${p.score}`).join(' | ');
+				await sleep(1000);
+				await lobby.chat(
+					`Welcome back ${username}! Score: ${score}. ` +
+					`${picker?.team.name}'s turn to pick. Use !pick <slot> (e.g. !pick NM1).`
+				);
+			} else if (m.state === MATCH_STATES.PLAYING) {
+				await sleep(1000);
+				await lobby.chat(`Welcome back ${username}! A game is in progress — ready up when it finishes.`);
+			}
+		} catch (err: any) {
+			console.error('[Orchestrator] Player join handler error:', err.message);
+		}
+	};
+
 	// ── Handle !roll from IRC ───────────────────────────────────────────
 	lobby.onRollResult = async (username: string, value: number) => {
 		try {
@@ -107,7 +147,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				return;
 			}
 
-			let targetParticipant: { id: string; rollValue: number | null } | null = null;
+			let targetParticipant: { id: string; rollValue: number | null; team: any } | null = null;
 
 			for (const p of m.participants) {
 				for (const pl of p.players) {
@@ -133,13 +173,24 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			await submitRoll(matchId, targetParticipant.id, value);
 			console.log(`[Orchestrator] IRC roll: ${username} = ${value}`);
 
+			// Check if all rolled → announce pick order
 			const updated = await getMatchFull(matchId);
+			const remaining = updated.participants.filter((p) => p.rollValue === null);
+
 			if (updated.state === MATCH_STATES.PICKING) {
 				const sorted = [...updated.participants].sort(
 					(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 				);
+				await sleep(500);
 				await lobby.chat(
-					`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
+					`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
+					`Use !pick <slot> (e.g. !pick NM1).`
+				);
+			} else if (remaining.length > 0) {
+				// Tell the other player they still need to roll
+				await lobby.chat(
+					`${targetParticipant.team?.name ?? username} rolled ${value}. ` +
+					`Waiting for ${remaining.map((p) => p.team.name).join(', ')} to !roll.`
 				);
 			}
 		} catch (err: any) {
@@ -187,7 +238,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			}
 
 			if (!isPickerTurn) {
-				await lobby.chat(`${username}: It's not your turn to pick.`);
+				await lobby.chat(`${username}: It's ${expectedPicker?.team.name}'s turn to pick.`);
 				return;
 			}
 
@@ -253,17 +304,24 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	if (!game) throw new Error('Game not found');
 
 	const slot = game.slot;
+	const m = await getMatchFull(matchId);
+	const config = m.config as MatchConfig;
+	const score = m.participants.map((p) => `${p.team.name} ${p.score}`).join(' - ');
 
+	// Set beatmap
 	await lobby.setMap(slot.beatmapId);
 	await sleep(1000);
 
+	// Set mods
 	await lobby.setMods(slot.mods);
 	await sleep(500);
 
+	// Announce with context: what map, current score, what to do
 	await lobby.chat(
-		`Playing ${slot.category}${slot.orderInCategory}. Ready up! (Game starts when all players are ready)`
+		`[${score}] Now playing ${slot.category}${slot.orderInCategory}. Please ready up!`
 	);
 
+	// Wait for all players to ready up in osu!, then start
 	try {
 		await lobby.waitForReady();
 		await lobby.chat('All ready — starting in 5s!');
@@ -271,11 +329,12 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	} catch (err: any) {
 		console.warn('[Orchestrator] Ready timeout:', err.message);
 		try {
-			await lobby.chat('Ready timed out. Use the web UI to force start, or ready up!');
+			await lobby.chat('Timed out waiting for ready. Ready up and the game will start, or an admin can force start from the web UI.');
 		} catch { /* lobby may be dead */ }
 		return;
 	}
 
+	// Non-blocking: wait for scores then process
 	collectScores(matchId, matchGameId, lobby).catch((err) =>
 		console.error('[Orchestrator] Score collection failed:', err)
 	);
@@ -294,11 +353,13 @@ export async function forceStartGame(matchId: string) {
 
 /**
  * Background task: waits for IRC scores, writes them to DB, advances match state.
+ * Announces results clearly in chat.
  */
 async function collectScores(matchId: string, matchGameId: string, lobby: TournamentLobby) {
 	const ircScores = await lobby.waitForScores();
 	console.log(`[Orchestrator] Scores for game ${matchGameId}:`, ircScores);
 
+	// Map IRC usernames → matchParticipantPlayer IDs
 	const m = await getMatchFull(matchId);
 	const scores: { playerId: string; score: number; passed: boolean }[] = [];
 
@@ -322,24 +383,53 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 
 	await submitGameScores(matchGameId, scores);
 
+	// ── Announce results clearly ──
 	const updated = await getMatchFull(matchId);
+	const config = updated.config as MatchConfig;
+	const winsNeeded = Math.ceil(config.bestOf / 2);
+
+	// Build score announcement: "Zigzy 808,050 vs Stan 3,418 — Zigzy wins!"
+	const game = updated.games.find((g) => g.id === matchGameId);
+	if (game && game.winnerParticipantId) {
+		const winner = updated.participants.find((p) => p.id === game.winnerParticipantId);
+
+		// Individual player scores
+		const scoreLines = ircScores
+			.map((s) => `${s.username}: ${s.score.toLocaleString()}`)
+			.join(' vs ');
+
+		await sleep(500);
+		try {
+			await lobby.chat(`${scoreLines} — ${winner?.team.name ?? '?'} wins the point!`);
+		} catch { /* ignore */ }
+	}
+
+	// Match score line
+	const matchScore = updated.participants
+		.map((p) => `${p.team.name} ${p.score}`)
+		.join(' - ');
+
 	if (updated.state === MATCH_STATES.FINISHED) {
 		const winner = updated.participants.find((p) => p.teamId === updated.winnerId);
 		try {
-			await lobby.chat(`GG! ${winner?.team.name ?? '?'} wins the match!`);
+			await sleep(1000);
+			await lobby.chat(`GG! ${winner?.team.name ?? '?'} wins the match! Final: ${matchScore}`);
 			await sleep(5000);
 			await lobby.close();
 		} catch { /* lobby may already be closed */ }
 		removeLobby(matchId);
 	} else {
+		// Announce next picker with current score
 		const sorted = [...updated.participants].sort(
 			(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 		);
 		const nextIdx = updated.games.length % sorted.length;
 		const nextPicker = sorted[nextIdx];
 		try {
+			await sleep(1000);
 			await lobby.chat(
-				`${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (e.g. !pick HD1) or pick in web UI.`
+				`Score: ${matchScore} (first to ${winsNeeded}). ` +
+				`${nextPicker?.team.name}'s turn to pick. Use !pick <slot>.`
 			);
 		} catch { /* lobby may be dead */ }
 	}
