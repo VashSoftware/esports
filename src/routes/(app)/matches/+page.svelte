@@ -2,187 +2,272 @@
 	import { enhance } from '$app/forms';
 
 	let { data } = $props();
-	let creating = $state(false);
+
+	let showCreate = $state(false);
 	let createError = $state('');
 
-	function stateColor(state: string) {
-		const colors: Record<string, string> = {
-			CREATED: 'border-border text-text-secondary',
-			LOBBY: 'border-yellow-500/30 text-yellow-400',
-			ROLLING: 'border-yellow-500/30 text-yellow-400',
-			PICKING: 'border-blue-500/30 text-blue-400',
-			PLAYING: 'border-green-500/30 text-green-400',
-			FINISHED: 'border-border text-text-secondary',
-			CANCELLED: 'border-red-500/30 text-red-400'
-		};
-		return colors[state] ?? 'border-border text-text-secondary';
+	const stateConfig: Record<string, { label: string; color: string; dot?: string }> = {
+		CREATED: { label: 'Created', color: 'text-text-secondary border-border' },
+		LOBBY: { label: 'In Lobby', color: 'text-yellow-400 border-yellow-500/30' },
+		ROLLING: { label: 'Rolling', color: 'text-yellow-400 border-yellow-500/30', dot: 'bg-yellow-400' },
+		PICKING: { label: 'Picking', color: 'text-blue-400 border-blue-500/30', dot: 'bg-blue-400' },
+		PLAYING: { label: 'Live', color: 'text-green-400 border-green-500/30', dot: 'bg-green-400' },
+		FINISHED: { label: 'Finished', color: 'text-text-secondary border-border' },
+		CANCELLED: { label: 'Cancelled', color: 'text-red-400 border-red-500/30' }
+	};
+
+	const liveStates = ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'];
+
+	const liveMatches = $derived(data.matches.filter((m: any) => liveStates.includes(m.state)));
+	const recentMatches = $derived(data.matches.filter((m: any) => !liveStates.includes(m.state)));
+
+	function teamDisplay(m: any) {
+		const p1 = m.participants[0];
+		const p2 = m.participants[1];
+		return { p1, p2 };
 	}
 
-	function poolLabel(pool: { name: string; slots: { starRating: number | null }[] }) {
-		if (pool.slots.length === 0) return pool.name;
-		const avg = pool.slots.reduce((s, sl) => s + (sl.starRating ?? 0), 0) / pool.slots.length;
-		return `${pool.name} (★${avg.toFixed(1)}, ${pool.slots.length} maps)`;
+	function timeAgo(date: string | Date) {
+		const d = new Date(date);
+		const diff = Date.now() - d.getTime();
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'just now';
+		if (mins < 60) return `${mins}m ago`;
+		const hours = Math.floor(mins / 60);
+		if (hours < 24) return `${hours}h ago`;
+		const days = Math.floor(hours / 24);
+		return `${days}d ago`;
 	}
 </script>
 
-<div class="mx-auto max-w-4xl">
+<div class="mx-auto max-w-5xl">
+	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-700 tracking-tight">Matches</h1>
-			<p class="mt-1 text-sm text-text-secondary">All matches</p>
+			<p class="mt-1 text-sm text-text-secondary">
+				{data.matches.length} match{data.matches.length !== 1 ? 'es' : ''}
+				{#if liveMatches.length > 0}
+					&middot; <span class="text-green-400">{liveMatches.length} live</span>
+				{/if}
+			</p>
 		</div>
 		<button
-			onclick={() => (creating = !creating)}
+			onclick={() => (showCreate = !showCreate)}
 			class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
 		>
-			{creating ? 'Cancel' : 'New Match'}
+			{showCreate ? 'Cancel' : 'New Match'}
 		</button>
 	</div>
 
-	<!-- Create Match Form -->
-	{#if creating}
+	<!-- Create Match Modal -->
+	{#if showCreate}
 		<form
 			method="post"
 			action="?/createMatch"
-            use:enhance={() => {
-                createError = '';
-                return async ({ result, update }) => {
-                    if (result.type === 'failure') {
-                        createError = (result.data as { error?: string })?.error ?? 'Failed to create match';
-                    } else {
-                        await update();
-                    }
-                };
-            }}
-			class="mt-4 rounded-lg border border-border bg-surface-800 p-5"
+			use:enhance={() => {
+				createError = '';
+				return async ({ result }) => {
+					if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
+						createError = (result.data as any)?.error ?? 'Failed to create match';
+					}
+				};
+			}}
+			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
 		>
 			<h2 class="text-sm font-600">Create Match</h2>
 
-            <div class="mt-4 grid grid-cols-2 gap-4">
-            <div>
-                <label for="match-name" class="text-xs text-text-secondary">Match Name</label>
-                <input
-                    id="match-name"
-                    type="text"
-                    name="name"
-                    placeholder="e.g. Grand Finals"
-                    class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
-                />
-            </div>
-
-            <div>
-                <label for="best-of" class="text-xs text-text-secondary">Best Of</label>
-                <select
-                    id="best-of"
-                    name="bestOf"
-                    class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-                >
-                    <option value="3">Best of 3</option>
-                    <option value="5">Best of 5</option>
-                    <option value="7" selected>Best of 7</option>
-                    <option value="9">Best of 9</option>
-                    <option value="11">Best of 11</option>
-                </select>
-            </div>
-
-            <div>
-                <label for="team1" class="text-xs text-text-secondary">Team 1</label>
-                <select
-                    id="team1"
-                    name="team1"
-                    required
-                    class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-                >
-                    <option value="">Select team...</option>
-                    {#each data.teams as t}
-                        <option value={t.id}>
-                            {t.name}{t.isPersonal ? ' (personal)' : ''}
-                        </option>
-                    {/each}
-                </select>
-            </div>
-
-            <div>
-                <label for="team2" class="text-xs text-text-secondary">Team 2</label>
-                <select
-                    id="team2"
-                    name="team2"
-                    required
-                    class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-                >
-                    <option value="">Select team...</option>
-                    {#each data.teams as t}
-                        <option value={t.id}>
-                            {t.name}{t.isPersonal ? ' (personal)' : ''}
-                        </option>
-                    {/each}
-                </select>
-            </div>
-
-            <div class="col-span-2">
-                <label for="mappool" class="text-xs text-text-secondary">Mappool</label>
-                <select
-                    id="mappool"
-                    name="mappool"
-                    required
-                    class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
-                >
-                    <option value="">Select mappool...</option>
-                    {#each data.mappools as pool}
-                        <option value={pool.id}>{poolLabel(pool)}</option>
-                    {/each}
-                </select>
-            </div>
-        </div>
-
 			{#if createError}
-				<p class="mt-3 text-sm text-red-400">{createError}</p>
+				<p class="mt-2 text-sm text-red-400">{createError}</p>
 			{/if}
 
-			<button
-				type="submit"
-				class="mt-4 rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
-			>
-				Create Match
-			</button>
+			<div class="mt-4 grid grid-cols-2 gap-4">
+				<div>
+					<label for="name" class="text-xs font-500 text-text-secondary">Match Name</label>
+					<input
+						type="text"
+						id="name"
+						name="name"
+						placeholder="e.g. Semifinals M1"
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
+					/>
+				</div>
+
+				<div>
+					<label for="bestOf" class="text-xs font-500 text-text-secondary">Best Of</label>
+					<select
+						id="bestOf"
+						name="bestOf"
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+					>
+						{#each [3, 5, 7, 9, 11, 13] as n}
+							<option value={n} selected={n === 7}>BO{n} (first to {Math.ceil(n / 2)})</option>
+						{/each}
+					</select>
+				</div>
+
+				<div>
+					<label for="team1" class="text-xs font-500 text-text-secondary">Team 1</label>
+					<select
+						id="team1"
+						name="team1"
+						required
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+					>
+						<option value="">Select team...</option>
+						{#each data.teams as t}
+							<option value={t.id}>{t.name}{t.isPersonal ? ' (solo)' : ''}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div>
+					<label for="team2" class="text-xs font-500 text-text-secondary">Team 2</label>
+					<select
+						id="team2"
+						name="team2"
+						required
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+					>
+						<option value="">Select team...</option>
+						{#each data.teams as t}
+							<option value={t.id}>{t.name}{t.isPersonal ? ' (solo)' : ''}</option>
+						{/each}
+					</select>
+				</div>
+
+				<div class="col-span-2">
+					<label for="mappool" class="text-xs font-500 text-text-secondary">Mappool</label>
+					<select
+						id="mappool"
+						name="mappool"
+						required
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+					>
+						<option value="">Select mappool...</option>
+						{#each data.mappools as p}
+							<option value={p.id}>{p.name} ({p.slots.length} maps)</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+
+			<div class="mt-4 flex justify-end">
+				<button
+					type="submit"
+					class="rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+				>
+					Create &amp; Start
+				</button>
+			</div>
 		</form>
 	{/if}
 
-	<!-- Match List -->
-	<div class="mt-6 flex flex-col gap-2">
-		{#each data.matches as m}
-			{@const p1 = m.participants[0]}
-			{@const p2 = m.participants[1]}
-<a
-
-				href="/matches/{m.id}"
-				class="flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-4 transition-colors hover:border-accent/30 hover:bg-surface-700"
-			>
-				<div class="min-w-0 flex-1">
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-600">{m.name}</span>
-						<span class="rounded border px-2 py-0.5 text-xs font-600 {stateColor(m.state)}">
-							{m.state}
-						</span>
-					</div>
-					<p class="mt-1 text-xs text-text-secondary">
-						{p1?.team.name ?? '?'} vs {p2?.team.name ?? '?'}
-						· {new Date(m.createdAt).toLocaleDateString()}
-					</p>
+	<!-- Live Matches -->
+{#if liveMatches.length > 0}
+		<div class="mt-6">
+			<h2 class="flex items-center gap-2 text-sm font-600">
+				<div class="relative h-2 w-2">
+					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
+					<div class="relative h-2 w-2 rounded-full bg-green-400"></div>
 				</div>
+				Live Now
+			</h2>
+			<div class="mt-3 flex flex-col gap-2">
+				{#each liveMatches as m}
+					{@const { p1, p2 } = teamDisplay(m)}
+					{@const sc = stateConfig[m.state]}
+					<a
+						href="/matches/{m.id}"
+						class="group flex items-center gap-4 rounded-lg border border-green-500/20 bg-surface-800 p-4 transition-all hover:border-green-500/40 hover:bg-surface-700"
+					>
+						<div class="flex flex-1 items-center gap-3">
+							{#if p1?.team.avatarUrl}
+								<img src={p1.team.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
+							{/if}
+							<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
+						</div>
 
-				{#if p1 && p2}
-					<div class="flex items-center gap-1 font-mono text-lg font-700 tabular-nums">
-						<span>{p1.score}</span>
-						<span class="text-text-secondary">-</span>
-						<span>{p2.score}</span>
+						<div class="flex items-center gap-3">
+							<span class="text-xl font-800 tabular-nums">{p1?.score ?? 0}</span>
+							<span class="text-xs font-600 text-text-secondary">vs</span>
+							<span class="text-xl font-800 tabular-nums">{p2?.score ?? 0}</span>
+						</div>
+
+						<div class="flex flex-1 items-center justify-end gap-3">
+							<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
+							{#if p2?.team.avatarUrl}
+								<img src={p2.team.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
+							{/if}
+						</div>
+
+						<span class="flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}">
+							{#if sc?.dot}
+								<span class="h-1.5 w-1.5 rounded-full {sc.dot}"></span>
+							{/if}
+							{sc?.label ?? m.state}
+						</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- All Matches -->
+	<div class="mt-6">
+		{#if liveMatches.length > 0}
+			<h2 class="text-sm font-600 text-text-secondary">Past Matches</h2>
+		{/if}
+		<div class="mt-3 flex flex-col gap-2">
+			{#each recentMatches as m}
+				{@const { p1, p2 } = teamDisplay(m)}
+				{@const config = m.config as { bestOf: number }}
+				{@const sc = stateConfig[m.state]}
+				<a
+					href="/matches/{m.id}"
+					class="group flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/30 hover:bg-surface-700"
+				>
+					<!-- Match info -->
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
+							<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
+							{#if m.state === 'FINISHED'}
+								<span class="text-xs font-700 tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p1?.score ?? 0}</span>
+								<span class="text-xs text-text-secondary">-</span>
+								<span class="text-xs font-700 tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p2?.score ?? 0}</span>
+							{:else}
+								<span class="text-xs text-text-secondary">vs</span>
+							{/if}
+							<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
+						</div>
+						<p class="mt-0.5 text-xs text-text-secondary">
+							{m.name ? `${m.name} · ` : ''}BO{config.bestOf}
+							{#if m.finishedAt}
+								&middot; {timeAgo(m.finishedAt)}
+							{:else if m.createdAt}
+								&middot; {timeAgo(m.createdAt)}
+							{/if}
+						</p>
+					</div>
+
+					<!-- Winner indicator -->
+					{#if m.state === 'FINISHED' && m.winnerId}
+						{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
+						<span class="text-xs font-500 text-green-400">🏆 {winner?.team.name}</span>
+					{/if}
+
+					<!-- State -->
+					<span class="rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}">
+						{sc?.label ?? m.state}
+					</span>
+				</a>
+			{:else}
+				{#if liveMatches.length === 0}
+					<div class="rounded-lg border border-dashed border-border py-12 text-center">
+						<p class="text-sm text-text-secondary">No matches yet. Create one to get started.</p>
 					</div>
 				{/if}
-			</a>
-		{:else}
-			<div class="rounded-lg border border-dashed border-border py-12 text-center">
-				<p class="text-sm text-text-secondary">No matches yet</p>
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
 </div>

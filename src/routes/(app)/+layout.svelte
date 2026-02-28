@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './layout.css';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Header from '$lib/components/Header.svelte';
 
