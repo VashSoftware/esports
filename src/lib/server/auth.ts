@@ -5,12 +5,36 @@ import { env } from '$env/dynamic/private';
 import { getRequestEvent } from '$app/server';
 import { db } from '$lib/server/db';
 import { genericOAuth } from 'better-auth/plugins';
+import { team, teamMember } from './db/schema';
 
 export const auth = betterAuth({
 	baseURL: env.ORIGIN,
 	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: 'pg' }),
 	emailAndPassword: { enabled: true },
+	databaseHooks: {
+		user: {
+			create: {
+				after: async (user) => {
+					const [personalTeam] = await db
+						.insert(team)
+						.values({
+							name: user.name,
+							isPersonal: true,
+							ownerId: user.id,
+							avatarUrl: user.image
+						})
+						.returning();
+
+					await db.insert(teamMember).values({
+						teamId: personalTeam.id,
+						userId: user.id,
+						role: 'owner'
+					});
+				}
+			}
+		}
+	},
 	plugins: [
 		genericOAuth({
 			config: [
