@@ -1,3 +1,4 @@
+// src/routes/api/matches/[id]/pick/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { pickMap } from '$lib/server/match/engine';
 import type { RequestHandler } from './$types';
@@ -13,7 +14,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	try {
 		const game = await pickMap(params.id, participantId, mappoolSlotId);
 		return json(game);
-	} catch (e) {
+	} catch (e: any) {
 		error(400, e.message);
 	}
 };

@@ -67,9 +67,11 @@
 			action="?/createMatch"
 			use:enhance={() => {
 				createError = '';
-				return async ({ result }) => {
+				return async ({ result, update }) => {
 					if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
 						createError = (result.data as any)?.error ?? 'Failed to create match';
+					} else {
+						await update();
 					}
 				};
 			}}

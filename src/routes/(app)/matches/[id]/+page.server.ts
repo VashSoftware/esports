@@ -1,9 +1,13 @@
+import { user } from '$lib/server/db/schema';
+import { db } from '$lib/server/db';
 import { getMatchFull, submitRoll, pickMap, cancelMatch } from '$lib/server/match/engine';
 import { playPickedMap, closeLobby, forceStartGame } from '$lib/server/match/orchestrator';
 import { getLobby } from '$lib/server/bancho/client';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
 import type { PageServerLoad, Actions } from './$types';
+import { eq } from 'drizzle-orm';
+
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, '/');
@@ -41,6 +45,28 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
+	reinvite: async ({ params, locals }) => {
+		if (!locals.user) redirect(302, '/');
+
+		const lobby = getLobby(params.id);
+		if (!lobby) return { error: 'No active IRC lobby for this match' };
+
+		const m = await getMatchFull(params.id);
+
+		const invited: string[] = [];
+		for (const p of m.participants) {
+			for (const pl of p.players) {
+				const u = await db.query.user.findFirst({ where: eq(user.id, pl.userId) });
+				if (u?.name) {
+					await lobby.invite(u.name);
+					invited.push(u.name);
+				}
+			}
+		}
+
+		return { reinvited: invited };
+	},
+
 	roll: async ({ params, locals }) => {
 		if (!locals.user) redirect(302, '/');
 

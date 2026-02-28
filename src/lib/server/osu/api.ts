@@ -1,12 +1,13 @@
+// src/lib/server/osu/api.ts
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { and, eq } from 'drizzle-orm';
 import { account } from '$lib/server/db/auth.schema';
+import { getCached, setCache } from './cache';
 
 let clientToken: string | null = null;
 let clientTokenExpiresAt = 0;
 
-// Client credentials token (no user needed, for public endpoints)
 async function getClientToken(): Promise<string> {
 	if (clientToken && Date.now() < clientTokenExpiresAt - 60_000) {
 		return clientToken;
@@ -36,7 +37,6 @@ async function getClientToken(): Promise<string> {
 	return clientToken!;
 }
 
-// Get a user's access token (for user-scoped endpoints)
 async function getUserToken(userId: string): Promise<string | null> {
 	const acc = await db.query.account.findFirst({
 		where: and(eq(account.userId, userId), eq(account.providerId, 'osu'))
@@ -44,7 +44,6 @@ async function getUserToken(userId: string): Promise<string | null> {
 
 	if (!acc?.accessToken) return null;
 
-	// Check if expired and refresh if needed
 	if (acc.accessTokenExpiresAt && acc.accessTokenExpiresAt < new Date()) {
 		if (!acc.refreshToken) return null;
 
@@ -94,18 +93,36 @@ async function osuFetch(path: string, token?: string) {
 	return res.json();
 }
 
-// ── Public API ──────────────────────────────────────────────────────────
+// ── Public API (with caching) ───────────────────────────────────────────
 
 export async function getBeatmap(beatmapId: string | number) {
-	return osuFetch(`/beatmaps/${beatmapId}`);
+	const cacheKey = `beatmap:${beatmapId}`;
+	const cached = getCached(cacheKey);
+	if (cached) return cached;
+
+	const data = await osuFetch(`/beatmaps/${beatmapId}`);
+	setCache(cacheKey, data);
+	return data;
 }
 
 export async function getBeatmapset(beatmapsetId: string | number) {
-	return osuFetch(`/beatmapsets/${beatmapsetId}`);
+	const cacheKey = `beatmapset:${beatmapsetId}`;
+	const cached = getCached(cacheKey);
+	if (cached) return cached;
+
+	const data = await osuFetch(`/beatmapsets/${beatmapsetId}`);
+	setCache(cacheKey, data);
+	return data;
 }
 
 export async function getUser(userId: string | number) {
-	return osuFetch(`/users/${userId}`);
+	const cacheKey = `osu_user:${userId}`;
+	const cached = getCached(cacheKey);
+	if (cached) return cached;
+
+	const data = await osuFetch(`/users/${userId}`);
+	setCache(cacheKey, data, 5 * 60 * 1000); // 5 min for user data
+	return data;
 }
 
 export async function getUserScores(

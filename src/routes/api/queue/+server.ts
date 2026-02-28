@@ -1,8 +1,9 @@
+// src/routes/api/queue/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { joinQueue, leaveQueue, getQueueStatus } from '$lib/server/match/engine';
 import { db } from '$lib/server/db';
-import { team, teamMember } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { teamMember } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals }) => {
@@ -29,7 +30,7 @@ export const POST: RequestHandler = async ({ locals }) => {
 	try {
 		const result = await joinQueue(locals.user.id, personalTeam.id);
 		return json({ matched: !!result, match: result });
-	} catch (e) {
+	} catch (e: any) {
 		error(400, e.message);
 	}
 };

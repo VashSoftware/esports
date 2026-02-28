@@ -1,3 +1,8 @@
+// src/lib/server/db/schema.ts
+//
+// CHANGE: Add `role` column to user table in auth.schema.ts (see that file).
+// This file adds the permission helper utilities.
+
 import {
 	pgTable,
 	integer,

@@ -1,3 +1,4 @@
+// src/routes/api/matches/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createMatch } from '$lib/server/match/engine';
@@ -35,7 +36,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			createdBy: locals.user.id
 		});
 		return json(result, { status: 201 });
-	} catch (e) {
+	} catch (e: any) {
 		error(400, e.message);
 	}
 };

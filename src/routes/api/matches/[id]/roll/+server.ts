@@ -1,3 +1,4 @@
+// src/routes/api/matches/[id]/roll/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { submitRoll } from '$lib/server/match/engine';
 import type { RequestHandler } from './$types';
@@ -13,7 +14,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	try {
 		const m = await submitRoll(params.id, participantId, value);
 		return json(m);
-	} catch (e) {
+	} catch (e: any) {
 		error(400, e.message);
 	}
 };

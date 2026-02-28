@@ -1,3 +1,4 @@
+// src/lib/server/auth.ts
 import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
@@ -48,7 +49,8 @@ export const auth = betterAuth({
 					scopes: ['identify', 'public'],
 					pkce: false,
 					authentication: 'post',
-					redirectURI: 'http://localhost:5173/api/auth/oauth2/callback/osu',
+					// ── FIX: Use ORIGIN env var instead of hardcoded localhost ──
+					redirectURI: `${env.ORIGIN}/api/auth/oauth2/callback/osu`,
 					getToken: async ({ code, redirectURI }) => {
 						const res = await fetch('https://osu.ppy.sh/oauth/token', {
 							method: 'POST',
@@ -87,6 +89,6 @@ export const auth = betterAuth({
 				}
 			]
 		}),
-		sveltekitCookies(getRequestEvent) // make sure this is the last plugin in the array
+		sveltekitCookies(getRequestEvent) // must be last
 	]
 });

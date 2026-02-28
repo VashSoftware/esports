@@ -136,6 +136,27 @@
 		</div>
 	{/if}
 
+	<!-- Re-invite players -->
+	{#if ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'].includes(m.state)}
+		<div class="mt-3 flex justify-center">
+			<form method="post" action="?/reinvite" use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success' && (result.data as any)?.reinvited) {
+						// Brief visual feedback — just reload
+						await update();
+					}
+				};
+			}}>
+				<button
+					type="submit"
+					class="rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:border-accent/40 hover:text-accent"
+				>
+					📨 Re-invite players to lobby
+				</button>
+			</form>
+		</div>
+	{/if}
+
 	<!-- ROLLING MODAL -->
 	{#if m.state === 'ROLLING'}
 		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">

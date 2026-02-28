@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 
+	const user = $derived(page.data?.user);
+
 	const nav = [
 		{ href: '/', label: 'Dashboard', icon: '⌂' },
 		{ href: '/matches', label: 'Matches', icon: '⚔' },
@@ -12,6 +14,9 @@
 		if (href === '/') return page.url.pathname === '/';
 		return page.url.pathname.startsWith(href);
 	}
+
+	const isStaff = $derived(user?.role === 'referee' || user?.role === 'admin');
+	const isAdmin = $derived(user?.role === 'admin');
 </script>
 
 <aside
@@ -42,13 +47,34 @@
 				{item.label}
 			</a>
 		{/each}
+
+		{#if isAdmin}
+			<div class="mt-4 mb-1 px-3">
+				<p class="text-[10px] font-600 text-text-secondary uppercase tracking-widest">Staff</p>
+			</div>
+			<a
+				href="/admin"
+				class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors {isActive(
+					'/admin'
+				)
+					? 'bg-red-500/10 text-red-400'
+					: 'text-text-secondary hover:bg-surface-700 hover:text-text-primary'}"
+			>
+				<span class="text-base">⚡</span>
+				Admin
+			</a>
+		{/if}
 	</nav>
 
 	<!-- Bottom -->
 	<div class="border-t border-border p-3">
 		<a
 			href="/settings"
-			class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-700 hover:text-text-primary"
+			class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-700 hover:text-text-primary {isActive(
+				'/settings'
+			)
+				? 'bg-accent-dim text-accent'
+				: ''}"
 		>
 			<span class="text-base">⚙</span>
 			Settings
