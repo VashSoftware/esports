@@ -60,12 +60,12 @@ export const actions: Actions = {
 	},
 	signInSocial: async (event) => {
 		const formData = await event.request.formData();
-		const provider = formData.get('provider')?.toString() ?? 'github';
+		const provider = formData.get('provider')?.toString() ?? 'osu';
 		const callbackURL = formData.get('callbackURL')?.toString() ?? '/demo/better-auth';
 
 		const result = await auth.api.signInSocial({
 			body: {
-				provider: provider as 'github',
+				provider: provider as 'osu',
 				callbackURL
 			}
 		});
