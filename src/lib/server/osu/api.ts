@@ -133,4 +133,12 @@ export async function getUserScores(
 	return osuFetch(`/users/${userId}/scores/${type}?limit=${limit}`);
 }
 
+/**
+ * Fetch osu! match data (events + scores) for a multiplayer lobby.
+ * Returns events array which includes game events with per-player scores and statistics.
+ */
+export async function getOsuMatch(osuMatchId: number) {
+	return osuFetch(`/matches/${osuMatchId}`);
+}
+
 export { getUserToken, getClientToken };

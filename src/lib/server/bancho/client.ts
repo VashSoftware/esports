@@ -160,6 +160,11 @@ export class TournamentLobby {
 	// Ready tracking
 	private allReadyResolve: (() => void) | null = null;
 
+	// Lobby status tracking
+	public inLobby: Set<string> = new Set();
+	public readyPlayers: Set<string> = new Set();
+	public gameInProgress = false;
+
 	// Event callbacks (set by orchestrator)
 	public onRollResult: ((username: string, value: number) => void) | null = null;
 	public onPickCommand: ((username: string, slotLabel: string) => void) | null = null;
@@ -265,6 +270,8 @@ export class TournamentLobby {
 		// Game finished
 		if (text.includes('The match has finished!')) {
 			console.log('[Bancho] Game finished. Scores:', this.collectedScores);
+			this.gameInProgress = false;
+			this.readyPlayers.clear();
 			if (this.matchFinishedResolve) {
 				this.matchFinishedResolve([...this.collectedScores]);
 				this.matchFinishedResolve = null;
@@ -290,19 +297,53 @@ export class TournamentLobby {
 		if (joinMatch) {
 			const username = joinMatch[1].trim();
 			console.log(`[Bancho] Player joined: ${username}`);
+			this.inLobby.add(username);
+			this.readyPlayers.delete(username);
 			if (this.onPlayerJoined) {
 				this.onPlayerJoined(username);
 			}
 			return;
 		}
 
+		// Player left: "Stan left the game."
+		const leftMatch = text.match(/^(.+?) left the game\./);
+		if (leftMatch) {
+			const username = leftMatch[1].trim();
+			console.log(`[Bancho] Player left: ${username}`);
+			this.inLobby.delete(username);
+			this.readyPlayers.delete(username);
+			return;
+		}
+
+		// Player ready: "Stan is Ready."
+		const readyMatch = text.match(/^(.+?) is Ready\.?$/i);
+		if (readyMatch) {
+			this.readyPlayers.add(readyMatch[1].trim());
+			return;
+		}
+
+		// Player not ready: "Stan is not Ready."
+		const notReadyMatch = text.match(/^(.+?) is not Ready\.?$/i);
+		if (notReadyMatch) {
+			this.readyPlayers.delete(notReadyMatch[1].trim());
+			return;
+		}
+
 		// All players ready
 		if (text.includes('All players are ready')) {
 			console.log('[Bancho] All players ready');
+			for (const u of this.inLobby) this.readyPlayers.add(u);
 			if (this.allReadyResolve) {
 				this.allReadyResolve();
 				this.allReadyResolve = null;
 			}
+			return;
+		}
+
+		// Game started
+		if (text.includes('The match has started!')) {
+			this.gameInProgress = true;
+			this.readyPlayers.clear();
 			return;
 		}
 
@@ -455,6 +496,20 @@ export function setLobby(matchId: string, lobby: TournamentLobby) {
 
 export function removeLobby(matchId: string) {
 	lobbies.delete(matchId);
+}
+
+export function getLobbyStatus(matchId: string): {
+	inLobby: string[];
+	readyPlayers: string[];
+	gameInProgress: boolean;
+} | null {
+	const lobby = lobbies.get(matchId);
+	if (!lobby || lobby._dead) return null;
+	return {
+		inLobby: [...lobby.inLobby],
+		readyPlayers: [...lobby.readyPlayers],
+		gameInProgress: lobby.gameInProgress
+	};
 }
 
 export function getActiveLobbyCount(): number {

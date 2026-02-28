@@ -5,6 +5,8 @@
 	let { data } = $props();
 
 	let m = $derived(data.match);
+	let lobbyStatus = $derived(data.lobbyStatus);
+	let playerNames = $derived(data.playerNames);
 	let p1 = $derived(m.participants[0]);
 	let p2 = $derived(m.participants[1]);
 
@@ -228,24 +230,54 @@
 	{#if m.state === 'PLAYING'}
 		{@const currentGame = m.games[m.games.length - 1]}
 		{@const bm = currentGame ? data.beatmapCache[currentGame.slot?.beatmapId] : null}
-		<div class="mt-6 rounded-lg border border-green-500/30 bg-green-500/5 p-5 text-center">
+		<div class="mt-6 rounded-lg border border-green-500/30 bg-green-500/5 p-5">
 			<div class="flex items-center justify-center gap-2">
 				<div class="relative h-3 w-3">
 					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 					<div class="relative h-3 w-3 rounded-full bg-green-400"></div>
 				</div>
-				<span class="text-sm font-600 text-green-400">Now Playing</span>
+				<span class="text-sm font-600 text-green-400">
+					{lobbyStatus?.gameInProgress ? 'Playing' : 'Now Playing — Waiting for ready'}
+				</span>
 			</div>
 			{#if bm}
-				<p class="mt-2 text-sm">{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span></p>
-				<p class="mt-1 text-xs text-text-secondary">★{bm.starRating.toFixed(1)} &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}</p>
+				<p class="mt-2 text-center text-sm">{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span></p>
+				<p class="mt-1 text-center text-xs text-text-secondary">★{bm.starRating.toFixed(1)} &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}</p>
 			{/if}
-			<p class="mt-3 text-xs text-text-secondary animate-pulse">
-				Waiting for players to ready up &amp; play in osu!...
-			</p>
+
+			<!-- Per-player lobby status -->
+			{#if lobbyStatus}
+				<div class="mt-4 flex flex-col gap-2">
+					{#each m.participants as participant}
+						{#each participant.players as player}
+							{@const username = playerNames[player.userId]}
+							{@const inLobby = username && lobbyStatus.inLobby.includes(username)}
+							{@const isReady = username && lobbyStatus.readyPlayers.includes(username)}
+							<div class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs">
+								<span class="font-500">{username ?? player.userId}</span>
+								<span class="ml-auto flex items-center gap-1.5">
+									{#if lobbyStatus.gameInProgress}
+										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">Playing</span>
+									{:else if isReady}
+										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">Ready</span>
+									{:else if inLobby}
+										<span class="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-600 text-yellow-400">In Lobby</span>
+									{:else}
+										<span class="rounded bg-surface-700 px-1.5 py-0.5 text-[10px] font-600 text-text-secondary">Not in lobby</span>
+									{/if}
+								</span>
+							</div>
+						{/each}
+					{/each}
+				</div>
+			{:else}
+				<p class="mt-3 text-center text-xs text-text-secondary animate-pulse">
+					Waiting for players to ready up &amp; play in osu!...
+				</p>
+			{/if}
 
 			{#if data.isStaff}
-				<div class="mt-3">
+				<div class="mt-3 text-center">
 					<form method="post" action="?/forceStart" use:enhance={() => {
 						forceStarting = true;
 						return async ({ update }) => { forceStarting = false; await update(); };
@@ -428,22 +460,45 @@
 							</div>
 						</div>
 
-						{#if game.state === 'FINISHED' && p1 && p2}
-							{@const p1Score = game.scores.filter((s: any) => s.player?.participantId === p1.id).reduce((sum: number, s: any) => sum + s.score, 0)}
-							{@const p2Score = game.scores.filter((s: any) => s.player?.participantId === p2.id).reduce((sum: number, s: any) => sum + s.score, 0)}
-							<div class="flex items-center gap-2 font-mono text-sm tabular-nums">
-								<span class="{p1Score > p2Score ? 'font-700 text-green-400' : 'text-text-secondary'}">{p1Score.toLocaleString()}</span>
-								<span class="text-text-secondary">-</span>
-								<span class="{p2Score > p1Score ? 'font-700 text-green-400' : 'text-text-secondary'}">{p2Score.toLocaleString()}</span>
-							</div>
-						{:else if game.state === 'PLAYING'}
+						{#if game.state === 'PLAYING'}
 							<span class="text-xs text-green-400 animate-pulse">Live</span>
-						{/if}
-
-						{#if winnerTeam}
+						{:else if winnerTeam}
 							<span class="text-xs text-green-400">✓ {winnerTeam.name}</span>
 						{/if}
 					</div>
+
+					<!-- Per-player score breakdown -->
+					{#if game.state === 'FINISHED' && game.scores?.length > 0}
+						<div class="mt-1.5 flex flex-col gap-1">
+							{#each game.scores as s}
+								{@const username = playerNames[s.player?.userId]}
+								<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-surface-900 px-3 py-1.5 text-xs">
+									<span class="w-24 truncate font-500">{username ?? s.player?.userId ?? '?'}</span>
+									<span class="font-mono tabular-nums text-text-primary">{s.score.toLocaleString()}</span>
+									{#if s.accuracy > 0}
+										<span class="text-text-secondary">{(s.accuracy * 100).toFixed(2)}%</span>
+									{/if}
+									{#if s.maxCombo > 0}
+										<span class="text-text-secondary">{s.maxCombo}x</span>
+									{/if}
+									{#if s.count300 > 0 || s.count100 > 0 || s.countMiss >= 0}
+										<span class="text-text-secondary">
+											<span class="text-blue-400">{s.count300}</span>
+											/<span class="text-green-400">{s.count100}</span>
+											/<span class="text-yellow-400">{s.count50}</span>
+											/<span class="text-red-400">{s.countMiss}</span>
+										</span>
+									{/if}
+									{#if s.pp != null}
+										<span class="font-600 text-accent">{Math.round(s.pp)}pp</span>
+									{/if}
+									{#if !s.passed}
+										<span class="rounded bg-red-500/20 px-1 text-[10px] text-red-400">FAILED</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
 				{/each}
 			</div>
 		</div>
@@ -463,6 +518,26 @@
 				<p class="mt-2 text-xs text-text-secondary">
 					<a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a>
 				</p>
+			{/if}
+			{#if lobbyStatus}
+				<div class="mt-3 flex flex-col gap-1.5">
+					{#each m.participants as participant}
+						{#each participant.players as player}
+							{@const username = playerNames[player.userId]}
+							{@const inLobby = username && lobbyStatus.inLobby.includes(username)}
+							<div class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs">
+								<span class="font-500">{username ?? player.userId}</span>
+								<span class="ml-auto">
+									{#if inLobby}
+										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">In Lobby</span>
+									{:else}
+										<span class="rounded bg-surface-700 px-1.5 py-0.5 text-[10px] font-600 text-text-secondary">Not in lobby</span>
+									{/if}
+								</span>
+							</div>
+						{/each}
+					{/each}
+				</div>
 			{/if}
 			<div class="mt-3">
 				{@render reinviteButton()}

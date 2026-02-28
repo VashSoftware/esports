@@ -187,13 +187,17 @@
 					<p class="text-sm text-text-secondary">No scores recorded yet.</p>
 				</div>
 			{:else}
+				<div class="px-4 py-2.5 border-b border-border">
+					<p class="text-xs text-text-secondary">Ranked by pp (performance points) when available, then score</p>
+				</div>
 				<div
-					class="grid grid-cols-[auto_auto_1fr_auto_auto_auto] gap-4 border-b border-border px-4 py-3"
+					class="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] gap-3 border-b border-border px-4 py-3"
 				>
 					<span class="text-xs font-600 text-text-secondary">#</span>
 					<span class="text-xs font-600 text-text-secondary"></span>
 					<span class="text-xs font-600 text-text-secondary">Player</span>
 					<span class="text-xs font-600 text-text-secondary">Map</span>
+					<span class="text-xs font-600 text-accent">PP</span>
 					<span class="text-xs font-600 text-text-secondary">Score</span>
 					<span class="text-xs font-600 text-text-secondary">Acc</span>
 				</div>
@@ -201,7 +205,7 @@
 				{#each data.highScores as s}
 					{@const medal = rankBadge(s.rank)}
 					<div
-						class="grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-4 border-b border-border/50 px-4 py-3 last:border-b-0 {s.rank <=
+						class="grid grid-cols-[auto_auto_1fr_auto_auto_auto_auto] items-center gap-3 border-b border-border/50 px-4 py-3 last:border-b-0 {s.rank <=
 						3
 							? 'bg-accent/[0.02]'
 							: ''}"
@@ -233,6 +237,11 @@
 						<!-- Map slot -->
 						<span class="text-xs font-600 {catColors[s.mapCategory] ?? 'text-text-secondary'}">
 							{s.mapCategory}{s.mapOrder}
+						</span>
+
+						<!-- PP -->
+						<span class="text-sm font-700 tabular-nums {s.pp != null ? 'text-accent' : 'text-text-secondary/40'}">
+							{s.pp != null ? `${Math.round(s.pp)}pp` : '—'}
 						</span>
 
 						<!-- Score -->

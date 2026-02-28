@@ -160,7 +160,8 @@ export const matchGameScore = pgTable(
 		count50: integer('count_50').default(0).notNull(),
 		countMiss: integer('count_miss').default(0).notNull(),
 		mods: text('mods').array().default([]).notNull(),
-		passed: boolean('passed').default(false).notNull()
+		passed: boolean('passed').default(false).notNull(),
+		pp: real('pp')
 	},
 	(t) => [index('idx_mgs_game').on(t.matchGameId)]
 );

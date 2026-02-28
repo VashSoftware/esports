@@ -87,23 +87,34 @@ export const load: PageServerLoad = async () => {
 
 	const topTeams = teamsWithDetails.filter(Boolean);
 
-	// ── Recent high scores (individual map scores) ──
-	const recentHighScores = await db.query.matchGameScore.findMany({
-		orderBy: desc(matchGameScore.score),
-		limit: 15,
-		with: {
-			player: true,
-			game: {
-				with: {
-					slot: true,
-					match: true
-				}
-			}
-		}
-	});
+	// ── High scores — sorted by pp (nulls last) then score ──
+	const recentHighScores = await db
+		.select()
+		.from(matchGameScore)
+		.orderBy(
+			sql`${matchGameScore.pp} DESC NULLS LAST`,
+			desc(matchGameScore.score)
+		)
+		.limit(15)
+		.then((rows) =>
+			Promise.all(
+				rows.map((s) =>
+					db.query.matchGameScore.findFirst({
+						where: eq(matchGameScore.id, s.id),
+						with: {
+							player: true,
+							game: {
+								with: { slot: true, match: true }
+							}
+						}
+					})
+				)
+			)
+		);
 
 	const highScoresWithNames = await Promise.all(
 		recentHighScores.map(async (s, i) => {
+			if (!s) return null;
 			const u = await db.query.user.findFirst({
 				where: eq(user.id, s.player.userId)
 			});
@@ -114,6 +125,11 @@ export const load: PageServerLoad = async () => {
 				score: s.score,
 				accuracy: s.accuracy,
 				maxCombo: s.maxCombo,
+				count300: s.count300,
+				count100: s.count100,
+				count50: s.count50,
+				countMiss: s.countMiss,
+				pp: s.pp,
 				mods: s.mods,
 				passed: s.passed,
 				beatmapId: s.game.slot?.beatmapId ?? null,
@@ -123,7 +139,7 @@ export const load: PageServerLoad = async () => {
 				matchId: s.game.matchId
 			};
 		})
-	);
+	).then((rows) => rows.filter(Boolean));
 
 	return {
 		topPlayers: playersWithUsers,
