@@ -3,11 +3,22 @@ import { match, matchGame, mappoolSlot, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, type MatchConfig } from './types';
 import { getMatchFull, submitRoll, pickMap, submitGameScores } from './engine';
-import { TournamentLobby, setLobby, getLobby, removeLobby } from '../bancho/client';
+import {
+	TournamentLobby,
+	setLobby,
+	getLobby,
+	removeLobby,
+	getActiveLobbyCount,
+	isBanchoConnected,
+	isBanchoReconnecting
+} from '../bancho/client';
 
 function sleep(ms: number) {
 	return new Promise<void>((r) => setTimeout(r, ms));
 }
+
+/** Max concurrent lobbies for non-bot accounts */
+const MAX_LOBBIES = 4;
 
 /**
  * Create IRC lobby → configure → invite players → wire up chat handlers → move to ROLLING.
@@ -15,6 +26,19 @@ function sleep(ms: number) {
 export async function initMatchLobby(matchId: string) {
 	const m = await getMatchFull(matchId);
 	const config = m.config as MatchConfig;
+
+	// Check lobby limit
+	const activeCount = getActiveLobbyCount();
+	if (activeCount >= MAX_LOBBIES) {
+		console.error(
+			`[Orchestrator] Cannot create lobby: ${activeCount}/${MAX_LOBBIES} lobbies active. ` +
+			`Close some matches first.`
+		);
+		throw new Error(
+			`Lobby limit reached (${activeCount}/${MAX_LOBBIES}). Close or finish existing matches first.`
+		);
+	}
+
 	const lobby = new TournamentLobby();
 
 	const lobbyName = `VASH: (${m.participants[0]?.team.name}) vs (${m.participants[1]?.team.name})`;
@@ -216,6 +240,12 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		return;
 	}
 
+	if (!lobby.isAlive) {
+		console.warn('[Orchestrator] Lobby for', matchId, 'is dead — removing');
+		removeLobby(matchId);
+		return;
+	}
+
 	const game = await db.query.matchGame.findFirst({
 		where: eq(matchGame.id, matchGameId),
 		with: { slot: true }
@@ -244,7 +274,11 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	} catch (err: any) {
 		// If ready times out, inform and don't start
 		console.warn('[Orchestrator] Ready timeout:', err.message);
-		await lobby.chat('Ready timed out. Use the web UI to force start, or ready up!');
+		try {
+			await lobby.chat('Ready timed out. Use the web UI to force start, or ready up!');
+		} catch {
+			// Lobby may be dead after timeout
+		}
 		return;
 	}
 
@@ -261,6 +295,11 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 export async function forceStartGame(matchId: string) {
 	const lobby = getLobby(matchId);
 	if (!lobby) return;
+
+	if (!lobby.isAlive) {
+		console.warn('[Orchestrator] Cannot force start — lobby is dead');
+		return;
+	}
 
 	await lobby.chat('Force starting in 10s!');
 	await lobby.startGame(10);
@@ -302,9 +341,13 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	const updated = await getMatchFull(matchId);
 	if (updated.state === MATCH_STATES.FINISHED) {
 		const winner = updated.participants.find((p) => p.teamId === updated.winnerId);
-		await lobby.chat(`GG! ${winner?.team.name ?? '?'} wins the match!`);
-		await sleep(5000);
-		await lobby.close();
+		try {
+			await lobby.chat(`GG! ${winner?.team.name ?? '?'} wins the match!`);
+			await sleep(5000);
+			await lobby.close();
+		} catch {
+			/* lobby may already be closed */
+		}
 		removeLobby(matchId);
 	} else {
 		// Announce next picker
@@ -313,9 +356,13 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		);
 		const nextIdx = updated.games.length % sorted.length;
 		const nextPicker = sorted[nextIdx];
-		await lobby.chat(
-			`${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (e.g. !pick HD1) or pick in web UI.`
-		);
+		try {
+			await lobby.chat(
+				`${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (e.g. !pick HD1) or pick in web UI.`
+			);
+		} catch {
+			/* lobby may be dead */
+		}
 	}
 }
 
