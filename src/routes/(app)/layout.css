@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@theme {
+	--color-surface-900: #0a0a0f;
+	--color-surface-800: #12121a;
+	--color-surface-700: #1a1a25;
+	--color-surface-600: #24243a;
+	--color-accent: #ff66ab;
+	--color-accent-hover: #ff85be;
+	--color-accent-dim: #ff66ab33;
+	--color-text-primary: #eeeef0;
+	--color-text-secondary: #8888a0;
+	--color-border: #2a2a3d;
+	--font-display: 'Geist', system-ui, sans-serif;
+	--font-body: 'Geist', system-ui, sans-serif;
+	--font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+html {
+	background-color: var(--color-surface-900);
+	color: var(--color-text-primary);
+	font-family: var(--font-body);
+}
+
+body {
+	min-height: 100dvh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+	width: 6px;
+}
+::-webkit-scrollbar-track {
+	background: var(--color-surface-900);
+}
+::-webkit-scrollbar-thumb {
+	background: var(--color-surface-600);
+	border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-accent);
+}
