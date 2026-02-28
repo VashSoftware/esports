@@ -94,7 +94,7 @@ async function tryMatchFromQueue() {
 
 	const created = await createMatch({
 		name: 'Ranked Match',
-		config: { bestOf: 7, teamSize: 1, scoringType: 'score' },
+		config: { bestOf: 5, teamSize: 1, scoringType: 'score_v2' },
 		mappoolId: selectedPool.id,
 		teams: [bestPair[0].teamId, bestPair[1].teamId],
 		createdBy: 'system'
