@@ -157,3 +157,56 @@ export const matchGameScore = pgTable(
 	},
 	(t) => [index('idx_mgs_game').on(t.matchGameId)]
 );
+
+import { relations } from 'drizzle-orm';
+
+// ── Relations ───────────────────────────────────────────────────────────
+
+export const teamRelations = relations(team, ({ many }) => ({
+	members: many(teamMember)
+}));
+
+export const teamMemberRelations = relations(teamMember, ({ one }) => ({
+	team: one(team, { fields: [teamMember.teamId], references: [team.id] })
+}));
+
+export const mappoolRelations = relations(mappool, ({ many }) => ({
+	slots: many(mappoolSlot)
+}));
+
+export const mappoolSlotRelations = relations(mappoolSlot, ({ one }) => ({
+	mappool: one(mappool, { fields: [mappoolSlot.mappoolId], references: [mappool.id] })
+}));
+
+export const matchRelations = relations(match, ({ one, many }) => ({
+	mappool: one(mappool, { fields: [match.mappoolId], references: [mappool.id] }),
+	participants: many(matchParticipant),
+	games: many(matchGame)
+}));
+
+export const matchParticipantRelations = relations(matchParticipant, ({ one, many }) => ({
+	match: one(match, { fields: [matchParticipant.matchId], references: [match.id] }),
+	team: one(team, { fields: [matchParticipant.teamId], references: [team.id] }),
+	players: many(matchParticipantPlayer)
+}));
+
+export const matchParticipantPlayerRelations = relations(matchParticipantPlayer, ({ one }) => ({
+	participant: one(matchParticipant, {
+		fields: [matchParticipantPlayer.participantId],
+		references: [matchParticipant.id]
+	})
+}));
+
+export const matchGameRelations = relations(matchGame, ({ one, many }) => ({
+	match: one(match, { fields: [matchGame.matchId], references: [match.id] }),
+	slot: one(mappoolSlot, { fields: [matchGame.mappoolSlotId], references: [mappoolSlot.id] }),
+	scores: many(matchGameScore)
+}));
+
+export const matchGameScoreRelations = relations(matchGameScore, ({ one }) => ({
+	game: one(matchGame, { fields: [matchGameScore.matchGameId], references: [matchGame.id] }),
+	player: one(matchParticipantPlayer, {
+		fields: [matchGameScore.playerId],
+		references: [matchParticipantPlayer.id]
+	})
+}));
