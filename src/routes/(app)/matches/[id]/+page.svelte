@@ -39,7 +39,7 @@
 
 	// Should the mappool be visible?
 	const showMappool = $derived(
-		['PICKING', 'PLAYING', 'ROLLING'].includes(m.state)
+		['PICKING', 'PLAYING', 'ROLLING', 'FINISHED'].includes(m.state)
 	);
 
 	// Can picks actually be made right now?
@@ -173,7 +173,7 @@
 			<p class="mt-0.5 text-xs text-text-secondary">
 				Best of {config.bestOf} &middot; First to {winsNeeded}
 				{#if m.mappool}
-					&middot; {m.mappool.name}{mappoolAvgSR() ? ` · avg ★${mappoolAvgSR()}` : ''}
+					&middot; <a href="/mappools/{m.mappool.id}" class="hover:text-accent hover:underline">{m.mappool.name}</a>{mappoolAvgSR() ? ` · avg ★${mappoolAvgSR()}` : ''}
 				{/if}
 				{#if duration}
 					&middot; {duration}
