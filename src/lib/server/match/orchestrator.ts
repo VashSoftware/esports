@@ -561,8 +561,8 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	await lobby.setMap(slot.beatmapId);
 	await sleep(1000);
 
-	// Set mods
-	await lobby.setMods(slot.mods);
+	// Set mods — FM category always uses Freemod regardless of stored mods array
+	await lobby.setMods(slot.category === 'FM' ? ['FM'] : slot.mods);
 	await sleep(500);
 
 	// Announce with context: what map, current score, what to do

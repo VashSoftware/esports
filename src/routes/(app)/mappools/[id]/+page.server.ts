@@ -161,7 +161,7 @@ export const actions: Actions = {
 			starRating: beatmap.difficulty_rating,
 			bpm: beatmap.bpm,
 			totalLength: beatmap.total_length,
-			mods: category === 'NM' || category === 'TB' || category === 'FM' ? [] : [category],
+			mods: category === 'NM' || category === 'TB' ? [] : [category],
 			// Cached metadata — all R2 URLs
 			title: beatmap.beatmapset.title,
 			artist: beatmap.beatmapset.artist,
