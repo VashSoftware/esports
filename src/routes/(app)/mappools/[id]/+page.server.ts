@@ -24,8 +24,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	// Use cached metadata from DB — only fall back to osu! API for legacy slots
 	const slotsWithBeatmaps = await Promise.all(
 		pool.slots.map(async (slot) => {
-			// Fast path: metadata already stored in DB (R2 URLs)
-			if (slot.title && slot.coverUrl) {
+			// Fast path: metadata already stored in DB
+			if (slot.title !== null) {
+				// Sanitize any stale ppy.sh fallback URLs (image was unavailable when first fetched)
+				const coverUrl = slot.coverUrl?.includes('ppy.sh') ? null : (slot.coverUrl ?? null);
 				return {
 					...slot,
 					beatmap: {
@@ -35,7 +37,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: slot.starRating ?? 0,
 						bpm: slot.bpm ?? 0,
 						totalLength: slot.totalLength ?? 0,
-						coverUrl: slot.coverUrl,
+						coverUrl,
 						url: `https://osu.ppy.sh/beatmaps/${slot.beatmapId}`
 					}
 				};

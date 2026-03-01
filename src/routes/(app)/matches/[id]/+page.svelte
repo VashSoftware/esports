@@ -502,6 +502,8 @@
 						<span class="w-6 text-center text-xs font-600 text-text-secondary">{game.gameNumber}</span>
 						{#if bm?.listCoverUrl}
 							<img src={bm.listCoverUrl} alt="" class="h-8 w-16 rounded object-cover" />
+						{:else}
+							<div class="h-8 w-16 flex-shrink-0 rounded bg-surface-700"></div>
 						{/if}
 						<div class="min-w-0 flex-1">
 							{#if bm}

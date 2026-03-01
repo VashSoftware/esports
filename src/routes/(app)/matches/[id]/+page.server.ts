@@ -30,7 +30,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		await Promise.allSettled(
 			m.mappool.slots.map(async (slot) => {
 				// Fast path: metadata already stored in DB
-				if (slot.title && slot.coverUrl) {
+				if (slot.title !== null) {
+					// Sanitize any stale ppy.sh fallback URLs (image was unavailable when first fetched)
+					const coverUrl = slot.coverUrl?.includes('ppy.sh') ? null : (slot.coverUrl ?? null);
+					const listCoverUrl = slot.listCoverUrl?.includes('ppy.sh') ? null : (slot.listCoverUrl ?? null);
 					beatmapCache[slot.beatmapId] = {
 						title: slot.title,
 						artist: slot.artist ?? '',
@@ -38,8 +41,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: slot.starRating ?? 0,
 						bpm: slot.bpm ?? 0,
 						totalLength: slot.totalLength ?? 0,
-						coverUrl: slot.coverUrl,
-						listCoverUrl: slot.listCoverUrl
+						coverUrl,
+						listCoverUrl
 					};
 					return;
 				}
