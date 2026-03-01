@@ -110,6 +110,8 @@ export const actions: Actions = {
 			category,
 			orderInCategory: existing.length + 1,
 			starRating: beatmap.difficulty_rating,
+			bpm: beatmap.bpm,
+			totalLength: beatmap.total_length,
 			mods: category === 'NM' || category === 'TB' || category === 'FM' ? [] : [category]
 		});
 
