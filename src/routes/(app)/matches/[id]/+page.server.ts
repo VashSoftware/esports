@@ -152,6 +152,7 @@ export const actions: Actions = {
 			}
 		}
 
+		const isLastRoll = m.participants.filter((p) => p.rollValue === null).length === 1;
 		const value = Math.floor(Math.random() * 100) + 1;
 		await submitRoll(params.id, myParticipant.id, value);
 
@@ -160,7 +161,7 @@ export const actions: Actions = {
 		if (lobby) {
 			lobby.chat(`${myParticipant.team?.name ?? 'Player'} rolled ${value} (via web)`).catch(() => {});
 
-			// Check if all rolled → announce pick order
+			// Check if all rolled → announce pick order or tie
 			const updated = await getMatchFull(params.id);
 			if (updated.state === 'PICKING') {
 				const sorted = [...updated.participants].sort(
@@ -169,6 +170,8 @@ export const actions: Actions = {
 				lobby.chat(
 					`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
 				).catch(() => {});
+			} else if (isLastRoll && updated.participants.every((p: any) => p.rollValue === null)) {
+				lobby.chat(`Tie! All players rolled ${value}. Please !roll again.`).catch(() => {});
 			}
 		}
 
