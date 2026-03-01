@@ -1,5 +1,5 @@
 // src/hooks.server.ts
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { auth } from '$lib/server/auth';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
@@ -7,6 +7,7 @@ import { db } from '$lib/server/db';
 import { user as userTable } from '$lib/server/db/auth.schema';
 import { eq } from 'drizzle-orm';
 import { ensureRootAdminRole } from '$lib/server/permissions';
+import { checkRateLimit } from '$lib/server/rate-limit';
 
 // ── Initialize the IRC DM handler once on server startup ──
 // This runs when the module is first imported (server boot).
@@ -15,9 +16,30 @@ if (!building) {
 	import('$lib/server/bancho/dm-handler')
 		.then(({ initDMHandler }) => initDMHandler())
 		.catch((err) => console.warn('[Hooks] DM handler init skipped:', err.message));
+
+	process.on('unhandledRejection', (reason) => {
+		console.error('[Unhandled Rejection]', reason);
+	});
+
+	process.on('uncaughtException', (err) => {
+		console.error('[Uncaught Exception]', err);
+	});
 }
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
+	// ── Rate limiting for API routes ──
+	// 200 req/min per IP — high enough for legit use, stops bots/scrapers.
+	if (event.url.pathname.startsWith('/api/')) {
+		const ip = event.getClientAddress();
+		const { ok, retryAfter } = checkRateLimit(`api:${ip}`, 200, 60_000);
+		if (!ok) {
+			return new Response('Too Many Requests', {
+				status: 429,
+				headers: { 'Retry-After': String(retryAfter ?? 60), 'Content-Type': 'text/plain' }
+			});
+		}
+	}
+
 	const session = await auth.api.getSession({ headers: event.request.headers });
 
 	if (session) {
@@ -49,3 +71,17 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 };
 
 export const handle: Handle = handleBetterAuth;
+
+// ── Global server error handler ──
+// Catches unhandled errors from load functions, API routes, etc.
+// Logs context for debugging; returns a safe message to the client.
+export const handleError: HandleServerError = ({ error, event }) => {
+	const err = error as any;
+	console.error('[Server Error]', {
+		message: err?.message ?? String(error),
+		path: event.url.pathname,
+		method: event.request.method,
+		stack: err?.stack
+	});
+	return { message: 'An unexpected error occurred.' };
+};
