@@ -343,7 +343,7 @@
 								<p class="mt-0.5 text-xs text-text-secondary">
 									{m.name ? `${m.name} · ` : ''}BO{config.bestOf}
 									{#if m.mappool}
-										&middot; <a href='/mappools/{m.mappool.id}' onclick={(e) => e.stopPropagation()} class='hover:text-accent hover:underline'>{m.mappool.name}</a>{#if avgSR(m.mappool)} <span>{avgSR(m.mappool)}★</span>{/if}
+										&middot; <a href='/mappools/{m.mappool.id}' onclick={(e) => e.stopPropagation()} class='hover:text-accent hover:underline'>{m.mappool.name}</a>{#if avgSR(m.mappool)} {" "} (<span>{avgSR(m.mappool)}★</span>){/if}
 									{/if}
 									&middot; {timeAgo(m.finishedAt ?? m.createdAt)}
 								</p>
