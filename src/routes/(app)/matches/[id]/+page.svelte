@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let { data } = $props();
 
@@ -99,7 +100,23 @@
 	function stateBorder(s: string) {
 		return ({ ROLLING: 'border-yellow-500/30', PICKING: 'border-blue-500/30', PLAYING: 'border-green-500/30', FINISHED: 'border-accent/30' })[s] ?? 'border-border';
 	}
+
+	const stateLabels: Record<string, string> = { LOBBY: 'In Lobby', ROLLING: 'Rolling', PICKING: 'Picking', PLAYING: 'Live Now', FINISHED: 'Finished', CANCELLED: 'Cancelled' };
+	const ogTitle = $derived(`${p1?.team?.name ?? 'TBD'} vs ${p2?.team?.name ?? 'TBD'} — ${m.name} | Vash Esports`);
+	const ogDesc = $derived(`${stateLabels[m.state] ?? m.state} · Best of ${(m.config as any)?.bestOf ?? '?'} · Watch on Vash Esports`);
 </script>
+
+<svelte:head>
+	<title>{ogTitle}</title>
+	<meta name="description" content={ogDesc} />
+	<meta property="og:title" content={ogTitle} />
+	<meta property="og:description" content={ogDesc} />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={page.url.href} />
+	<meta property="og:image" content="/og-image.png" />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
 
 <!-- Shared reinvite snippet -->
 {#snippet reinviteButton()}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let { data } = $props();
 
@@ -86,6 +87,18 @@
 		return `${days}d ago`;
 	}
 </script>
+
+<svelte:head>
+	<title>Vash Esports — osu! Tournament Platform</title>
+	<meta name="description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management. Built for serious competition." />
+	<meta property="og:title" content="Vash Esports — osu! Tournament Platform" />
+	<meta property="og:description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management." />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={page.url.href} />
+	<meta property="og:image" content="/og-image.png" />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
 
 <!-- ── LANDING PAGE (not logged in) ── -->
 {#if !data.user}

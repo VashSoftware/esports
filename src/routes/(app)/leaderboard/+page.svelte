@@ -33,6 +33,15 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Leaderboard — Vash Esports</title>
+	<meta name="description" content="Top players and teams on the Vash Esports osu! tournament platform." />
+	<meta property="og:title" content="Leaderboard — Vash Esports" />
+	<meta property="og:description" content="Top players and teams on the Vash Esports osu! tournament platform." />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary" />
+</svelte:head>
+
 <div class="mx-auto max-w-4xl">
 	<div>
 		<h1 class="text-2xl font-700 tracking-tight">Leaderboard</h1>
