@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 
 	let { data } = $props();
 
@@ -47,6 +48,18 @@
 		TB: 'bg-pink-500/20 text-pink-400 border-pink-500/30'
 	};
 </script>
+
+<svelte:head>
+	<title>{data.pool.name} — Mappool | Vash Esports</title>
+	<meta name="description" content="View the {data.pool.name} mappool with {data.pool.slots.length} maps on Vash Esports." />
+	<meta property="og:title" content="{data.pool.name} — Mappool | Vash Esports" />
+	<meta property="og:description" content="{data.pool.slots.length} maps · View on Vash Esports" />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content={page.url.href} />
+	<meta property="og:image" content="/og-image.png" />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
 
 <div class="mx-auto max-w-4xl">
 	<!-- Header -->

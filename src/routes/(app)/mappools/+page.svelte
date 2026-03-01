@@ -5,6 +5,15 @@
 	let creating = $state(false);
 </script>
 
+<svelte:head>
+	<title>Mappools — Vash Esports</title>
+	<meta name="description" content="Browse and manage osu! tournament mappools on Vash Esports." />
+	<meta property="og:title" content="Mappools — Vash Esports" />
+	<meta property="og:description" content="Browse and manage osu! tournament mappools on Vash Esports." />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary" />
+</svelte:head>
+
 <div class="mx-auto max-w-4xl">
 	<div class="flex items-center justify-between">
 		<div>

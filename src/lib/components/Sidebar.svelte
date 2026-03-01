@@ -99,5 +99,9 @@
 			<span class="text-base">⚙</span>
 			Settings
 		</a>
+		<div class="mt-2 flex gap-3 px-3 pb-1">
+			<a href="/terms" class="text-xs text-text-secondary/50 hover:text-text-secondary transition-colors">Terms</a>
+			<a href="/privacy" class="text-xs text-text-secondary/50 hover:text-text-secondary transition-colors">Privacy</a>
+		</div>
 	</div>
 </aside>
