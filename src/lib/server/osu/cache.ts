@@ -1,15 +1,15 @@
 // src/lib/server/osu/cache.ts
 //
-// Simple in-memory cache for osu! beatmap metadata.
-// TTL: 10 minutes. Max entries: 500.
-// Avoids hammering the osu! API on every page load.
+// In-memory cache for osu! beatmap metadata.
+// Beatmap data is essentially immutable, so we use a long TTL (2 hours)
+// and return stale entries on fetch failure to prevent "?" in the UI.
 
 interface CacheEntry<T> {
 	data: T;
 	expiresAt: number;
 }
 
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours (beatmap data rarely changes)
 const MAX_ENTRIES = 500;
 
 const cache = new Map<string, CacheEntry<any>>();
@@ -18,9 +18,19 @@ export function getCached<T>(key: string): T | null {
 	const entry = cache.get(key);
 	if (!entry) return null;
 	if (Date.now() > entry.expiresAt) {
-		cache.delete(key);
+		// Expired — don't delete yet, keep as stale fallback
 		return null;
 	}
+	return entry.data as T;
+}
+
+/**
+ * Return stale (expired) data for a key if it exists.
+ * Used as a fallback when the osu! API fails, so the UI doesn't lose data.
+ */
+export function getStale<T>(key: string): T | null {
+	const entry = cache.get(key);
+	if (!entry) return null;
 	return entry.data as T;
 }
 

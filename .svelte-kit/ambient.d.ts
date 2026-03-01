@@ -38,6 +38,14 @@
  * The above values will be the same _even if_ different values for `ENVIRONMENT` or `PUBLIC_BASE_URL` are set at runtime, as they are statically replaced in your code with their build time values.
  */
 declare module '$env/static/private' {
+	export const ROOT_ADMIN_EMAIL: string;
+	export const DATABASE_URL: string;
+	export const ORIGIN: string;
+	export const BETTER_AUTH_SECRET: string;
+	export const OSU_CLIENT_ID: string;
+	export const OSU_CLIENT_SECRET: string;
+	export const OSU_IRC_USERNAME: string;
+	export const OSU_IRC_PASSWORD: string;
 	export const NVM_INC: string;
 	export const TERM_PROGRAM: string;
 	export const NODE: string;
@@ -191,6 +199,14 @@ declare module '$env/static/public' {
  */
 declare module '$env/dynamic/private' {
 	export const env: {
+		ROOT_ADMIN_EMAIL: string;
+		DATABASE_URL: string;
+		ORIGIN: string;
+		BETTER_AUTH_SECRET: string;
+		OSU_CLIENT_ID: string;
+		OSU_CLIENT_SECRET: string;
+		OSU_IRC_USERNAME: string;
+		OSU_IRC_PASSWORD: string;
 		NVM_INC: string;
 		TERM_PROGRAM: string;
 		NODE: string;

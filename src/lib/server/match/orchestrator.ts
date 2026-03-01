@@ -380,8 +380,10 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		pp?: number | null;
 	}[] = [];
 
-	// Build userId → osu accountId map for API enrichment
-	const userOsuIdMap = new Map<string, number>(); // userId → osu numeric ID
+	// ── FIX: Build matchParticipantPlayer.id → osu numeric account ID map ──
+	// Previously this was keyed by userId but looked up by playerId, which broke enrichment.
+	const playerOsuIdMap = new Map<string, number>(); // matchParticipantPlayer.id → osu numeric ID
+	const playerUserIdMap = new Map<string, string>(); // matchParticipantPlayer.id → userId
 
 	for (const irc of ircScores) {
 		for (const participant of m.participants) {
@@ -391,13 +393,15 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 				const dbName = u?.name?.toLowerCase();
 				if (dbName && (dbName === ircName || dbName === irc.username.toLowerCase())) {
 					scores.push({ playerId: player.id, score: irc.score, passed: irc.passed });
-					// Cache the osu account ID for enrichment
-					if (u && !userOsuIdMap.has(player.userId)) {
+					playerUserIdMap.set(player.id, player.userId);
+
+					// Cache the osu account ID for enrichment, keyed by matchParticipantPlayer.id
+					if (!playerOsuIdMap.has(player.id)) {
 						const acc = await db.query.account.findFirst({
 							where: and(eq(account.userId, player.userId), eq(account.providerId, 'osu'))
 						});
 						if (acc?.accountId) {
-							userOsuIdMap.set(player.userId, parseInt(acc.accountId));
+							playerOsuIdMap.set(player.id, parseInt(acc.accountId));
 						}
 					}
 				}
@@ -410,9 +414,12 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		return;
 	}
 
-	// Enrich scores with osu! API data (300/100/50/miss/accuracy/maxCombo/pp)
+	// ── Enrich scores with osu! API data (300/100/50/miss/accuracy/maxCombo/pp) ──
 	if (m.osuLobbyId) {
 		try {
+			// Small delay to let osu! API update with the latest game data
+			await sleep(2000);
+
 			const osuMatchData = await getOsuMatch(m.osuLobbyId);
 			// Find the most recent game event matching our beatmap
 			const gameRecord = await db.query.matchGame.findFirst({
@@ -435,13 +442,25 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						osuScoreMap.set(os.user_id, os);
 					}
 
-					// Enrich each score
-					for (const s of scores) {
-						const playerOsuId = userOsuIdMap.get(s.playerId);
-						if (playerOsuId === undefined) continue;
-						const osuScore = osuScoreMap.get(playerOsuId);
-						if (!osuScore) continue;
+					console.log(
+						`[Orchestrator] osu! API returned ${osuGame.scores.length} scores for beatmap ${beatmapId}. ` +
+						`Player map has ${playerOsuIdMap.size} entries.`
+					);
 
+					// Enrich each score using the FIXED mapping (matchParticipantPlayer.id → osu ID)
+					for (const s of scores) {
+						const playerOsuId = playerOsuIdMap.get(s.playerId);
+						if (playerOsuId === undefined) {
+							console.warn(`[Orchestrator] No osu account ID for player ${s.playerId}`);
+							continue;
+						}
+						const osuScore = osuScoreMap.get(playerOsuId);
+						if (!osuScore) {
+							console.warn(`[Orchestrator] No osu! API score for osu user ${playerOsuId}`);
+							continue;
+						}
+
+						// v2 API format: accuracy is a float (0-1), statistics has count_300 etc.
 						s.accuracy = osuScore.accuracy ?? undefined;
 						s.maxCombo = osuScore.max_combo ?? undefined;
 						s.count300 = osuScore.statistics?.count_300 ?? undefined;
@@ -456,6 +475,8 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						}
 					}
 					console.log(`[Orchestrator] Enriched scores from osu! API for game ${matchGameId}`);
+				} else {
+					console.warn(`[Orchestrator] No scores in osu! API game event for beatmap ${beatmapId}`);
 				}
 			}
 		} catch (err: any) {
