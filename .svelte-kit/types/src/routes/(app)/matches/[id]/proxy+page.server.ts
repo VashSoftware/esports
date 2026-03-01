@@ -3,11 +3,13 @@ import { user } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { getMatchFull, submitRoll, pickMap, cancelMatch } from '$lib/server/match/engine';
 import { playPickedMap, closeLobby, forceStartGame } from '$lib/server/match/orchestrator';
-import { getLobby } from '$lib/server/bancho/client';
+import { getLobby, getLobbyStatus } from '$lib/server/bancho/client';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
+import { hasRole } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 import { eq } from 'drizzle-orm';
+import type { MatchConfig } from '$lib/server/match/types';
 
 
 export const load = async ({ params, locals }: Parameters<PageServerLoad>[0]) => {
@@ -42,7 +44,20 @@ export const load = async ({ params, locals }: Parameters<PageServerLoad>[0]) =>
 		);
 	}
 
-	return { match: m, beatmapCache, userId: locals.user.id };
+	const isStaff = hasRole(locals.user.role, 'referee');
+
+	// Fetch player usernames for lobby status display
+	const playerNames: Record<string, string> = {};
+	for (const p of m.participants) {
+		for (const pl of p.players) {
+			const u = await db.query.user.findFirst({ where: eq(user.id, pl.userId) });
+			if (u?.name) playerNames[pl.userId] = u.name;
+		}
+	}
+
+	const lobbyStatus = getLobbyStatus(params.id);
+
+	return { match: m, beatmapCache, userId: locals.user.id, isStaff, lobbyStatus, playerNames };
 };
 
 export const actions = {
@@ -52,20 +67,14 @@ export const actions = {
 		const lobby = getLobby(params.id);
 		if (!lobby) return { error: 'No active IRC lobby for this match' };
 
-		const m = await getMatchFull(params.id);
-
-		const invited: string[] = [];
-		for (const p of m.participants) {
-			for (const pl of p.players) {
-				const u = await db.query.user.findFirst({ where: eq(user.id, pl.userId) });
-				if (u?.name) {
-					await lobby.invite(u.name);
-					invited.push(u.name);
-				}
-			}
+		// Only invite the currently logged-in user
+		const u = await db.query.user.findFirst({ where: eq(user.id, locals.user.id) });
+		if (u?.name) {
+			await lobby.invite(u.name);
+			return { reinvited: [u.name] };
 		}
 
-		return { reinvited: invited };
+		return { error: 'Could not find your username' };
 	},
 
 	roll: async ({ params, locals }: import('./$types').RequestEvent) => {
@@ -133,6 +142,27 @@ export const actions = {
 
 		if (!expectedPicker) return { error: 'Cannot determine picker' };
 
+		// ── Verify the logged-in user is on the expected picker's team ──
+		// No staff bypass here — even admins can't pick for another team
+		const isOnPickerTeam = expectedPicker.players.some(
+			(pl) => pl.userId === locals.user!.id
+		);
+		if (!isOnPickerTeam) {
+			return { error: "It's not your turn to pick" };
+		}
+
+		// ── Tiebreaker restriction ──
+		// TB maps can only be picked when both teams are at match point (e.g. 2-2 in BO5)
+		const config = m.config as MatchConfig;
+		const winsNeeded = Math.ceil(config.bestOf / 2);
+		const slot = m.mappool?.slots?.find((s) => s.id === slotId);
+		if (slot?.category === 'TB') {
+			const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
+			if (!allAtMatchPoint) {
+				return { error: 'Tiebreaker can only be picked when both teams are at match point' };
+			}
+		}
+
 		try {
 			const game = await pickMap(params.id, expectedPicker.id, slotId);
 
@@ -149,12 +179,20 @@ export const actions = {
 
 	forceStart: async ({ params, locals }: import('./$types').RequestEvent) => {
 		if (!locals.user) redirect(302, '/');
+		// Only staff can force start
+		if (!hasRole(locals.user.role, 'referee')) {
+			return { error: 'Only referees and admins can force start' };
+		}
 		await forceStartGame(params.id);
 		return { started: true };
 	},
 
 	cancel: async ({ params, locals }: import('./$types').RequestEvent) => {
 		if (!locals.user) redirect(302, '/');
+		// Only staff can cancel matches
+		if (!hasRole(locals.user.role, 'referee')) {
+			return { error: 'Only referees and admins can cancel matches' };
+		}
 
 		await cancelMatch(params.id);
 		await closeLobby(params.id);

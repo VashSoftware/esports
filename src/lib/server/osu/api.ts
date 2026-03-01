@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { and, eq } from 'drizzle-orm';
 import { account } from '$lib/server/db/auth.schema';
-import { getCached, setCache } from './cache';
+import { getCached, setCache, getStale } from './cache';
 
 let clientToken: string | null = null;
 let clientTokenExpiresAt = 0;
@@ -95,14 +95,29 @@ async function osuFetch(path: string, token?: string) {
 
 // ── Public API (with caching) ───────────────────────────────────────────
 
+/**
+ * Fetch beatmap data with stale-on-error resilience.
+ * If the osu! API is down or rate-limited, we return the last known data
+ * so the UI doesn't degrade to "?" placeholders mid-match.
+ */
 export async function getBeatmap(beatmapId: string | number) {
 	const cacheKey = `beatmap:${beatmapId}`;
 	const cached = getCached(cacheKey);
 	if (cached) return cached;
 
-	const data = await osuFetch(`/beatmaps/${beatmapId}`);
-	setCache(cacheKey, data);
-	return data;
+	try {
+		const data = await osuFetch(`/beatmaps/${beatmapId}`);
+		setCache(cacheKey, data);
+		return data;
+	} catch (err) {
+		// If fetch fails, try returning stale (expired) cached data
+		const stale = getStale(cacheKey);
+		if (stale) {
+			console.warn(`[osu! API] Failed to fetch beatmap ${beatmapId}, returning stale cache`);
+			return stale;
+		}
+		throw err; // No stale data either — propagate the error
+	}
 }
 
 export async function getBeatmapset(beatmapsetId: string | number) {
@@ -110,9 +125,15 @@ export async function getBeatmapset(beatmapsetId: string | number) {
 	const cached = getCached(cacheKey);
 	if (cached) return cached;
 
-	const data = await osuFetch(`/beatmapsets/${beatmapsetId}`);
-	setCache(cacheKey, data);
-	return data;
+	try {
+		const data = await osuFetch(`/beatmapsets/${beatmapsetId}`);
+		setCache(cacheKey, data);
+		return data;
+	} catch (err) {
+		const stale = getStale(cacheKey);
+		if (stale) return stale;
+		throw err;
+	}
 }
 
 export async function getUser(userId: string | number) {
