@@ -11,6 +11,7 @@ import {
 } from '$lib/server/db/schema';
 import { eq, asc, sql, desc, and, inArray } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
+import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/client';
 
 // ── Queue ───────────────────────────────────────────────────────────────
 
@@ -241,7 +242,9 @@ export async function createMatch(opts: {
 		}
 	}
 
-	return getMatchFull(created.id);
+	const full = await getMatchFull(created.id);
+	notifyMatchCreated(full).catch(() => {});
+	return full;
 }
 
 // ── State Transitions ───────────────────────────────────────────────────
@@ -465,6 +468,9 @@ export async function submitGameScores(
 			.where(eq(match.id, game.matchId));
 
 		await updateElo(participants, matchWinner.id);
+
+		const finishedMatch = await getMatchFull(game.matchId);
+		notifyMatchFinished(finishedMatch).catch(() => {});
 	} else {
 		await db
 			.update(match)
