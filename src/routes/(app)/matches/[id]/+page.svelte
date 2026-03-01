@@ -172,9 +172,6 @@
 			<h1 class="text-xl font-700 tracking-tight">{m.name || 'Match'}</h1>
 			<p class="mt-0.5 text-xs text-text-secondary">
 				Best of {config.bestOf} &middot; First to {winsNeeded}
-				{#if m.mappool}
-					&middot; <a href="/mappools/{m.mappool.id}" class="hover:text-accent hover:underline">{m.mappool.name}</a>{mappoolAvgSR() ? ` · avg ★${mappoolAvgSR()}` : ''}
-				{/if}
 				{#if duration}
 					&middot; {duration}
 				{/if}
@@ -365,7 +362,16 @@
 		<div class="mt-6">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
-					<h2 class="text-sm font-600">Mappool</h2>
+					<h2 class="text-sm font-600">
+						{#if m.mappool}
+							<a href="/mappools/{m.mappool.id}" class="hover:text-accent hover:underline">{m.mappool.name}</a>
+						{:else}
+							Mappool
+						{/if}
+					</h2>
+					{#if mappoolAvgSR()}
+						<span class="text-xs text-text-secondary">avg ★{mappoolAvgSR()}</span>
+					{/if}
 					{#if pickingPhase}
 						<span class="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-600 text-blue-400">
 							{isMyTurnToPick ? 'Your pick!' : `${expectedPicker?.team.name}'s pick`}
