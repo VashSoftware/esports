@@ -2,7 +2,7 @@ import { db } from '$lib/server/db';
 import { match, matchGame, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
-import { getMatchFull, submitRoll, pickMap, submitGameScores } from './engine';
+import { getMatchFull, submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
 import { env } from '$env/dynamic/private';
 
 // matchId → lowercase usernames of all expected players
@@ -21,6 +21,118 @@ import { account } from '../db/auth.schema';
 
 function sleep(ms: number) {
 	return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+// ── Match Timeouts ──────────────────────────────────────────────────────
+// Hard caps so the platform doesn't wait forever for players.
+// If a phase isn't completed in time the match is auto-cancelled.
+
+const TIMEOUT_LOBBY_JOIN = 10 * 60 * 1000; // 10 min to join
+const TIMEOUT_ROLLING    =  5 * 60 * 1000; //  5 min to complete all rolls
+const TIMEOUT_PICKING    =  5 * 60 * 1000; //  5 min to pick a map
+const TIMEOUT_READY      =  5 * 60 * 1000; //  5 min to ready up after map is set
+
+const matchTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+function setMatchTimeout(matchId: string, phase: string, ms: number, fn: () => void) {
+	const key = `${matchId}:${phase}`;
+	clearMatchTimeout(matchId, phase);
+	matchTimeouts.set(key, setTimeout(fn, ms));
+	const secs = Math.round(ms / 1000);
+	console.log(`[Timeout] Set ${phase} timeout for match ${matchId} (${secs}s)`);
+}
+
+function clearMatchTimeout(matchId: string, phase: string) {
+	const key = `${matchId}:${phase}`;
+	const t = matchTimeouts.get(key);
+	if (t) {
+		clearTimeout(t);
+		matchTimeouts.delete(key);
+		console.log(`[Timeout] Cleared ${phase} timeout for match ${matchId}`);
+	}
+}
+
+function clearAllMatchTimeouts(matchId: string) {
+	for (const [key, t] of matchTimeouts.entries()) {
+		if (key.startsWith(`${matchId}:`)) {
+			clearTimeout(t);
+			matchTimeouts.delete(key);
+		}
+	}
+}
+
+/**
+ * Cancel a match due to timeout.  Notifies in IRC, closes the lobby, and
+ * marks the match CANCELLED in the database.
+ */
+async function timeoutMatch(matchId: string, reason: string) {
+	console.warn(`[Orchestrator] Match ${matchId} timed out: ${reason}`);
+	clearAllMatchTimeouts(matchId);
+
+	const lobby = getLobby(matchId);
+	if (lobby?.isAlive) {
+		try {
+			await lobby.chat(`⏰ Match cancelled — ${reason}`);
+			await sleep(3000);
+			await lobby.close();
+		} catch { /* lobby may already be dead */ }
+	}
+
+	removeLobby(matchId);
+	expectedPlayers.delete(matchId);
+	joinedPlayers.delete(matchId);
+
+	try {
+		await cancelMatch(matchId);
+	} catch (err: any) {
+		console.error(`[Orchestrator] Failed to cancel timed-out match ${matchId}:`, err.message);
+	}
+}
+
+/**
+ * Central timeout manager.  Call after every state transition so the
+ * correct phase-timeout is armed.  Safe to call from both IRC handlers
+ * and web form actions.
+ */
+export function onMatchStateChange(matchId: string, newState: string) {
+	// Always wipe previous phase timers first
+	clearAllMatchTimeouts(matchId);
+
+	switch (newState) {
+		case MATCH_STATES.LOBBY:
+			setMatchTimeout(matchId, 'lobby', TIMEOUT_LOBBY_JOIN, async () => {
+				const joined = joinedPlayers.get(matchId) ?? new Set();
+				const expected = expectedPlayers.get(matchId) ?? new Set();
+				const missing = [...expected].filter((p) => !joined.has(p));
+				const detail =
+					missing.length > 0
+						? `Missing: ${missing.join(', ')}.`
+						: '';
+				await timeoutMatch(
+					matchId,
+					`Not all players joined within 10 minutes. ${detail}`
+				);
+			});
+			break;
+
+		case MATCH_STATES.ROLLING:
+			setMatchTimeout(matchId, 'rolling', TIMEOUT_ROLLING, () => {
+				timeoutMatch(matchId, 'Not all players rolled within 5 minutes.');
+			});
+			break;
+
+		case MATCH_STATES.PICKING:
+			setMatchTimeout(matchId, 'picking', TIMEOUT_PICKING, () => {
+				timeoutMatch(matchId, 'No map was picked within 5 minutes.');
+			});
+			break;
+
+		// PLAYING ready-timeout is set by playPickedMap (needs gameInProgress guard)
+		case MATCH_STATES.FINISHED:
+		case MATCH_STATES.CANCELLED:
+			// Already cleared above — nothing else to arm
+			break;
+	}
 }
 
 /** Max concurrent lobbies for non-bot accounts */
@@ -94,6 +206,9 @@ export async function initMatchLobby(matchId: string) {
 	// Wire up IRC chat handlers for rolls, picks, and player joins
 	setupChatHandlers(matchId, lobby);
 
+	// ── Arm the lobby-join timeout (10 min) ──
+	onMatchStateChange(matchId, MATCH_STATES.LOBBY);
+
 	// State stays LOBBY — transitions to ROLLING only when all players have joined
 	return { osuMatchId: osuId, channel };
 }
@@ -126,9 +241,11 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 
 				if (allJoined) {
 					await db.update(match).set({ state: MATCH_STATES.ROLLING }).where(eq(match.id, matchId));
+					// ── Arm rolling timeout (clears lobby timeout) ──
+					onMatchStateChange(matchId, MATCH_STATES.ROLLING);
 					await sleep(500);
 					await lobby.chat(
-						`All players present! BO${config.bestOf} match — type !roll to decide pick order.`
+						`All players present! BO${config.bestOf} match — type !roll to decide pick order. You have 5 minutes.`
 					);
 				} else {
 					const missing = [...expected].filter((p) => !joined.has(p));
@@ -157,10 +274,16 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 					`Welcome back ${username}! ${scoreStr} — ${picker?.team.name}'s turn to pick. Use !pick <slot> (e.g. !pick NM1).`
 				);
 			} else if (m.state === MATCH_STATES.PLAYING) {
-				const activeGame = m.games.find((g: any) => g.state === GAME_STATES.PLAYING);
-				if (activeGame) {
-					await sleep(1000);
-					await lobby.chat(`Welcome back ${username}! A game is in progress — ready up when it finishes.`);
+				// ── FIX: check lobby.gameInProgress to give the right message ──
+				await sleep(1000);
+				if (lobby.gameInProgress) {
+					await lobby.chat(
+						`Welcome back ${username}! A game is in progress — ready up when it finishes.`
+					);
+				} else {
+					await lobby.chat(
+						`Welcome back ${username}! Please ready up so the game can start.`
+					);
 				}
 			}
 		} catch (err: any) {
@@ -208,13 +331,15 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			const remaining = updated.participants.filter((p) => p.rollValue === null);
 
 			if (updated.state === MATCH_STATES.PICKING) {
+				// ── Arm picking timeout (clears rolling timeout) ──
+				onMatchStateChange(matchId, MATCH_STATES.PICKING);
 				const sorted = [...updated.participants].sort(
 					(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 				);
 				await sleep(500);
 				await lobby.chat(
 					`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-					`Use !pick <slot> (e.g. !pick NM1).`
+					`Use !pick <slot> (e.g. !pick NM1). You have 5 minutes.`
 				);
 			} else if (remaining.length > 0) {
 				// Tell the other player they still need to roll
@@ -300,6 +425,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			const game = await pickMap(matchId, expectedPicker!.id, slot.id);
 			console.log(`[Orchestrator] IRC pick: ${username} picked ${slotLabel}`);
 
+			// Picking timeout is cleared inside playPickedMap
 			playPickedMap(matchId, game.id).catch((err) =>
 				console.error('[Orchestrator] IRC play failed:', err.message)
 			);
@@ -315,6 +441,9 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
  * Sets map + mods in IRC, waits for ready, starts game, collects scores.
  */
 export async function playPickedMap(matchId: string, matchGameId: string) {
+	// ── Clear picking timeout (a pick was made) ──
+	clearMatchTimeout(matchId, 'picking');
+
 	const lobby = getLobby(matchId);
 	if (!lobby) {
 		console.warn('[Orchestrator] No IRC lobby for', matchId, '— skipping IRC');
@@ -347,18 +476,37 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 
 	// Announce with context: what map, current score, what to do
 	await lobby.chat(
-		`[${score}] Now playing ${slot.category}${slot.orderInCategory}. Please ready up!`
+		`[${score}] Now playing ${slot.category}${slot.orderInCategory}. Please ready up! You have 5 minutes.`
 	);
 
+	// ── Arm ready timeout: cancel if nobody readies within 5 min ──
+	// Guard: if the game actually starts (force start / normal start)
+	// the timeout checks gameInProgress before cancelling.
+	setMatchTimeout(matchId, 'ready', TIMEOUT_READY, async () => {
+		const currentLobby = getLobby(matchId);
+		if (currentLobby?.gameInProgress) {
+			// Game is running — don't cancel, scores will come in eventually
+			console.log(`[Timeout] Ready timeout fired but game is in progress for ${matchId}, ignoring`);
+			return;
+		}
+		await timeoutMatch(matchId, 'Players did not ready up within 5 minutes.');
+	});
+
 	// Wait for all players to ready up in osu!, then start
+	// Use a shorter soft-timeout so we can warn before the hard cancel fires
 	try {
-		await lobby.waitForReady();
+		await lobby.waitForReady(TIMEOUT_READY - 30_000);
+		clearMatchTimeout(matchId, 'ready'); // players readied — disarm
 		await lobby.chat('All ready — starting in 5s!');
 		await lobby.startGame(5);
 	} catch (err: any) {
 		console.warn('[Orchestrator] Ready timeout:', err.message);
 		try {
-			await lobby.chat('Timed out waiting for ready. Ready up and the game will start, or an admin can force start from the web UI.');
+			await lobby.chat(
+				'Timed out waiting for ready. Ready up and the game will start, ' +
+				'or an admin can force start from the web UI. ' +
+				'Match will auto-cancel if nobody readies soon.'
+			);
 		} catch { /* lobby may be dead */ }
 		// Still set up score collection — force start will trigger the game
 		collectScores(matchId, matchGameId, lobby).catch((err) =>
@@ -380,6 +528,9 @@ export async function forceStartGame(matchId: string) {
 	const lobby = getLobby(matchId);
 	if (!lobby || !lobby.isAlive) return;
 
+	// Game is being force-started → disarm the ready timeout
+	clearMatchTimeout(matchId, 'ready');
+
 	await lobby.chat('Force starting in 10s!');
 	await lobby.startGame(10);
 }
@@ -390,6 +541,10 @@ export async function forceStartGame(matchId: string) {
  */
 async function collectScores(matchId: string, matchGameId: string, lobby: TournamentLobby) {
 	const ircScores = await lobby.waitForScores();
+
+	// Game finished → disarm the ready timeout if it's still ticking
+	clearMatchTimeout(matchId, 'ready');
+
 	console.log(`[Orchestrator] Scores for game ${matchGameId}:`, ircScores);
 
 	// Map IRC usernames → matchParticipantPlayer IDs
@@ -409,9 +564,8 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	}[] = [];
 
 	// ── FIX: Build matchParticipantPlayer.id → osu numeric account ID map ──
-	// Previously this was keyed by userId but looked up by playerId, which broke enrichment.
-	const playerOsuIdMap = new Map<string, number>(); // matchParticipantPlayer.id → osu numeric ID
-	const playerUserIdMap = new Map<string, string>(); // matchParticipantPlayer.id → userId
+	const playerOsuIdMap = new Map<string, number>();
+	const playerUserIdMap = new Map<string, string>();
 
 	for (const irc of ircScores) {
 		for (const participant of m.participants) {
@@ -423,7 +577,6 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 					scores.push({ playerId: player.id, score: irc.score, passed: irc.passed });
 					playerUserIdMap.set(player.id, player.userId);
 
-					// Cache the osu account ID for enrichment, keyed by matchParticipantPlayer.id
 					if (!playerOsuIdMap.has(player.id)) {
 						const acc = await db.query.account.findFirst({
 							where: and(eq(account.userId, player.userId), eq(account.providerId, 'osu'))
@@ -442,14 +595,12 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		return;
 	}
 
-	// ── Enrich scores with osu! API data (300/100/50/miss/accuracy/maxCombo/pp) ──
+	// ── Enrich scores with osu! API data ──
 	if (m.osuLobbyId) {
 		try {
-			// Small delay to let osu! API update with the latest game data
 			await sleep(2000);
 
 			const osuMatchData = await getOsuMatch(m.osuLobbyId);
-			// Find the most recent game event matching our beatmap
 			const gameRecord = await db.query.matchGame.findFirst({
 				where: eq(matchGame.id, matchGameId),
 				with: { slot: true }
@@ -457,14 +608,12 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 			const beatmapId = gameRecord?.slot?.beatmapId ? parseInt(gameRecord.slot.beatmapId) : null;
 
 			if (beatmapId && osuMatchData?.events) {
-				// Find game events in reverse (most recent first) matching our beatmap
 				const gameEvents = [...osuMatchData.events]
 					.reverse()
 					.filter((e: any) => e.game?.beatmap_id === beatmapId);
 
 				const osuGame = gameEvents[0]?.game;
 				if (osuGame?.scores) {
-					// Build osu userID → score stats map
 					const osuScoreMap = new Map<number, any>();
 					for (const os of osuGame.scores) {
 						osuScoreMap.set(os.user_id, os);
@@ -475,7 +624,6 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						`Player map has ${playerOsuIdMap.size} entries.`
 					);
 
-					// Enrich each score using the FIXED mapping (matchParticipantPlayer.id → osu ID)
 					for (const s of scores) {
 						const playerOsuId = playerOsuIdMap.get(s.playerId);
 						if (playerOsuId === undefined) {
@@ -488,7 +636,6 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 							continue;
 						}
 
-						// v2 API format: accuracy is a float (0-1), statistics has count_300 etc.
 						s.accuracy = osuScore.accuracy ?? undefined;
 						s.maxCombo = osuScore.max_combo ?? undefined;
 						s.count300 = osuScore.statistics?.count_300 ?? undefined;
@@ -519,7 +666,6 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	const config = updated.config as MatchConfig;
 	const winsNeeded = Math.ceil(config.bestOf / 2);
 
-	// Sort participants by pick order for consistent display
 	const sortedPs = [...updated.participants].sort(
 		(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 	);
@@ -531,7 +677,6 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		const winner = updated.participants.find((p) => p.id === game.winnerParticipantId);
 		const slotLabel = `${game.slot?.category}${game.slot?.orderInCategory}`;
 
-		// Per-team score totals from game scores
 		const teamTotals = new Map<string, number>();
 		for (const s of game.scores ?? []) {
 			const pid = s.player?.participantId;
@@ -548,10 +693,12 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		} catch { /* ignore */ }
 	}
 
-	// Match score string: "(Team1) 2 - 1 (Team2)"
 	const matchScoreStr = `(${ps1?.team.name}) ${ps1?.score} - ${ps2?.score} (${ps2?.team.name})`;
 
 	if (updated.state === MATCH_STATES.FINISHED) {
+		// ── Match over — clear everything ──
+		clearAllMatchTimeouts(matchId);
+
 		const winner = updated.participants.find((p) => p.teamId === updated.winnerId);
 		try {
 			await sleep(1000);
@@ -566,12 +713,15 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		expectedPlayers.delete(matchId);
 		joinedPlayers.delete(matchId);
 	} else {
+		// ── Back to PICKING — arm the pick timeout ──
+		onMatchStateChange(matchId, MATCH_STATES.PICKING);
+
 		const nextIdx = updated.games.length % sortedPs.length;
 		const nextPicker = sortedPs[nextIdx];
 		try {
 			await sleep(1000);
 			await lobby.chat(
-				`${matchScoreStr} — first to ${winsNeeded} — ${nextPicker?.team.name}'s turn to pick. Use !pick <slot>`
+				`${matchScoreStr} — first to ${winsNeeded} — ${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (5 min to pick)`
 			);
 		} catch { /* lobby may be dead */ }
 	}
@@ -581,6 +731,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
  * Close the IRC lobby for a match.
  */
 export async function closeLobby(matchId: string) {
+	clearAllMatchTimeouts(matchId);
 	const lobby = getLobby(matchId);
 	if (lobby) {
 		await lobby.close();
