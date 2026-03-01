@@ -76,12 +76,12 @@ export const handle: Handle = handleBetterAuth;
 // Catches unhandled errors from load functions, API routes, etc.
 // Logs context for debugging; returns a safe message to the client.
 export const handleError: HandleServerError = ({ error, event }) => {
-	const err = error as any;
+	const err = error instanceof Error ? error : new Error(String(error));
 	console.error('[Server Error]', {
-		message: err?.message ?? String(error),
+		message: err.message,
 		path: event.url.pathname,
 		method: event.request.method,
-		stack: err?.stack
+		stack: err.stack
 	});
 	return { message: 'An unexpected error occurred.' };
 };
