@@ -49,7 +49,7 @@
 		<div class="mt-6 border-t border-border pt-4">
 			<h3 class="text-xs font-600 text-text-secondary uppercase tracking-wider">Connected Accounts</h3>
 			<div class="mt-3 flex items-center gap-3 rounded-md bg-surface-700 px-4 py-3">
-				<span class="text-lg">🎮</span>
+				<img src="/osu.png" alt="osu!" class="h-5 w-5 object-contain" />
 				<div class="flex-1">
 					<p class="text-sm font-500">osu!</p>
 					<p class="text-xs text-text-secondary">
