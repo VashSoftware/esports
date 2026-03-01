@@ -7,6 +7,7 @@ import { getRequestEvent } from '$app/server';
 import { db } from '$lib/server/db';
 import { genericOAuth } from 'better-auth/plugins';
 import { team, teamMember } from './db/schema';
+import { proxyImage } from './storage/r2';
 
 export const auth = betterAuth({
 	baseURL: env.ORIGIN,
@@ -79,10 +80,10 @@ export const auth = betterAuth({
 							raw: data
 						};
 					},
-					mapProfileToUser(profile) {
+					async mapProfileToUser(profile) {
 						return {
 							name: profile.username,
-							image: profile.avatar_url,
+							image: await proxyImage(profile.avatar_url),
 							email: `${profile.id}@osu.local`
 						};
 					}
