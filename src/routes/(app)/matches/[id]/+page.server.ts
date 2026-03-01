@@ -1,5 +1,6 @@
 import { user } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
+import { mappoolSlot } from '$lib/server/db/schema';
 import { getMatchFull, submitRoll, pickMap, cancelMatch } from '$lib/server/match/engine';
 import { playPickedMap, closeLobby, forceStartGame } from '$lib/server/match/orchestrator';
 import { getLobby, getLobbyStatus } from '$lib/server/bancho/client';
@@ -22,13 +23,32 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		error(404, 'Match not found');
 	}
 
-	// Build beatmap metadata cache for all slots in the mappool
+	// Build beatmap metadata cache — prefer DB-stored R2 URLs, fall back to API
 	const beatmapCache: Record<string, any> = {};
 	if (m.mappool?.slots) {
 		await Promise.allSettled(
 			m.mappool.slots.map(async (slot) => {
+				// Fast path: metadata already stored in DB
+				if (slot.title && slot.coverUrl) {
+					beatmapCache[slot.beatmapId] = {
+						title: slot.title,
+						artist: slot.artist ?? '',
+						version: slot.version ?? '',
+						starRating: slot.starRating ?? 0,
+						bpm: slot.bpm ?? 0,
+						totalLength: slot.totalLength ?? 0,
+						coverUrl: slot.coverUrl,
+						listCoverUrl: slot.listCoverUrl
+					};
+					return;
+				}
+
+				// Slow path: legacy slot — fetch from API + backfill DB
 				try {
 					const bm = await getBeatmap(slot.beatmapId);
+					const coverUrl = await proxyImage(bm.beatmapset.covers['card@2x']);
+					const listCoverUrl = await proxyImage(bm.beatmapset.covers['list@2x']);
+
 					beatmapCache[slot.beatmapId] = {
 						title: bm.beatmapset.title,
 						artist: bm.beatmapset.artist,
@@ -36,9 +56,24 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: bm.difficulty_rating,
 						bpm: bm.bpm,
 						totalLength: bm.total_length,
-						coverUrl: await proxyImage(bm.beatmapset.covers['card@2x']),
-						listCoverUrl: await proxyImage(bm.beatmapset.covers['list@2x'])
+						coverUrl,
+						listCoverUrl
 					};
+
+					// Backfill so future loads are instant
+					await db
+						.update(mappoolSlot)
+						.set({
+							title: bm.beatmapset.title,
+							artist: bm.beatmapset.artist,
+							version: bm.version,
+							coverUrl,
+							listCoverUrl,
+							starRating: bm.difficulty_rating,
+							bpm: bm.bpm,
+							totalLength: bm.total_length
+						})
+						.where(eq(mappoolSlot.id, slot.id));
 				} catch { /* skip */ }
 			})
 		);

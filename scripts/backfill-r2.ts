@@ -1,13 +1,20 @@
 /**
- * One-time script to upload existing user avatars and beatmap covers to R2.
- * Run with: bun run scripts/backfill-r2.ts
+ * Backfill ALL images into R2:
+ *  1. Mappool slot covers (title/artist/version/coverUrl/listCoverUrl)
+ *  2. User avatars still pointing at osu! servers
+ *  3. Team avatars still pointing at osu! servers
+ *
+ * Run with: bun run scripts/backfill-r2-all.ts
  * Reads credentials from .env automatically.
+ *
+ * After running, do `bun run db:push` to add the new schema columns,
+ * then run this script to populate them.
  */
 
 import postgres from 'postgres';
 import { S3Client } from 'bun';
 
-// ── Config from env ────────────────────────────────────────────────────
+// ── Config ─────────────────────────────────────────────────────────────
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -18,11 +25,14 @@ const DATABASE_URL = process.env.DATABASE_URL!;
 const OSU_CLIENT_ID = process.env.OSU_CLIENT_ID!;
 const OSU_CLIENT_SECRET = process.env.OSU_CLIENT_SECRET!;
 
-for (const [k, v] of Object.entries({ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_URL, DATABASE_URL, OSU_CLIENT_ID, OSU_CLIENT_SECRET })) {
+for (const [k, v] of Object.entries({
+	R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+	R2_BUCKET, R2_PUBLIC_URL, DATABASE_URL, OSU_CLIENT_ID, OSU_CLIENT_SECRET
+})) {
 	if (!v) { console.error(`Missing env var: ${k}`); process.exit(1); }
 }
 
-// ── R2 client ──────────────────────────────────────────────────────────
+// ── R2 ─────────────────────────────────────────────────────────────────
 
 const r2 = new S3Client({
 	accessKeyId: R2_ACCESS_KEY_ID,
@@ -38,20 +48,32 @@ function urlToKey(url: string): string {
 	return `misc${u.pathname}`;
 }
 
-async function uploadIfMissing(url: string): Promise<'uploaded' | 'exists' | 'failed'> {
-	const key = urlToKey(url);
+async function proxyToR2(osuUrl: string): Promise<string> {
+	const key = urlToKey(osuUrl);
+	const cdnUrl = `${R2_PUBLIC_URL}/${key}`;
 	try {
 		const file = r2.file(key);
-		if (await file.exists()) return 'exists';
+		if (await file.exists()) return cdnUrl;
 
-		const res = await fetch(url);
+		const res = await fetch(osuUrl);
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		const contentType = res.headers.get('content-type') ?? 'image/jpeg';
 		await file.write(res, { type: contentType });
-		return 'uploaded';
+		console.log(`  ↑ uploaded ${key}`);
+		return cdnUrl;
 	} catch (err: unknown) {
-		console.error(`  ✗ ${key} — ${err instanceof Error ? err.message : err}`);
-		return 'failed';
+		console.error(`  ✗ failed ${key}: ${err instanceof Error ? err.message : err}`);
+		return osuUrl; // Return original on failure
+	}
+}
+
+function isOsuUrl(url: string | null): boolean {
+	if (!url) return false;
+	try {
+		const u = new URL(url);
+		return u.hostname.endsWith('.ppy.sh');
+	} catch {
+		return false;
 	}
 }
 
@@ -81,18 +103,26 @@ async function getOsuToken(): Promise<string> {
 	return osuToken;
 }
 
-async function getBeatmapCovers(beatmapId: string): Promise<{ card: string; list: string } | null> {
+interface BeatmapData {
+	beatmapset: {
+		title: string;
+		artist: string;
+		covers: Record<string, string>;
+	};
+	version: string;
+	difficulty_rating: number;
+	bpm: number;
+	total_length: number;
+}
+
+async function getBeatmap(beatmapId: string): Promise<BeatmapData | null> {
 	try {
 		const token = await getOsuToken();
 		const res = await fetch(`https://osu.ppy.sh/api/v2/beatmaps/${beatmapId}`, {
 			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
 		});
 		if (!res.ok) return null;
-		const data = await res.json() as { beatmapset: { covers: Record<string, string> } };
-		return {
-			card: data.beatmapset.covers['card@2x'],
-			list: data.beatmapset.covers['list@2x']
-		};
+		return await res.json() as BeatmapData;
 	} catch {
 		return null;
 	}
@@ -102,57 +132,135 @@ async function getBeatmapCovers(beatmapId: string): Promise<{ card: string; list
 
 const sql = postgres(DATABASE_URL);
 
-console.log('── Backfilling user avatars ─────────────────────────────');
+// ════════════════════════════════════════════════════════════════════════
+// 1. MAPPOOL SLOTS — backfill title/artist/version/coverUrl/listCoverUrl
+// ════════════════════════════════════════════════════════════════════════
 
-const users = await sql<{ image: string }[]>`
-	SELECT image FROM "user" WHERE image IS NOT NULL AND image != ''
+console.log('═══ 1/3: Backfilling mappool slot metadata + covers ═══\n');
+
+const slots = await sql<{ id: string; beatmap_id: string; cover_url: string | null; title: string | null }[]>`
+	SELECT id, beatmap_id, cover_url, title FROM mappool_slot
+	WHERE cover_url IS NULL OR title IS NULL
 `;
 
-let uploaded = 0, skipped = 0, failed = 0;
-for (const { image } of users) {
-	if (!image.includes('ppy.sh') && !image.includes('a.ppy.sh')) {
-		// Non-osu avatar, skip for now
-		continue;
-	}
-	const result = await uploadIfMissing(image);
-	if (result === 'uploaded') { uploaded++; console.log(`  ↑ ${urlToKey(image)}`); }
-	else if (result === 'exists') skipped++;
-	else failed++;
-}
-console.log(`Done: ${uploaded} uploaded, ${skipped} already existed, ${failed} failed\n`);
+console.log(`Found ${slots.length} slots missing metadata\n`);
 
-console.log('── Backfilling beatmap covers ────────────────────────────');
-
-const slots = await sql<{ beatmap_id: string }[]>`
-	SELECT DISTINCT beatmap_id FROM mappool_slot
-`;
-
-console.log(`Found ${slots.length} unique beatmaps\n`);
-
-uploaded = 0; skipped = 0; failed = 0;
-for (const { beatmap_id } of slots) {
-	process.stdout.write(`  beatmap ${beatmap_id} ... `);
-	const covers = await getBeatmapCovers(beatmap_id);
-	if (!covers) {
+let slotOk = 0, slotFail = 0;
+for (const slot of slots) {
+	process.stdout.write(`  beatmap ${slot.beatmap_id} ... `);
+	const bm = await getBeatmap(slot.beatmap_id);
+	if (!bm) {
 		console.log('✗ not found on osu!');
-		failed++;
+		slotFail++;
 		continue;
 	}
 
-	let ok = true;
-	for (const url of [covers.card, covers.list]) {
-		if (!url) continue;
-		const result = await uploadIfMissing(url);
-		if (result === 'failed') ok = false;
-		if (result === 'uploaded') uploaded++;
-		if (result === 'exists') skipped++;
-	}
-	console.log(ok ? '✓' : '✗ partial');
+	const cardUrl = bm.beatmapset.covers['card@2x'];
+	const listUrl = bm.beatmapset.covers['list@2x'];
 
-	// Be polite to osu! API — 10 req/s max
-	await sleep(120);
+	const coverUrl = cardUrl ? await proxyToR2(cardUrl) : null;
+	const listCoverUrl = listUrl ? await proxyToR2(listUrl) : null;
+
+	await sql`
+		UPDATE mappool_slot SET
+			title = ${bm.beatmapset.title},
+			artist = ${bm.beatmapset.artist},
+			version = ${bm.version},
+			star_rating = ${bm.difficulty_rating},
+			bpm = ${bm.bpm},
+			total_length = ${bm.total_length},
+			cover_url = ${coverUrl},
+			list_cover_url = ${listCoverUrl}
+		WHERE id = ${slot.id}
+	`;
+
+	console.log('✓');
+	slotOk++;
+	await sleep(120); // Rate limit osu! API
 }
 
-console.log(`\nDone: ${uploaded} uploaded, ${skipped} already existed, ${failed} failed`);
+console.log(`\nSlots: ${slotOk} updated, ${slotFail} failed\n`);
+
+// Also update any slots that have osu! URLs instead of R2 URLs (partially migrated)
+const osuUrlSlots = await sql<{ id: string; cover_url: string | null; list_cover_url: string | null }[]>`
+	SELECT id, cover_url, list_cover_url FROM mappool_slot
+	WHERE (cover_url LIKE '%ppy.sh%' OR list_cover_url LIKE '%ppy.sh%')
+`;
+
+if (osuUrlSlots.length > 0) {
+	console.log(`Found ${osuUrlSlots.length} slots with osu! URLs (need R2 proxy)\n`);
+	for (const slot of osuUrlSlots) {
+		const newCover = slot.cover_url && isOsuUrl(slot.cover_url) ? await proxyToR2(slot.cover_url) : slot.cover_url;
+		const newList = slot.list_cover_url && isOsuUrl(slot.list_cover_url) ? await proxyToR2(slot.list_cover_url) : slot.list_cover_url;
+		await sql`UPDATE mappool_slot SET cover_url = ${newCover}, list_cover_url = ${newList} WHERE id = ${slot.id}`;
+	}
+	console.log('Done re-proxying slot covers\n');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// 2. USER AVATARS — re-proxy any still pointing at ppy.sh
+// ════════════════════════════════════════════════════════════════════════
+
+console.log('═══ 2/3: Backfilling user avatars ═══\n');
+
+const users = await sql<{ id: string; image: string | null }[]>`
+	SELECT id, image FROM "user" WHERE image IS NOT NULL
+`;
+
+let avatarOk = 0, avatarSkip = 0;
+for (const u of users) {
+	if (!isOsuUrl(u.image)) {
+		avatarSkip++;
+		continue;
+	}
+	process.stdout.write(`  user ${u.id} (${u.image}) ... `);
+	const cdnUrl = await proxyToR2(u.image!);
+	if (cdnUrl !== u.image) {
+		await sql`UPDATE "user" SET image = ${cdnUrl} WHERE id = ${u.id}`;
+		console.log('✓ updated');
+		avatarOk++;
+	} else {
+		console.log('— unchanged (proxy failed)');
+	}
+}
+
+console.log(`\nAvatars: ${avatarOk} updated, ${avatarSkip} already R2\n`);
+
+// ════════════════════════════════════════════════════════════════════════
+// 3. TEAM AVATARS — re-proxy any still pointing at ppy.sh
+// ════════════════════════════════════════════════════════════════════════
+
+console.log('═══ 3/3: Backfilling team avatars ═══\n');
+
+const teams = await sql<{ id: string; avatar_url: string | null }[]>`
+	SELECT id, avatar_url FROM team WHERE avatar_url IS NOT NULL
+`;
+
+let teamOk = 0, teamSkip = 0;
+for (const t of teams) {
+	if (!isOsuUrl(t.avatar_url)) {
+		teamSkip++;
+		continue;
+	}
+	process.stdout.write(`  team ${t.id} ... `);
+	const cdnUrl = await proxyToR2(t.avatar_url!);
+	if (cdnUrl !== t.avatar_url) {
+		await sql`UPDATE team SET avatar_url = ${cdnUrl} WHERE id = ${t.id}`;
+		console.log('✓ updated');
+		teamOk++;
+	} else {
+		console.log('— unchanged');
+	}
+}
+
+console.log(`\nTeams: ${teamOk} updated, ${teamSkip} already R2\n`);
+
+// ════════════════════════════════════════════════════════════════════════
+
+console.log('═══ All done! ═══');
+console.log('Summary:');
+console.log(`  Mappool slots:  ${slotOk} backfilled, ${slotFail} failed`);
+console.log(`  User avatars:   ${avatarOk} re-proxied, ${avatarSkip} already R2`);
+console.log(`  Team avatars:   ${teamOk} re-proxied, ${teamSkip} already R2`);
 
 await sql.end();

@@ -21,11 +21,47 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	if (!pool) error(404, 'Mappool not found');
 
-	// Fetch beatmap metadata for all slots
+	// Use cached metadata from DB — only fall back to osu! API for legacy slots
 	const slotsWithBeatmaps = await Promise.all(
 		pool.slots.map(async (slot) => {
+			// Fast path: metadata already stored in DB (R2 URLs)
+			if (slot.title && slot.coverUrl) {
+				return {
+					...slot,
+					beatmap: {
+						title: slot.title,
+						artist: slot.artist ?? '',
+						version: slot.version ?? '',
+						starRating: slot.starRating ?? 0,
+						bpm: slot.bpm ?? 0,
+						totalLength: slot.totalLength ?? 0,
+						coverUrl: slot.coverUrl,
+						url: `https://osu.ppy.sh/beatmaps/${slot.beatmapId}`
+					}
+				};
+			}
+
+			// Slow path: legacy slot without cached metadata — fetch + backfill
 			try {
 				const beatmap = await getBeatmap(slot.beatmapId);
+				const coverUrl = await proxyImage(beatmap.beatmapset.covers['card@2x']);
+				const listCoverUrl = await proxyImage(beatmap.beatmapset.covers['list@2x']);
+
+				// Backfill the slot so future loads are instant
+				await db
+					.update(mappoolSlot)
+					.set({
+						title: beatmap.beatmapset.title,
+						artist: beatmap.beatmapset.artist,
+						version: beatmap.version,
+						coverUrl,
+						listCoverUrl,
+						starRating: beatmap.difficulty_rating,
+						bpm: beatmap.bpm,
+						totalLength: beatmap.total_length
+					})
+					.where(eq(mappoolSlot.id, slot.id));
+
 				return {
 					...slot,
 					beatmap: {
@@ -35,7 +71,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: beatmap.difficulty_rating,
 						bpm: beatmap.bpm,
 						totalLength: beatmap.total_length,
-						coverUrl: await proxyImage(beatmap.beatmapset.covers['card@2x']),
+						coverUrl,
 						url: beatmap.url
 					}
 				};
@@ -105,6 +141,16 @@ export const actions: Actions = {
 			where: and(eq(mappoolSlot.mappoolId, params.id), eq(mappoolSlot.category, category))
 		});
 
+		// Proxy covers to R2 at insert time — pages never hit osu! again
+		let coverUrl: string | null = null;
+		let listCoverUrl: string | null = null;
+		try {
+			coverUrl = await proxyImage(beatmap.beatmapset.covers['card@2x']);
+			listCoverUrl = await proxyImage(beatmap.beatmapset.covers['list@2x']);
+		} catch (err: any) {
+			console.warn('[Mappool] Failed to proxy covers to R2:', err.message);
+		}
+
 		await db.insert(mappoolSlot).values({
 			mappoolId: params.id,
 			beatmapId,
@@ -113,7 +159,13 @@ export const actions: Actions = {
 			starRating: beatmap.difficulty_rating,
 			bpm: beatmap.bpm,
 			totalLength: beatmap.total_length,
-			mods: category === 'NM' || category === 'TB' || category === 'FM' ? [] : [category]
+			mods: category === 'NM' || category === 'TB' || category === 'FM' ? [] : [category],
+			// Cached metadata — all R2 URLs
+			title: beatmap.beatmapset.title,
+			artist: beatmap.beatmapset.artist,
+			version: beatmap.version,
+			coverUrl,
+			listCoverUrl
 		});
 
 		return { success: true };
