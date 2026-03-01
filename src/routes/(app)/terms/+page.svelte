@@ -59,6 +59,6 @@
 	<p>
 		For questions about these Terms, contact us at
 		<!-- TODO: add contact email -->
-		<a href="mailto:contact@vash.software">contact@vash.software</a>.
+		<a href="mailto:stan@vash.software">stan@vash.software</a>.
 	</p>
 </div>
