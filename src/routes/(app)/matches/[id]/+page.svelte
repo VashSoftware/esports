@@ -468,35 +468,17 @@
 		</div>
 	{/if}
 
-	<!-- FINISHED MODAL -->
+	<!-- FINISHED BANNER -->
 	{#if m.state === 'FINISHED'}
 		{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
-		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-			<div class="w-full max-w-md rounded-xl border border-accent/30 bg-surface-800 p-8 text-center shadow-2xl">
-				<div class="text-4xl">🏆</div>
-				<h2 class="mt-4 text-2xl font-800">
-					<span class="text-accent">{winner?.team.name}</span> wins!
-				</h2>
-				<p class="mt-2 text-lg font-700 tabular-nums text-text-secondary">
-					{p1?.score} – {p2?.score}
-				</p>
-
-				<div class="mt-6 flex flex-col gap-1">
-					{#each m.games as game}
-						{@const bm = data.beatmapCache[game.slot?.beatmapId]}
-						{@const winnerP = m.participants.find((p: any) => p.id === game.winnerParticipantId)}
-						<div class="flex items-center gap-2 rounded bg-surface-700 px-3 py-1.5 text-xs">
-							<span class="font-600 {catColors[game.slot?.category]?.split(' ')[1] ?? 'text-text-secondary'}">{game.slot?.category}{game.slot?.orderInCategory}</span>
-							<span class="flex-1 truncate text-text-secondary">{bm ? `${bm.artist} - ${bm.title}` : `#${game.slot?.beatmapId}`}</span>
-							<span class="font-600 {winnerP?.id === p1?.id ? 'text-blue-400' : 'text-red-400'}">{winnerP?.team.name}</span>
-						</div>
-					{/each}
-				</div>
-
-				<a href="/" class="mt-6 inline-block rounded-md bg-accent px-6 py-2.5 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover">
-					Back to Dashboard
-				</a>
-			</div>
+		<div class="mt-6 rounded-xl border border-accent/30 bg-surface-800 p-6 text-center">
+			<div class="text-3xl">🏆</div>
+			<h2 class="mt-3 text-xl font-800">
+				<span class="text-accent">{winner?.team.name}</span> wins!
+			</h2>
+			<p class="mt-1 text-base font-700 tabular-nums text-text-secondary">
+				{p1?.score} – {p2?.score}
+			</p>
 		</div>
 	{/if}
 
