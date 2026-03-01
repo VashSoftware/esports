@@ -81,12 +81,21 @@
 		"src/routes/(app)/matches/[id]/+page.server.ts",
 		"src/routes/(app)/+layout.server.ts"
 	],
+	"/(app)/privacy": [
+		"src/routes/(app)/+layout.server.ts"
+	],
 	"/(app)/settings": [
 		"src/routes/(app)/settings/+page.server.ts",
 		"src/routes/(app)/+layout.server.ts"
 	],
+	"/sitemap.xml": [
+		"src/routes/sitemap.xml/+server.ts"
+	],
 	"/(app)/teams": [
 		"src/routes/(app)/teams/+page.server.ts",
+		"src/routes/(app)/+layout.server.ts"
+	],
+	"/(app)/terms": [
 		"src/routes/(app)/+layout.server.ts"
 	]
 }
