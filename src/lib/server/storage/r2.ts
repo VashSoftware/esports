@@ -38,10 +38,10 @@ const knownKeys = new Set<string>();
 
 /**
  * Returns a CDN URL for the given osu! image URL, uploading to R2 on first access.
- * Falls back to the original URL if R2 is not configured or the upload fails.
+ * Returns null if R2 is not configured or the upload/fetch fails.
  */
-export async function proxyImage(osuUrl: string): Promise<string> {
-	if (!isConfigured()) return osuUrl;
+export async function proxyImage(osuUrl: string): Promise<string | null> {
+	if (!isConfigured()) return null;
 
 	const key = urlToKey(osuUrl);
 	const cdnUrl = `${env.R2_PUBLIC_URL}/${key}`;
@@ -65,6 +65,6 @@ export async function proxyImage(osuUrl: string): Promise<string> {
 		return cdnUrl;
 	} catch (err: unknown) {
 		console.error('[R2] proxyImage failed for', key, '—', err instanceof Error ? err.message : err);
-		return osuUrl;
+		return null;
 	}
 }
