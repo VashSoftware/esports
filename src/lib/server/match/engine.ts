@@ -298,24 +298,38 @@ export async function submitRoll(matchId: string, participantId: string, value: 
 	);
 
 	if (allRolled) {
-		const sorted = [...participants]
-			.map((p) => ({
-				...p,
-				rollValue: p.id === participantId ? value : p.rollValue!
-			}))
-			.sort((a, b) => b.rollValue - a.rollValue);
+		const finalRolls = participants.map((p) => ({
+			...p,
+			rollValue: p.id === participantId ? value : p.rollValue!
+		}));
 
-		for (let i = 0; i < sorted.length; i++) {
+		const rollValues = finalRolls.map((p) => p.rollValue);
+		const hasTie = new Set(rollValues).size < rollValues.length;
+
+		if (hasTie) {
+			// Reset all rolls so everyone must roll again
+			for (const p of participants) {
+				await db
+					.update(matchParticipant)
+					.set({ rollValue: null })
+					.where(eq(matchParticipant.id, p.id));
+			}
+			// Stay in ROLLING state
+		} else {
+			const sorted = [...finalRolls].sort((a, b) => b.rollValue - a.rollValue);
+
+			for (let i = 0; i < sorted.length; i++) {
+				await db
+					.update(matchParticipant)
+					.set({ pickOrder: i + 1 })
+					.where(eq(matchParticipant.id, sorted[i].id));
+			}
+
 			await db
-				.update(matchParticipant)
-				.set({ pickOrder: i + 1 })
-				.where(eq(matchParticipant.id, sorted[i].id));
+				.update(match)
+				.set({ state: MATCH_STATES.PICKING })
+				.where(eq(match.id, matchId));
 		}
-
-		await db
-			.update(match)
-			.set({ state: MATCH_STATES.PICKING })
-			.where(eq(match.id, matchId));
 	}
 
 	return getMatchFull(matchId);

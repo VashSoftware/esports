@@ -122,28 +122,42 @@ export function onMatchStateChange(matchId: string, newState: string) {
 					if (m.state !== MATCH_STATES.ROLLING) return;
 
 					const lobby = getLobby(matchId);
-					const unrolled = m.participants.filter((p) => p.rollValue === null);
-					if (unrolled.length === 0) return;
+					const initialUnrolled = m.participants.filter((p) => p.rollValue === null);
+					if (initialUnrolled.length === 0) return;
 
-					const names = unrolled.map((p) => p.team.name).join(', ');
+					const names = initialUnrolled.map((p) => p.team.name).join(', ');
 					if (lobby?.isAlive) {
 						await lobby.chat(`⏰ Rolling timed out — auto-rolling for: ${names}`);
 					}
 
-					for (const p of unrolled) {
-						const autoRoll = Math.floor(Math.random() * 100) + 1;
-						await submitRoll(matchId, p.id, autoRoll);
-						console.log(`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`);
-						if (lobby?.isAlive) {
-							await lobby.chat(`${p.team.name} auto-rolled ${autoRoll}`);
+					// Auto-roll with tie retry: keep rolling until no ties
+					let tieTries = 0;
+					let current = await getMatchFull(matchId);
+					while (current.state === MATCH_STATES.ROLLING && tieTries < 10) {
+						const unrolled = current.participants.filter((p) => p.rollValue === null);
+						if (unrolled.length === 0) break;
+						for (const p of unrolled) {
+							const autoRoll = Math.floor(Math.random() * 100) + 1;
+							await submitRoll(matchId, p.id, autoRoll);
+							console.log(`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`);
+							if (lobby?.isAlive) {
+								await lobby.chat(`${p.team.name} auto-rolled ${autoRoll}`);
+							}
+						}
+						current = await getMatchFull(matchId);
+						if (current.state === MATCH_STATES.ROLLING) {
+							// Tie — all rolls were reset, retry
+							tieTries++;
+							if (lobby?.isAlive) {
+								await lobby.chat(`Tie! Auto-rolling again...`);
+							}
 						}
 					}
 
 					// After auto-rolling, check if state advanced to PICKING
-					const updated = await getMatchFull(matchId);
-					if (updated.state === MATCH_STATES.PICKING) {
+					if (current.state === MATCH_STATES.PICKING) {
 						onMatchStateChange(matchId, MATCH_STATES.PICKING);
-						const sorted = [...updated.participants].sort(
+						const sorted = [...current.participants].sort(
 							(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 						);
 						if (lobby?.isAlive) {
@@ -414,10 +428,12 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				return;
 			}
 
+			const isLastRoll = m.participants.filter((p) => p.rollValue === null).length === 1;
+
 			await submitRoll(matchId, targetParticipant.id, value);
 			console.log(`[Orchestrator] IRC roll: ${username} = ${value}`);
 
-			// Check if all rolled → announce pick order
+			// Check if all rolled → announce pick order or tie
 			const updated = await getMatchFull(matchId);
 			const remaining = updated.participants.filter((p) => p.rollValue === null);
 
@@ -432,6 +448,9 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 					`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
 					`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
 				);
+			} else if (isLastRoll && remaining.length === updated.participants.length) {
+				// All rolled the same value — everyone must reroll
+				await lobby.chat(`Tie! All players rolled ${value}. Please !roll again.`);
 			} else if (remaining.length > 0) {
 				// Tell the other player they still need to roll
 				await lobby.chat(
