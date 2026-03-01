@@ -83,7 +83,7 @@ async function resolveUser(ircUsername: string) {
 
 	if (!match) {
 		throw new Error(
-			'Your osu! account is not linked. Please sign in at the web UI first.'
+			'Your osu! account is not linked. Please sign up or link your account at https://esports.vash.software/'
 		);
 	}
 
