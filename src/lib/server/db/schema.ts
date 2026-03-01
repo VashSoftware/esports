@@ -58,6 +58,8 @@ export const mappoolSlot = pgTable('mappool_slot', {
 	orderInCategory: integer('order_in_category').notNull(),
 	beatmapId: text('beatmap_id').notNull(),
 	starRating: real('star_rating'),
+	bpm: real('bpm'),
+	totalLength: integer('total_length'),
 	mods: text('mods').array().default([]).notNull()
 });
 

@@ -53,7 +53,9 @@
 
 	<div class="mt-6 flex flex-col gap-3">
 		{#each data.mappools as pool}
-<a
+			{@const rated = pool.slots.filter((s: any) => s.starRating != null)}
+			{@const avgSr = rated.length > 0 ? (rated.reduce((sum: number, s: any) => sum + s.starRating, 0) / rated.length).toFixed(2) : null}
+			<a
 				href="/mappools/{pool.id}"
 				class="group flex items-center justify-between rounded-lg border border-border bg-surface-800 p-4 transition-colors hover:border-accent/40 hover:bg-surface-700"
 			>
@@ -61,6 +63,7 @@
 					<h2 class="text-sm font-600">{pool.name}</h2>
 					<p class="mt-1 text-xs text-text-secondary">
 						{pool.slots.length} map{pool.slots.length !== 1 ? 's' : ''}
+						{#if avgSr}· ★ {avgSr}{/if}
 						· Created {new Date(pool.createdAt).toLocaleDateString()}
 					</p>
 				</div>
