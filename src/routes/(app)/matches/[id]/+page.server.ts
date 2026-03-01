@@ -5,6 +5,7 @@ import { playPickedMap, closeLobby, forceStartGame } from '$lib/server/match/orc
 import { getLobby, getLobbyStatus } from '$lib/server/bancho/client';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
+import { proxyImage } from '$lib/server/storage/r2';
 import { hasRole } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 import { eq } from 'drizzle-orm';
@@ -35,8 +36,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: bm.difficulty_rating,
 						bpm: bm.bpm,
 						totalLength: bm.total_length,
-						coverUrl: bm.beatmapset.covers['card@2x'],
-						listCoverUrl: bm.beatmapset.covers['list@2x']
+						coverUrl: await proxyImage(bm.beatmapset.covers['card@2x']),
+						listCoverUrl: await proxyImage(bm.beatmapset.covers['list@2x'])
 					};
 				} catch { /* skip */ }
 			})

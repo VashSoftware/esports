@@ -3,6 +3,7 @@ import { mappool, mappoolSlot } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
+import { proxyImage } from '$lib/server/storage/r2';
 import { requireAuth, requireOwnerOrAdmin } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -34,7 +35,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 						starRating: beatmap.difficulty_rating,
 						bpm: beatmap.bpm,
 						totalLength: beatmap.total_length,
-						coverUrl: beatmap.beatmapset.covers['card@2x'],
+						coverUrl: await proxyImage(beatmap.beatmapset.covers['card@2x']),
 						url: beatmap.url
 					}
 				};
