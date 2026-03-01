@@ -304,7 +304,7 @@
 			</div>
 			{#if bm}
 				<p class="mt-2 text-center text-sm">{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span></p>
-				<p class="mt-1 text-center text-xs text-text-secondary">★{bm.starRating.toFixed(1)} &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}</p>
+				<p class="mt-1 text-center text-xs text-text-secondary">{bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}</p>
 			{/if}
 
 			<!-- Per-player lobby status -->
@@ -370,7 +370,7 @@
 						{/if}
 					</h2>
 					{#if mappoolAvgSR()}
-						<span class="text-xs text-text-secondary">avg ★{mappoolAvgSR()}</span>
+						<span class="text-xs text-text-secondary">avg {mappoolAvgSR()}★</span>
 					{/if}
 					{#if pickingPhase}
 						<span class="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-600 text-blue-400">
@@ -452,7 +452,7 @@
 											<div class="min-w-0 flex-1">
 												{#if bm}
 													<p class="truncate text-xs font-500">{bm.artist} - {bm.title}</p>
-													<p class="text-xs text-text-secondary">[{bm.version}] &middot; ★{bm.starRating.toFixed(1)} &middot; {bm.bpm}bpm</p>
+													<p class="text-xs text-text-secondary">[{bm.version}] &middot; {bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm</p>
 												{:else}
 													<p class="text-xs text-text-secondary">#{slot.beatmapId}</p>
 												{/if}

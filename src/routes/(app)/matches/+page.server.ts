@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	requireAuth(locals);
 
 	const matches = await db.query.match.findMany({
-		with: { participants: { with: { team: true } } },
+		with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
 		orderBy: desc(match.createdAt),
 		limit: 50
 	});
