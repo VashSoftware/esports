@@ -340,13 +340,10 @@
 									{/if}
 									<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
 								</div>
-								<p class="mt-0.5 text-xs text-text-secondary">
-									{m.name ? `${m.name} · ` : ''}BO{config.bestOf}
-									{#if m.mappool}
-										&middot; <a href='/mappools/{m.mappool.id}' onclick={(e) => e.stopPropagation()} class='hover:text-accent hover:underline'>{m.mappool.name}</a>{#if avgSR(m.mappool)} {" "} (<span>{avgSR(m.mappool)}★</span>){/if}
-									{/if}
-									&middot; {timeAgo(m.finishedAt ?? m.createdAt)}
-								</p>
+								<p class="mt-0.5 text-xs text-text-secondary">{m.name ? `${m.name} · ` : ''}BO{config.bestOf} &middot; {timeAgo(m.finishedAt ?? m.createdAt)}</p>
+								{#if m.mappool}
+									<p class="text-xs text-text-secondary"><a href='/mappools/{m.mappool.id}' onclick={(e) => e.stopPropagation()} class='hover:text-accent hover:underline'>{m.mappool.name}</a>{#if avgSR(m.mappool)} ({avgSR(m.mappool)}★){/if}</p>
+								{/if}
 							</div>
 
 							{#if m.state === 'FINISHED' && m.winnerId}
