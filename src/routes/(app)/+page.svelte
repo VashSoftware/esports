@@ -225,6 +225,13 @@
 							Leave Queue
 						</button>
 					</div>
+				{:else if data.hasActiveMatch}
+					<a
+						href="/matches/{data.activeMatchId}"
+						class="rounded-md border border-accent/40 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10"
+					>
+						View Active Match →
+					</a>
 				{:else}
 					<button
 						onclick={joinQueue}

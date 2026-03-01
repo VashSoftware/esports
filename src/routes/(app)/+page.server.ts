@@ -2,6 +2,7 @@
 import { db } from '$lib/server/db';
 import { match, team, mappool } from '$lib/server/db/schema';
 import { eq, desc, count, inArray } from 'drizzle-orm';
+import { getQueueStatus } from '$lib/server/match/engine';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -35,10 +36,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.from(match)
 		.where(eq(match.state, 'FINISHED'));
 
+	const queueStatus = await getQueueStatus(locals.user.id);
+
 	return {
 		authenticated: true as const,
 		recentMatches,
 		liveMatches,
+		hasActiveMatch: !!queueStatus.matchedMatchId,
+		activeMatchId: queueStatus.matchedMatchId ?? null,
 		stats: {
 			matches: matchCount.count,
 			finished: finishedCount.count,
