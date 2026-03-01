@@ -68,6 +68,36 @@
 		return groups;
 	});
 
+	// Match duration
+	let now = $state(Date.now());
+	$effect(() => {
+		if (m.startedAt && !['FINISHED', 'CANCELLED'].includes(m.state)) {
+			const interval = setInterval(() => { now = Date.now(); }, 1000);
+			return () => clearInterval(interval);
+		}
+	});
+	function formatDuration(ms: number): string {
+		const totalSecs = Math.floor(ms / 1000);
+		const mins = Math.floor(totalSecs / 60);
+		const secs = totalSecs % 60;
+		return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+	}
+	const duration = $derived(
+		m.startedAt
+			? m.finishedAt
+				? formatDuration(new Date(m.finishedAt).getTime() - new Date(m.startedAt).getTime())
+				: formatDuration(now - new Date(m.startedAt).getTime())
+			: null
+	);
+
+	// Mappool avg SR
+	const mappoolAvgSR = $derived(() => {
+		const slots = m.mappool?.slots;
+		if (!slots?.length) return null;
+		const avg = slots.reduce((sum: number, s: any) => sum + (s.starRating ?? 0), 0) / slots.length;
+		return avg.toFixed(2);
+	});
+
 	let rolling = $state(false);
 	let picking = $state(false);
 	let pickError = $state('');
@@ -142,6 +172,12 @@
 			<h1 class="text-xl font-700 tracking-tight">{m.name || 'Match'}</h1>
 			<p class="mt-0.5 text-xs text-text-secondary">
 				Best of {config.bestOf} &middot; First to {winsNeeded}
+				{#if m.mappool}
+					&middot; {m.mappool.name}{mappoolAvgSR() ? ` · avg ★${mappoolAvgSR()}` : ''}
+				{/if}
+				{#if duration}
+					&middot; {duration}
+				{/if}
 				{#if m.osuLobbyId}
 					&middot; <a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a>
 				{/if}
@@ -165,6 +201,12 @@
 				{/if}
 				<div class="flex-1">
 					<p class="text-sm font-600">{p1.team.name}</p>
+					{#if config.teamSize === 1}
+						{@const r1 = data.playerRatings?.[p1.players[0]?.userId]}
+						{#if r1}
+							<p class="text-xs text-text-secondary">{r1.elo} ELO · {r1.wins}W {r1.losses}L</p>
+						{/if}
+					{/if}
 					{#if p1.rollValue != null}
 						<p class="text-xs text-text-secondary">Roll: {p1.rollValue}{p1.pickOrder === 1 ? ' ★' : ''}</p>
 					{/if}
@@ -178,6 +220,12 @@
 				<span class="text-3xl font-800 tabular-nums {p2.score >= winsNeeded ? 'text-green-400' : 'text-text-primary'}">{p2.score}</span>
 				<div class="flex-1 text-right">
 					<p class="text-sm font-600">{p2.team.name}</p>
+					{#if config.teamSize === 1}
+						{@const r2 = data.playerRatings?.[p2.players[0]?.userId]}
+						{#if r2}
+							<p class="text-xs text-text-secondary">{r2.wins}W {r2.losses}L · {r2.elo} ELO</p>
+						{/if}
+					{/if}
 					{#if p2.rollValue != null}
 						<p class="text-xs text-text-secondary">{p2.pickOrder === 1 ? '★ ' : ''}Roll: {p2.rollValue}</p>
 					{/if}
