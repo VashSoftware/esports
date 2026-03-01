@@ -1,14 +1,16 @@
 import { env } from '$env/dynamic/private';
-import { S3Client } from 'bun';
+
+type S3ClientType = import('bun').S3Client;
 
 function isConfigured(): boolean {
 	return !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ACCOUNT_ID && env.R2_BUCKET && env.R2_PUBLIC_URL);
 }
 
-let client: S3Client | null = null;
+let client: S3ClientType | null = null;
 
-function getClient(): S3Client {
+async function getClient(): Promise<S3ClientType> {
 	if (!client) {
+		const { S3Client } = await import(/* @vite-ignore */ 'bun');
 		client = new S3Client({
 			accessKeyId: env.R2_ACCESS_KEY_ID,
 			secretAccessKey: env.R2_SECRET_ACCESS_KEY,
@@ -49,7 +51,7 @@ export async function proxyImage(osuUrl: string): Promise<string | null> {
 	if (knownKeys.has(key)) return cdnUrl;
 
 	try {
-		const r2 = getClient();
+		const r2 = await getClient();
 		const file = r2.file(key);
 
 		const exists = await file.exists();
