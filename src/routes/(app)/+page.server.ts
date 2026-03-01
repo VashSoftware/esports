@@ -18,13 +18,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// ── LOGGED IN → dashboard data ──
 	const recentMatches = await db.query.match.findMany({
-		with: { participants: { with: { team: true } } },
+		with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
 		orderBy: desc(match.createdAt),
 		limit: 5
 	});
 
 	const liveMatches = await db.query.match.findMany({
-		with: { participants: { with: { team: true } } },
+		with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
 		where: inArray(match.state, ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'])
 	});
 

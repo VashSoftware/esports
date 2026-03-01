@@ -242,7 +242,7 @@
 									</a>
 									<div class="mt-0.5 flex items-center gap-3 text-xs text-text-secondary">
 										<span>[{slot.beatmap.version}]</span>
-										<span>★ {slot.beatmap.starRating.toFixed(2)}</span>
+										<span>{slot.beatmap.starRating.toFixed(2)}★</span>
 										<span>{slot.beatmap.bpm} BPM</span>
 										<span>{formatLength(slot.beatmap.totalLength)}</span>
 									</div>

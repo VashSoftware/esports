@@ -63,7 +63,7 @@
 					<h2 class="text-sm font-600">{pool.name}</h2>
 					<p class="mt-1 text-xs text-text-secondary">
 						{pool.slots.length} map{pool.slots.length !== 1 ? 's' : ''}
-						{#if avgSr}· ★ {avgSr}{/if}
+						{#if avgSr}· {avgSr}★{/if}
 						· Created {new Date(pool.createdAt).toLocaleDateString()}
 					</p>
 				</div>

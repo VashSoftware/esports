@@ -39,6 +39,13 @@
 		return { p1, p2 };
 	}
 
+	function avgSR(mappool: any): string | null {
+		const slots = mappool?.slots;
+		if (!slots?.length) return null;
+		const avg = slots.reduce((s: number, sl: any) => s + (sl.starRating ?? 0), 0) / slots.length;
+		return avg.toFixed(2);
+	}
+
 	function timeAgo(date: string | Date) {
 		const d = new Date(date);
 		const diff = Date.now() - d.getTime();
@@ -281,6 +288,9 @@
 						</div>
 						<p class="mt-0.5 text-xs text-text-secondary">
 							{m.name ? `${m.name} · ` : ''}BO{config.bestOf}
+							{#if m.mappool}
+								&middot; <a href='/mappools/{m.mappool.id}' onclick={(e) => e.stopPropagation()} class='hover:text-accent hover:underline'>{m.mappool.name}</a>{#if avgSR(m.mappool)} <span>{avgSR(m.mappool)}★</span>{/if}
+							{/if}
 							{#if m.finishedAt}
 								&middot; {timeAgo(m.finishedAt)}
 							{:else if m.createdAt}
