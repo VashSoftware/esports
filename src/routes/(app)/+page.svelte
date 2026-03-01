@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { untrack } from 'svelte';
+	import { onMount } from 'svelte';
 
 	let { data } = $props();
 
@@ -67,18 +67,13 @@
 		queueLoading = false;
 	}
 
-	// Poll queue status while on dashboard.
-	// Rate is read via untrack so queueStatus changes don't re-trigger the effect
-	// (which would cause an infinite fetch loop + rate limit exhaustion).
-	$effect(() => {
-		if (data.user) {
-			fetchQueueStatus();
-			const interval = setInterval(
-				fetchQueueStatus,
-				untrack(() => (queueStatus?.inQueue ? 2000 : 5000))
-			);
-			return () => clearInterval(interval);
-		}
+	// Poll queue status with a plain setInterval — no reactive dependencies,
+	// so Svelte can never re-trigger it and cause a request flood.
+	onMount(() => {
+		if (!data.user) return;
+		fetchQueueStatus();
+		const id = setInterval(fetchQueueStatus, 4000);
+		return () => clearInterval(id);
 	});
 
 	function timeAgo(date: string | Date) {
@@ -96,9 +91,9 @@
 
 <svelte:head>
 	<title>Vash Esports</title>
-	<meta name="description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management. Built for serious competition." />
+	<meta name="description" content="very cool and awesome automated osu! matchmaking platform" />
 	<meta property="og:title" content="Vash Esports" />
-	<meta property="og:description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management." />
+	<meta property="og:description" content="very cool and awesome automated osu! matchmaking platform" />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={page.url.href} />
 	<meta property="og:image" content="/og-image.png" />
