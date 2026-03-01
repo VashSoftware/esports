@@ -199,7 +199,7 @@
 					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 					<div class="relative h-2 w-2 rounded-full bg-green-400"></div>
 				</div>
-				Live Now
+				Live Now (max 4 until osu! gives me bot account lol)
 			</h2>
 			<div class="mt-3 flex flex-col gap-2">
 				{#each liveMatches as m}

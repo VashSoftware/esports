@@ -24,6 +24,15 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Teams — Vash Esports</title>
+	<meta name="description" content="Browse and manage teams on Vash Esports." />
+	<meta property="og:title" content="Teams — Vash Esports" />
+	<meta property="og:description" content="Browse and manage teams on Vash Esports." />
+	<meta property="og:site_name" content="Vash Esports" />
+	<meta name="twitter:card" content="summary" />
+</svelte:head>
+
 <div class="mx-auto max-w-4xl">
 	<!-- Header -->
 	<div class="flex items-center justify-between">

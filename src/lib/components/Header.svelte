@@ -28,14 +28,6 @@
 				<img src={user.image} alt={user.name} class="h-7 w-7 rounded-full" />
 			{/if}
 			<span class="hidden font-500 text-sm text-text-primary sm:inline">{user.name}</span>
-			<form method="post" action="/settings?/logout" use:enhance>
-				<button
-					type="submit"
-					class="rounded-md border border-border px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-red-500/30 hover:text-red-400"
-				>
-					Logout
-				</button>
-			</form>
 		</div>
 	{:else}
 		<a

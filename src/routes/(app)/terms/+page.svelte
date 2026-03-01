@@ -15,7 +15,7 @@
 
 	<h2>2. Use of the Service</h2>
 	<p>
-		Vash Esports is an osu! tournament management platform. You may use the Service only for lawful
+		Vash Esports is an event management platform. You may use the Service only for lawful
 		purposes and in accordance with these Terms. You agree not to:
 	</p>
 	<ul>
