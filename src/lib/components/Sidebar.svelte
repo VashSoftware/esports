@@ -3,6 +3,8 @@
 
 	const user = $derived(page.data?.user);
 
+	let { open = $bindable(false) } = $props();
+
 	const nav = [
 		{ href: '/', label: 'Dashboard', icon: '⌂' },
 		{ href: '/matches', label: 'Matches', icon: '⚔' },
@@ -18,10 +20,27 @@
 
 	const isStaff = $derived(user?.role === 'referee' || user?.role === 'admin');
 	const isAdmin = $derived(user?.role === 'admin');
+
+	// Close sidebar on navigation (mobile)
+	$effect(() => {
+		page.url.pathname;
+		open = false;
+	});
 </script>
 
+<!-- Backdrop (mobile only) -->
+{#if open}
+	<button
+		class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+		onclick={() => (open = false)}
+		aria-label="Close menu"
+	></button>
+{/if}
+
 <aside
-	class="fixed top-0 left-0 z-40 flex h-full w-56 flex-col border-r border-border bg-surface-800"
+	class="fixed top-0 left-0 z-50 flex h-full w-56 flex-col border-r border-border bg-surface-800 transition-transform duration-200 {open
+		? 'translate-x-0'
+		: '-translate-x-full'} lg:translate-x-0 lg:z-40"
 >
 	<!-- Logo -->
 	<a href="/" class="flex items-center gap-2.5 px-5 py-5">
