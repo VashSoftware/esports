@@ -113,11 +113,13 @@
 	<div class="flex min-h-[70vh] flex-col items-center justify-center text-center">
 		<img src="/logo.png" alt="Vash Esports" class="mb-6 h-16 w-16" />
 		<h1 class="text-4xl font-800 tracking-tight">
-			Welcome to <span class="text-accent">Vash Esports</span>
+			Welcome to <span class="text-accent font-semibold">Vash Esports</span>
 		</h1>
 		<p class="mt-3 max-w-md text-text-secondary">
-			Automated tournament match management for osu! — lobbies, mappools, picks, bans, and ELO
-			tracking all in one place.
+			a pretty cool automated osu! matchmaking platform.
+		</p>
+		<p class="mt-3 max-w-md text-text-secondary">
+			Please join <a href="https://discord.gg/n3mZgWk" target="_blank" rel="noopener" class="text-text-primary underline underline-offset-2 hover:text-accent transition-colors">discord.gg/n3mZgWk</a> and give any feedback :)
 		</p>
 		<a
 			href="/login"
@@ -125,9 +127,6 @@
 		>
 			Sign in with osu!
 		</a>
-		<p class="mt-4 text-xs text-text-secondary">
-			Uses your osu! account. No extra registration needed.
-		</p>
 	</div>
 
 	<!-- ── DASHBOARD (logged in) ── -->
