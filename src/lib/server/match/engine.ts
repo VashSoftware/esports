@@ -182,23 +182,21 @@ async function selectMappoolForRating(avgElo: number) {
 	const targetStars = 3 + ((avgElo - 800) / 400) * 4;
 	const clampedTarget = Math.max(2, Math.min(8, targetStars));
 
-	let bestPool = pools[0];
-	let bestDiff = Infinity;
+	// Score each pool by distance from target
+	const scored = pools
+		.filter((p) => p.slots.length > 0)
+		.map((p) => {
+			const avgStars = p.slots.reduce((sum, s) => sum + (s.starRating ?? 0), 0) / p.slots.length;
+			return { pool: p, diff: Math.abs(avgStars - clampedTarget) };
+		})
+		.sort((a, b) => a.diff - b.diff);
 
-	for (const pool of pools) {
-		if (pool.slots.length === 0) continue;
+	if (scored.length === 0) return null;
 
-		const avgStars =
-			pool.slots.reduce((sum, s) => sum + (s.starRating ?? 0), 0) / pool.slots.length;
-		const diff = Math.abs(avgStars - clampedTarget);
-
-		if (diff < bestDiff) {
-			bestDiff = diff;
-			bestPool = pool;
-		}
-	}
-
-	return bestPool;
+	// Allow any pool within 1 star of the closest match, then pick randomly
+	const threshold = scored[0].diff + 1.0;
+	const candidates = scored.filter((s) => s.diff <= threshold);
+	return candidates[Math.floor(Math.random() * candidates.length)].pool;
 }
 
 // ── Create Match ────────────────────────────────────────────────────────
