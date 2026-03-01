@@ -25,12 +25,12 @@ function sleep(ms: number) {
 
 // ── Match Timeouts ──────────────────────────────────────────────────────
 // Hard caps so the platform doesn't wait forever for players.
-// If a phase isn't completed in time the match is auto-cancelled.
+// Lobby join → cancel.  Rolling → auto-roll.  Picking → auto-pick.  Ready → force start.
 
-const TIMEOUT_LOBBY_JOIN = 10 * 60 * 1000; // 10 min to join
-const TIMEOUT_ROLLING    =  5 * 60 * 1000; //  5 min to complete all rolls
-const TIMEOUT_PICKING    =  5 * 60 * 1000; //  5 min to pick a map
-const TIMEOUT_READY      =  5 * 60 * 1000; //  5 min to ready up after map is set
+const TIMEOUT_LOBBY_JOIN = 5 * 60 * 1000; //  5 min to join
+const TIMEOUT_ROLLING    = 5 * 60 * 1000; //  5 min to complete all rolls
+const TIMEOUT_PICKING    = 2 * 60 * 1000; //  2 min to pick a map
+const TIMEOUT_READY      = 2 * 60 * 1000; //  2 min to ready up after map is set
 
 const matchTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -110,20 +110,111 @@ export function onMatchStateChange(matchId: string, newState: string) {
 						: '';
 				await timeoutMatch(
 					matchId,
-					`Not all players joined within 10 minutes. ${detail}`
+					`Not all players joined within 5 minutes. ${detail}`
 				);
 			});
 			break;
 
 		case MATCH_STATES.ROLLING:
-			setMatchTimeout(matchId, 'rolling', TIMEOUT_ROLLING, () => {
-				timeoutMatch(matchId, 'Not all players rolled within 5 minutes.');
+			setMatchTimeout(matchId, 'rolling', TIMEOUT_ROLLING, async () => {
+				try {
+					const m = await getMatchFull(matchId);
+					if (m.state !== MATCH_STATES.ROLLING) return;
+
+					const lobby = getLobby(matchId);
+					const unrolled = m.participants.filter((p) => p.rollValue === null);
+					if (unrolled.length === 0) return;
+
+					const names = unrolled.map((p) => p.team.name).join(', ');
+					if (lobby?.isAlive) {
+						await lobby.chat(`⏰ Rolling timed out — auto-rolling for: ${names}`);
+					}
+
+					for (const p of unrolled) {
+						const autoRoll = Math.floor(Math.random() * 100) + 1;
+						await submitRoll(matchId, p.id, autoRoll);
+						console.log(`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`);
+						if (lobby?.isAlive) {
+							await lobby.chat(`${p.team.name} auto-rolled ${autoRoll}`);
+						}
+					}
+
+					// After auto-rolling, check if state advanced to PICKING
+					const updated = await getMatchFull(matchId);
+					if (updated.state === MATCH_STATES.PICKING) {
+						onMatchStateChange(matchId, MATCH_STATES.PICKING);
+						const sorted = [...updated.participants].sort(
+							(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
+						);
+						if (lobby?.isAlive) {
+							await lobby.chat(
+								`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
+								`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
+							);
+						}
+					}
+				} catch (err: any) {
+					console.error(`[Timeout] Auto-roll failed for match ${matchId}:`, err.message);
+					await timeoutMatch(matchId, 'Auto-roll failed — match cancelled.');
+				}
 			});
 			break;
 
 		case MATCH_STATES.PICKING:
-			setMatchTimeout(matchId, 'picking', TIMEOUT_PICKING, () => {
-				timeoutMatch(matchId, 'No map was picked within 5 minutes.');
+			setMatchTimeout(matchId, 'picking', TIMEOUT_PICKING, async () => {
+				try {
+					const m = await getMatchFull(matchId);
+					if (m.state !== MATCH_STATES.PICKING) return;
+
+					const lobby = getLobby(matchId);
+					const config = m.config as MatchConfig;
+
+					// Determine whose turn it is
+					const sorted = [...m.participants].sort(
+						(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
+					);
+					const expectedIdx = m.games.length % sorted.length;
+					const picker = sorted[expectedIdx];
+
+					// Find available (unplayed, non-TB) slots
+					const playedSlotIds = new Set(m.games.map((g) => g.mappoolSlotId));
+					const available = (m.mappool?.slots ?? []).filter(
+						(s) => !playedSlotIds.has(s.id) && s.category !== 'TB'
+					);
+
+					if (available.length === 0) {
+						// Only TB left — check if it's match point
+						const winsNeeded = Math.ceil(config.bestOf / 2);
+						const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
+						if (allAtMatchPoint) {
+							const tb = (m.mappool?.slots ?? []).find(
+								(s) => s.category === 'TB' && !playedSlotIds.has(s.id)
+							);
+							if (tb) available.push(tb);
+						}
+					}
+
+					if (available.length === 0) {
+						await timeoutMatch(matchId, 'No available maps to auto-pick.');
+						return;
+					}
+
+					const randomSlot = available[Math.floor(Math.random() * available.length)];
+					const slotLabel = `${randomSlot.category}${randomSlot.orderInCategory}`;
+
+					if (lobby?.isAlive) {
+						await lobby.chat(`⏰ Pick timed out — auto-picking ${slotLabel} for ${picker?.team.name}`);
+					}
+					console.log(`[Timeout] Auto-picked ${slotLabel} for match ${matchId}`);
+
+					const game = await pickMap(matchId, picker!.id, randomSlot.id);
+					playPickedMap(matchId, game.id).catch((err) =>
+						console.error('[Timeout] Auto-pick play failed:', err.message)
+					);
+				} catch (err: any) {
+					console.error(`[Timeout] Auto-pick failed for match ${matchId}:`, err.message);
+					await timeoutMatch(matchId, 'Auto-pick failed — match cancelled.');
+				}
 			});
 			break;
 
@@ -206,7 +297,7 @@ export async function initMatchLobby(matchId: string) {
 	// Wire up IRC chat handlers for rolls, picks, and player joins
 	setupChatHandlers(matchId, lobby);
 
-	// ── Arm the lobby-join timeout (10 min) ──
+	// ── Arm the lobby-join timeout (5 min) ──
 	onMatchStateChange(matchId, MATCH_STATES.LOBBY);
 
 	// State stays LOBBY — transitions to ROLLING only when all players have joined
@@ -339,7 +430,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				await sleep(500);
 				await lobby.chat(
 					`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-					`Use !pick <slot> (e.g. !pick NM1). You have 5 minutes.`
+					`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
 				);
 			} else if (remaining.length > 0) {
 				// Tell the other player they still need to roll
@@ -476,26 +567,34 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 
 	// Announce with context: what map, current score, what to do
 	await lobby.chat(
-		`[${score}] Now playing ${slot.category}${slot.orderInCategory}. Please ready up! You have 5 minutes.`
+		`[${score}] Now playing ${slot.category}${slot.orderInCategory}. Please ready up! You have 2 minutes.`
 	);
 
-	// ── Arm ready timeout: cancel if nobody readies within 5 min ──
+	// ── Arm ready timeout: force start if nobody readies within 2 min ──
 	// Guard: if the game actually starts (force start / normal start)
-	// the timeout checks gameInProgress before cancelling.
+	// the timeout checks gameInProgress before force-starting.
 	setMatchTimeout(matchId, 'ready', TIMEOUT_READY, async () => {
 		const currentLobby = getLobby(matchId);
 		if (currentLobby?.gameInProgress) {
-			// Game is running — don't cancel, scores will come in eventually
+			// Game is running — scores will come in eventually
 			console.log(`[Timeout] Ready timeout fired but game is in progress for ${matchId}, ignoring`);
 			return;
 		}
-		await timeoutMatch(matchId, 'Players did not ready up within 5 minutes.');
+		console.log(`[Timeout] Ready timed out for match ${matchId} — force starting`);
+		if (currentLobby?.isAlive) {
+			try {
+				await currentLobby.chat('⏰ Ready timed out — force starting in 10s!');
+				await currentLobby.startGame(10);
+			} catch (err: any) {
+				console.error(`[Timeout] Force start failed for match ${matchId}:`, err.message);
+			}
+		}
 	});
 
 	// Wait for all players to ready up in osu!, then start
-	// Use a shorter soft-timeout so we can warn before the hard cancel fires
+	// Use a shorter soft-timeout so we can warn before the hard force-start fires
 	try {
-		await lobby.waitForReady(TIMEOUT_READY - 30_000);
+		await lobby.waitForReady(TIMEOUT_READY - 15_000);
 		clearMatchTimeout(matchId, 'ready'); // players readied — disarm
 		await lobby.chat('All ready — starting in 5s!');
 		await lobby.startGame(5);
@@ -503,9 +602,7 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		console.warn('[Orchestrator] Ready timeout:', err.message);
 		try {
 			await lobby.chat(
-				'Timed out waiting for ready. Ready up and the game will start, ' +
-				'or an admin can force start from the web UI. ' +
-				'Match will auto-cancel if nobody readies soon.'
+				'Timed out waiting for ready. Game will force start soon!'
 			);
 		} catch { /* lobby may be dead */ }
 		// Still set up score collection — force start will trigger the game
@@ -721,7 +818,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		try {
 			await sleep(1000);
 			await lobby.chat(
-				`${matchScoreStr} — first to ${winsNeeded} — ${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (5 min to pick)`
+				`${matchScoreStr} — first to ${winsNeeded} — ${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (2 min to pick)`
 			);
 		} catch { /* lobby may be dead */ }
 	}
