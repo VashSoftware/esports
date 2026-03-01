@@ -31,7 +31,7 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	// 200 req/min per IP — high enough for legit use, stops bots/scrapers.
 	if (event.url.pathname.startsWith('/api/')) {
 		const ip = event.getClientAddress();
-		const { ok, retryAfter } = checkRateLimit(`api:${ip}`, 200, 60_000);
+		const { ok, retryAfter } = checkRateLimit(`api:${ip}`, 600, 60_000);
 		if (!ok) {
 			return new Response('Too Many Requests', {
 				status: 429,
