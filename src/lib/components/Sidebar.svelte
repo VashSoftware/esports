@@ -54,7 +54,7 @@
 	<!-- Logo -->
 	<a href="/" class="flex items-center gap-2.5 px-5 py-5">
 		<img src="/logo.png" alt="Vash Esports" class="h-8 w-8" />
-		<span class="font-700 text-base tracking-tight text-text-primary">Vash Esports</span>
+		<span class="font-700 font-bold text-base tracking-tight text-text-primary">Vash Esports</span>
 	</a>
 
 	<!-- Nav -->

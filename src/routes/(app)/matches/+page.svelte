@@ -207,7 +207,7 @@
 					{@const sc = stateConfig[m.state]}
 					<a
 						href="/matches/{m.id}"
-						class="group flex items-center gap-4 rounded-lg border border-green-500/20 bg-surface-800 p-4 transition-all hover:border-green-500/40 hover:bg-surface-700"
+						class="group flex items-center gap-4 rounded-lg border border-white/15 bg-surface-800 p-4 transition-all hover:border-white/30 hover:bg-surface-700"
 					>
 						<div class="flex flex-1 items-center gap-3">
 							{#if p1?.team.avatarUrl}
