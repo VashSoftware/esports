@@ -1,8 +1,3 @@
-// src/lib/server/db/schema.ts
-//
-// CHANGE: Add `role` column to user table in auth.schema.ts (see that file).
-// This file adds the permission helper utilities.
-
 import {
 	pgTable,
 	integer,
@@ -60,7 +55,13 @@ export const mappoolSlot = pgTable('mappool_slot', {
 	starRating: real('star_rating'),
 	bpm: real('bpm'),
 	totalLength: integer('total_length'),
-	mods: text('mods').array().default([]).notNull()
+	mods: text('mods').array().default([]).notNull(),
+	// ── Cached beatmap metadata (stored at insert time → zero API calls on page load) ──
+	title: text('title'),
+	artist: text('artist'),
+	version: text('version'),
+	coverUrl: text('cover_url'),
+	listCoverUrl: text('list_cover_url')
 });
 
 // ── Matches ─────────────────────────────────────────────────────────────
