@@ -89,11 +89,7 @@
 			class="flex h-14 items-center justify-between border-b border-border bg-surface-900/80 px-6 backdrop-blur-md"
 		>
 			<a href="/" class="flex items-center gap-2.5">
-				<div
-					class="font-800 flex h-8 w-8 items-center justify-center rounded-md bg-accent text-sm text-surface-900"
-				>
-					V
-				</div>
+				<img src="/logo.png" alt="Vash Esports" class="h-8 w-8" />
 				<span class="font-700 text-base tracking-tight text-text-primary">Vash Esports</span>
 			</a>
 			<a

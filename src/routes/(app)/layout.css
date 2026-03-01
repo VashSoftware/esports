@@ -2,16 +2,16 @@
 @plugin '@tailwindcss/typography';
 
 @theme {
-	--color-surface-900: #0a0a0f;
-	--color-surface-800: #12121a;
-	--color-surface-700: #1a1a25;
-	--color-surface-600: #24243a;
+	--color-surface-900: #000000;
+	--color-surface-800: #1a1a1a;
+	--color-surface-700: #242424;
+	--color-surface-600: #2e2e2e;
 	--color-accent: #ff66ab;
 	--color-accent-hover: #ff85be;
-	--color-accent-dim: #ff66ab33;
-	--color-text-primary: #eeeef0;
-	--color-text-secondary: #8888a0;
-	--color-border: #2a2a3d;
+	--color-accent-dim: #ff66ab26;
+	--color-text-primary: #f0f0f0;
+	--color-text-secondary: #888888;
+	--color-border: #2a2a2a;
 	--font-display: 'Geist', system-ui, sans-serif;
 	--font-body: 'Geist', system-ui, sans-serif;
 	--font-mono: 'Geist Mono', ui-monospace, monospace;
