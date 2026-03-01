@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
+	import { untrack } from 'svelte';
 
 	let { data } = $props();
 
@@ -66,11 +67,16 @@
 		queueLoading = false;
 	}
 
-	// Poll queue status while on dashboard (faster when in queue)
+	// Poll queue status while on dashboard.
+	// Rate is read via untrack so queueStatus changes don't re-trigger the effect
+	// (which would cause an infinite fetch loop + rate limit exhaustion).
 	$effect(() => {
 		if (data.user) {
 			fetchQueueStatus();
-			const interval = setInterval(fetchQueueStatus, queueStatus?.inQueue ? 2000 : 5000);
+			const interval = setInterval(
+				fetchQueueStatus,
+				untrack(() => (queueStatus?.inQueue ? 2000 : 5000))
+			);
 			return () => clearInterval(interval);
 		}
 	});
@@ -89,9 +95,9 @@
 </script>
 
 <svelte:head>
-	<title>Vash Esports — osu! Tournament Platform</title>
+	<title>Vash Esports</title>
 	<meta name="description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management. Built for serious competition." />
-	<meta property="og:title" content="Vash Esports — osu! Tournament Platform" />
+	<meta property="og:title" content="Vash Esports" />
 	<meta property="og:description" content="Run osu! tournaments with automated lobbies, live scoring, mappools, and team management." />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={page.url.href} />
@@ -103,11 +109,7 @@
 <!-- ── LANDING PAGE (not logged in) ── -->
 {#if !data.user}
 	<div class="flex min-h-[70vh] flex-col items-center justify-center text-center">
-		<div
-			class="font-800 mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-accent text-2xl text-surface-900"
-		>
-			V
-		</div>
+		<img src="/logo.png" alt="Vash Esports" class="mb-6 h-16 w-16" />
 		<h1 class="text-4xl font-800 tracking-tight">
 			Welcome to <span class="text-accent">Vash Esports</span>
 		</h1>
@@ -129,11 +131,14 @@
 	<!-- ── DASHBOARD (logged in) ── -->
 {:else}
 	<div class="mx-auto max-w-5xl">
-		<div>
-			<h1 class="text-2xl font-700 tracking-tight">
-				Welcome back, <span class="text-accent">{data.user.name}</span>
-			</h1>
-			<p class="mt-1 text-sm text-text-secondary">Automated esports match management for osu!</p>
+		<div class="rounded-lg border border-border bg-surface-800 p-5">
+			<h1 class="text-3xl mb-4 font-semibold text-center font-800 tracking-tight">Vash Esports</h1>
+			<p class="mt-2 text-sm text-text-secondary leading-relaxed">
+				Press <span class="font-600 text-text-primary">'Find Match'</span> to join the queue to play a fully automated osu! match with other players in an ELO-appropriate map pool.
+			</p>
+			<p class="mt-2 text-sm text-text-secondary leading-relaxed">
+				I'll be adding a lot more features soon, like arbitrarily large team sizes, fully automated tournaments, automated broadcasting, and more. Please join <a href="https://discord.gg/n3mZgWk" target="_blank" rel="noopener" class="text-text-primary underline underline-offset-2 hover:text-accent transition-colors">discord.gg/n3mZgWk</a> and give any feedback :)
+			</p>
 		</div>
 
 		<!-- Stats -->
@@ -164,7 +169,7 @@
 						<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 						<div class="relative h-2 w-2 rounded-full bg-green-400"></div>
 					</div>
-					<h2 class="text-sm font-600">Live Now</h2>
+					<h2 class="text-sm font-600">Live Now (max 4 until osu! gives me bot account lol)</h2>
 				</div>
 				<div class="mt-3 flex flex-col gap-2">
 					{#each data.liveMatches as m}
@@ -173,7 +178,7 @@
 						{@const sc = stateConfig[m.state]}
 						<a
 							href="/matches/{m.id}"
-							class="flex items-center gap-4 rounded-lg border border-green-500/20 bg-surface-800 p-4 transition-all hover:border-green-500/40 hover:bg-surface-700"
+							class="flex items-center gap-4 rounded-lg border border-white/15 bg-surface-800 p-4 transition-all hover:border-white/30 hover:bg-surface-700"
 						>
 							<div class="flex flex-1 items-center gap-3">
 								{#if p1?.team.avatarUrl}
@@ -246,10 +251,9 @@
 						href="/matches"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
 					>
-						<span
-							class="flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent"
-							>⚔</span
-						>
+						<span class="flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 3.5-3.5"/><path d="m16.5 22 5-5"/><path d="M10 5.5 6 2H3v3l4 4"/></svg>
+						</span>
 						<div>
 							<p class="text-sm font-600">Matches</p>
 							<p class="text-xs text-text-secondary">View all matches</p>
@@ -259,10 +263,9 @@
 						href="/mappools"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
 					>
-						<span
-							class="flex h-8 w-8 items-center justify-center rounded-md bg-purple-500/10 text-purple-400"
-							>♫</span
-						>
+						<span class="flex h-8 w-8 items-center justify-center rounded-md bg-purple-500/10 text-purple-400">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="18" r="3"/><path d="M11 18V8l9-1v10"/><circle cx="20" cy="17" r="3"/></svg>
+						</span>
 						<div>
 							<p class="text-sm font-600">Mappools</p>
 							<p class="text-xs text-text-secondary">Build a pool</p>
@@ -272,10 +275,9 @@
 						href="/teams"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
 					>
-						<span
-							class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-400"
-							>⚑</span
-						>
+						<span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-400">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+						</span>
 						<div>
 							<p class="text-sm font-600">Teams</p>
 							<p class="text-xs text-text-secondary">Manage rosters</p>
@@ -285,10 +287,9 @@
 						href="/leaderboard"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/40 hover:bg-surface-700"
 					>
-						<span
-							class="flex h-8 w-8 items-center justify-center rounded-md bg-yellow-500/10 text-yellow-400"
-							>🏆</span
-						>
+						<span class="flex h-8 w-8 items-center justify-center rounded-md bg-yellow-500/10 text-yellow-400">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+						</span>
 						<div>
 							<p class="text-sm font-600">Leaderboard</p>
 							<p class="text-xs text-text-secondary">Rankings & stats</p>

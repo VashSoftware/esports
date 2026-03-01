@@ -103,7 +103,17 @@ async function findRecentActiveMatch(userId: string): Promise<string | null> {
 	return activeMatches[0]?.id ?? null;
 }
 
+const MAX_CONCURRENT_MATCHES = 4;
+
 async function tryMatchFromQueue() {
+	// Hard cap: osu! non-bot accounts can only host a limited number of lobbies
+	const [{ activeCount }] = await db
+		.select({ activeCount: sql<number>`count(*)` })
+		.from(match)
+		.where(inArray(match.state, [MATCH_STATES.LOBBY, MATCH_STATES.ROLLING, MATCH_STATES.PICKING, MATCH_STATES.PLAYING]));
+
+	if (Number(activeCount) >= MAX_CONCURRENT_MATCHES) return null;
+
 	const queue = await db.query.matchQueue.findMany({
 		orderBy: asc(matchQueue.elo)
 	});
