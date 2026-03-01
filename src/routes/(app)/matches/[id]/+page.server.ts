@@ -11,6 +11,7 @@ import { hasRole } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 import { eq } from 'drizzle-orm';
 import type { MatchConfig } from '$lib/server/match/types';
+import { playerRating } from '$lib/server/db/schema';
 
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -92,7 +93,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	const lobbyStatus = getLobbyStatus(params.id);
 
-	return { match: m, beatmapCache, userId: locals.user.id, isStaff, lobbyStatus, playerNames };
+	const playerRatings: Record<string, { elo: number; wins: number; losses: number }> = {};
+	for (const p of m.participants) {
+		for (const pl of p.players) {
+			const rating = await db.query.playerRating.findFirst({
+				where: eq(playerRating.userId, pl.userId)
+			});
+			if (rating) {
+				playerRatings[pl.userId] = { elo: rating.elo, wins: rating.wins, losses: rating.losses };
+			}
+		}
+	}
+
+	return { match: m, beatmapCache, userId: locals.user.id, isStaff, lobbyStatus, playerNames, playerRatings };
 };
 
 export const actions: Actions = {

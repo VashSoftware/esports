@@ -16,6 +16,9 @@ import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/cli
 // ── Queue ───────────────────────────────────────────────────────────────
 
 export async function joinQueue(userId: string, teamId: string) {
+	const activeMatchId = await findRecentActiveMatch(userId);
+	if (activeMatchId) throw new Error('You are already in an active match');
+
 	let rating = await db.query.playerRating.findFirst({
 		where: eq(playerRating.userId, userId)
 	});
