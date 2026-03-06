@@ -54,6 +54,8 @@
 		TB: 'bg-pink-500/20 text-pink-400 border-pink-500/30'
 	};
 
+	const MOD_ORDER = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
+
 	// Group mappool slots by category
 	const groupedSlots = $derived(() => {
 		if (!m.mappool?.slots) return {};
@@ -65,7 +67,10 @@
 		for (const cat of Object.keys(groups)) {
 			groups[cat].sort((a: any, b: any) => a.orderInCategory - b.orderInCategory);
 		}
-		return groups;
+		// Return entries sorted by canonical mod order
+		return Object.fromEntries(
+			MOD_ORDER.filter((cat) => groups[cat]).map((cat) => [cat, groups[cat]])
+		);
 	});
 
 	// Match duration
