@@ -9,13 +9,21 @@ import {
 	playerRating,
 	teamMember
 } from '$lib/server/db/schema';
-import { eq, asc, sql, desc, and, inArray } from 'drizzle-orm';
+import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/client';
 
 // ── Queue ───────────────────────────────────────────────────────────────
 
+const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+async function purgeExpiredQueueEntries() {
+	const cutoff = new Date(Date.now() - QUEUE_TIMEOUT_MS);
+	await db.delete(matchQueue).where(lt(matchQueue.joinedAt, cutoff));
+}
+
 export async function joinQueue(userId: string, teamId: string) {
+	await purgeExpiredQueueEntries();
 	const activeMatchId = await findRecentActiveMatch(userId);
 	if (activeMatchId) throw new Error('You are already in an active match');
 
@@ -50,6 +58,7 @@ export async function leaveQueue(userId: string) {
 }
 
 export async function getQueueStatus(userId: string) {
+	await purgeExpiredQueueEntries();
 	const entry = await db.query.matchQueue.findFirst({
 		where: eq(matchQueue.userId, userId)
 	});
