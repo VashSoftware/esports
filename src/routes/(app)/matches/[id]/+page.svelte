@@ -59,13 +59,13 @@
 	// Group mappool slots by category
 	const groupedSlots = $derived(() => {
 		if (!m.mappool?.slots) return {};
-		const groups: Record<string, any[]> = {};
+		const groups: Record<string, unknown[]> = {};
 		for (const slot of m.mappool.slots) {
 			if (!groups[slot.category]) groups[slot.category] = [];
 			groups[slot.category].push(slot);
 		}
 		for (const cat of Object.keys(groups)) {
-			groups[cat].sort((a: any, b: any) => a.orderInCategory - b.orderInCategory);
+			groups[cat].sort((a: unknown, b: unknown) => a.orderInCategory - b.orderInCategory);
 		}
 		// Return entries sorted by canonical mod order
 		return Object.fromEntries(
@@ -99,7 +99,7 @@
 	const mappoolAvgSR = $derived(() => {
 		const slots = m.mappool?.slots;
 		if (!slots?.length) return null;
-		const avg = slots.reduce((sum: number, s: any) => sum + (s.starRating ?? 0), 0) / slots.length;
+		const avg = slots.reduce((sum: number, s: unknown) => sum + (s.starRating ?? 0), 0) / slots.length;
 		return avg.toFixed(2);
 	});
 
@@ -412,64 +412,76 @@
 
 			{#if !mappoolCollapsed}
 				<div class="mt-3 flex flex-col gap-3">
-					{#each Object.entries(groupedSlots()) as [category, slots]}
+					{#each Object.entries(groupedSlots()) as [category, slots] (category)}
+						<!-- Grouped slots -->
 						<div>
 							<span class="mb-1.5 inline-block rounded border px-2 py-0.5 text-xs font-600 {catColors[category] ?? 'border-border'}">
 								{category}
 							</span>
 							<div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-								{#each slots as slot}
+								{#each slots as slot (slot.id)}
+									<!-- Slot -->
 									{@const bm = data.beatmapCache[slot.beatmapId]}
 									{@const isPlayed = playedSlotIds.has(slot.id)}
 									{@const isTB = slot.category === 'TB'}
 									{@const tbLocked = isTB && !isTiebreakerAllowed}
 									{@const cantPick = !isMyTurnToPick || !pickingPhase}
 
-									<form method="post" action="?/pick" use:enhance={() => {
-										picking = true;
-										pickError = '';
-										return async ({ result, update }) => {
-											picking = false;
-											if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
-												pickError = (result.data as any)?.error ?? 'Pick failed';
-											} else {
-												await update();
-											}
-										};
-									}}>
-										<input type="hidden" name="slotId" value={slot.id} />
-										<button
-											type="submit"
-											disabled={isPlayed || picking || tbLocked || cantPick}
-											class="flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-all {isPlayed
-												? 'border-border/50 bg-surface-900 opacity-30 cursor-not-allowed'
-												: tbLocked
-													? 'border-border/50 bg-surface-900 opacity-30 cursor-not-allowed'
-													: cantPick
-														? 'border-border bg-surface-800 opacity-60 cursor-default'
-														: 'border-border bg-surface-700 hover:border-accent hover:bg-surface-600 cursor-pointer'}"
+									<div class="flex items-center gap-2 rounded-lg border p-2 transition-all {isPlayed
+										? 'border-border/50 bg-surface-900 opacity-30'
+										: tbLocked
+											? 'border-border/50 bg-surface-900 opacity-30'
+											: 'border-border bg-surface-800'}">
+										<a
+											href="https://osu.ppy.sh/beatmaps/{slot.beatmapId}"
+											target="_blank"
+											class="flex min-w-0 flex-1 items-center gap-3"
 										>
 											{#if bm?.listCoverUrl}
-												<img src={bm.listCoverUrl} alt="" class="h-10 w-20 rounded object-cover" />
+												<img src={bm.listCoverUrl} alt="" class="h-10 w-20 shrink-0 rounded object-cover" />
 											{:else}
-												<div class="flex h-10 w-20 items-center justify-center rounded bg-surface-600 text-xs text-text-secondary">?</div>
+												<div class="flex h-10 w-20 shrink-0 items-center justify-center rounded bg-surface-600 text-xs text-text-secondary">?</div>
 											{/if}
 											<div class="min-w-0 flex-1">
 												{#if bm}
-													<p class="truncate text-xs font-500">{bm.artist} - {bm.title}</p>
+													<p class="truncate text-sm font-500">{bm.artist} - {bm.title}</p>
 													<p class="text-xs text-text-secondary">[{bm.version}] &middot; {bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm</p>
 												{:else}
 													<p class="text-xs text-text-secondary">#{slot.beatmapId}</p>
 												{/if}
 											</div>
-											<span class="text-xs font-600 text-text-secondary">{category}{slot.orderInCategory}</span>
-											{#if isPlayed}
-												<span class="text-xs text-text-secondary">✓</span>
-											{:else if tbLocked}
-												<span class="text-[10px] text-pink-400/60" title="Match point only">🔒</span>
-											{/if}
-										</button>
-									</form>
+										</a>
+										<span class="text-xs font-600 text-text-secondary">{category}{slot.orderInCategory}</span>
+										{#if isPlayed}
+											<span class="text-xs text-text-secondary">✓</span>
+										{:else if tbLocked}
+											<span class="text-[10px] text-pink-400/60" title="Match point only">🔒</span>
+										{:else if pickingPhase}
+											<form method="post" action="?/pick" use:enhance={() => {
+												picking = true;
+												pickError = '';
+												return async ({ result, update }) => {
+													picking = false;
+													if (result.type === 'failure' || (result.type === 'success' && (result.data as Record<string, unknown>)?.error)) {
+														pickError = (result.data as Record<string, unknown>)?.error as string ?? 'Pick failed';
+													} else {
+														await update();
+													}
+												};
+											}}>
+												<input type="hidden" name="slotId" value={slot.id} />
+												<button
+													type="submit"
+													disabled={picking || cantPick}
+													class="rounded px-2 py-1 text-[10px] font-700 transition-colors {cantPick
+														? 'bg-surface-600 text-text-secondary/40 cursor-default'
+														: 'bg-white text-black hover:bg-white/80 cursor-pointer'}"
+												>
+													PICK
+												</button>
+											</form>
+										{/if}
+									</div>
 								{/each}
 							</div>
 						</div>
