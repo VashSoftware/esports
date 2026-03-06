@@ -184,8 +184,9 @@ async function tryMatchFromQueue() {
 }
 
 async function selectMappoolForRating(avgElo: number) {
-	// Get all mappools with their slots
+	// Only use verified mappools
 	const pools = await db.query.mappool.findMany({
+		where: (m, { isNotNull }) => isNotNull(m.verifiedAt),
 		with: { slots: true }
 	});
 

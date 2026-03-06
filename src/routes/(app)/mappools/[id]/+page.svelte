@@ -108,6 +108,11 @@
 				{:else}
 					<div class="flex items-center gap-2">
 						<h1 class="text-2xl font-700 tracking-tight">{data.pool.name}</h1>
+						{#if data.pool.verifiedAt}
+							<span class="flex items-center gap-1 rounded border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-600 text-green-400">
+								✓ Verified
+							</span>
+						{/if}
 						{#if data.canEdit}
 							<button
 								onclick={() => {
@@ -128,19 +133,42 @@
 			</div>
 		</div>
 
-		{#if data.canEdit}
-			<form method="post" action="?/deletePool" use:enhance>
-				<button
-					type="submit"
-					onclick={(e) => {
-						if (!confirm('Delete this mappool?')) e.preventDefault();
-					}}
-					class="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-500/10"
-				>
-					Delete Pool
-				</button>
-			</form>
-		{/if}
+		<div class="flex items-center gap-2">
+			{#if data.isAdmin}
+				{#if data.pool.verifiedAt}
+					<form method="post" action="?/unverify" use:enhance>
+						<button
+							type="submit"
+							class="rounded-md border border-green-500/30 px-3 py-1.5 text-sm text-green-400 transition-colors hover:bg-green-500/10"
+						>
+							Unverify
+						</button>
+					</form>
+				{:else}
+					<form method="post" action="?/verify" use:enhance>
+						<button
+							type="submit"
+							class="rounded-md border border-green-500/30 px-3 py-1.5 text-sm text-green-400 transition-colors hover:bg-green-500/10"
+						>
+							✓ Verify
+						</button>
+					</form>
+				{/if}
+			{/if}
+			{#if data.canEdit}
+				<form method="post" action="?/deletePool" use:enhance>
+					<button
+						type="submit"
+						onclick={(e) => {
+							if (!confirm('Delete this mappool?')) e.preventDefault();
+						}}
+						class="rounded-md border border-red-500/30 px-3 py-1.5 text-sm text-red-400 transition-colors hover:bg-red-500/10"
+					>
+						Delete Pool
+					</button>
+				</form>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Add Map -->

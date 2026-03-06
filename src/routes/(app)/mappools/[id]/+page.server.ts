@@ -88,7 +88,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		pool: { ...pool, slots: slotsWithBeatmaps },
-		canEdit: isOwner || isAdmin
+		canEdit: isOwner || isAdmin,
+		isAdmin
 	};
 };
 
@@ -185,6 +186,30 @@ export const actions: Actions = {
 		if (!slotId) return { error: 'Missing slot ID' };
 
 		await db.delete(mappoolSlot).where(eq(mappoolSlot.id, slotId));
+		return { success: true };
+	},
+
+	verify: async ({ params, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+
+		await db
+			.update(mappool)
+			.set({ verifiedAt: new Date() })
+			.where(eq(mappool.id, params.id));
+
+		return { success: true };
+	},
+
+	unverify: async ({ params, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+
+		await db
+			.update(mappool)
+			.set({ verifiedAt: null })
+			.where(eq(mappool.id, params.id));
+
 		return { success: true };
 	},
 
