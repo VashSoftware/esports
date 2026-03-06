@@ -148,7 +148,7 @@
 	<meta property="og:description" content={ogDesc} />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={page.url.href} />
-	<meta property="og:image" content="/logo.png" />
+	<meta property="og:image" content="https://esports.vash.software/logo.png" />
 	<meta property="og:site_name" content="Vash Esports" />
 	<meta name="twitter:card" content="summary" />
 </svelte:head>
