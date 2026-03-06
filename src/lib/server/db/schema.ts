@@ -40,7 +40,8 @@ export const mappool = pgTable('mappool', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	name: text('name').notNull(),
 	createdBy: text('created_by'),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+	verifiedAt: timestamp('verified_at', { withTimezone: true })
 });
 
 // ── Mappool Slots ───────────────────────────────────────────────────────

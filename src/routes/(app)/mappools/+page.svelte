@@ -60,7 +60,12 @@
 				class="group flex items-center justify-between rounded-lg border border-border bg-surface-800 p-4 transition-colors hover:border-accent/40 hover:bg-surface-700"
 			>
 				<div>
-					<h2 class="text-sm font-600">{pool.name}</h2>
+					<div class="flex items-center gap-2">
+						<h2 class="text-sm font-600">{pool.name}</h2>
+						{#if pool.verifiedAt}
+							<span class="rounded border border-green-500/30 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-600 text-green-400">✓ Verified</span>
+						{/if}
+					</div>
 					<p class="mt-1 text-xs text-text-secondary">
 						{pool.slots.length} map{pool.slots.length !== 1 ? 's' : ''}
 						{#if avgSr}· {avgSr}★{/if}
