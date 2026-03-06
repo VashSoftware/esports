@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 
 	let { children } = $props();
@@ -12,6 +13,8 @@
 		<!-- svelte-ignore a11y_missing_attribute -->
 		<script async defer src={umamiUrl} data-website-id={umamiId}></script>
 	{/if}
+	<link rel="canonical" href={page.url.href} />
+	<meta name="robots" content="index, follow" />
 </svelte:head>
 
 {@render children()}
