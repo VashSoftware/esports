@@ -285,9 +285,6 @@ export async function initMatchLobby(matchId: string) {
 		: config.scoringType === 'combo' ? 2
 		: 0;
 	await lobby.setProperties(0, scoreMode, config.teamSize * 2);
-
-	// Remove password so players can join via mp link (and rejoin after disconnect)
-	await lobby.send('!mp password');
 	await sleep(500);
 
 	// Invite all players from both teams (with dedup + delays)
