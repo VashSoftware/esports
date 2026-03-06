@@ -19,7 +19,11 @@ const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 async function purgeExpiredQueueEntries() {
 	const cutoff = new Date(Date.now() - QUEUE_TIMEOUT_MS);
-	await db.delete(matchQueue).where(lt(matchQueue.joinedAt, cutoff));
+	const deleted = await db.delete(matchQueue).where(lt(matchQueue.joinedAt, cutoff)).returning();
+
+	if (deleted.length > 0) {
+		console.log(`[Queue] Purged ${deleted.length} expired queue entr${deleted.length === 1 ? 'y' : 'ies'}`);
+	}
 }
 
 export async function joinQueue(userId: string, teamId: string) {
