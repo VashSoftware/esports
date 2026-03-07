@@ -10,9 +10,10 @@
 	];
 
 	function eloColor(elo: number): string {
-		if (elo >= 1400) return 'text-yellow-400';
-		if (elo >= 1200) return 'text-purple-400';
-		if (elo >= 1000) return 'text-blue-400';
+		if (elo >= 2500) return 'text-yellow-400';
+		if (elo >= 2000) return 'text-purple-400';
+		if (elo >= 1500) return 'text-blue-400';
+		if (elo >= 1000) return 'text-green-400';
 		return 'text-text-secondary';
 	}
 
@@ -235,10 +236,11 @@
 	<div class="mt-6 rounded-lg border border-border bg-surface-800 p-5">
 		<h2 class="text-sm font-600">How ELO Works</h2>
 		<p class="mt-2 text-xs text-text-secondary leading-relaxed">
-			Every player starts at 1000 ELO. Win a match to gain points, lose to drop.
-			The system uses K=32, so new players' ratings shift quickly. As you play more,
-			your rating stabilizes around your true skill level. Queue matchmaking pairs players
-			with similar ELO for fair matches.
+			Your initial rating is seeded from your osu! global rank. Winning gains ELO and
+			losing drops it, but the amount depends on your opponent's rating — beating a
+			stronger player earns more points. New players' ratings shift faster to help
+			find your true skill level quickly. Queue matchmaking pairs players with similar
+			ELO for fair matches.
 		</p>
 	</div>
 </div>

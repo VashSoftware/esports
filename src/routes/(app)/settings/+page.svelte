@@ -12,7 +12,7 @@
 	const badge = $derived(roleBadge[data.profile.role] ?? roleBadge.player);
 
 	const winRate = $derived(
-		data.rating.wins + data.rating.losses > 0
+		data.rating && data.rating.wins + data.rating.losses > 0
 			? ((data.rating.wins / (data.rating.wins + data.rating.losses)) * 100).toFixed(1)
 			: '—'
 	);
@@ -79,15 +79,15 @@
 		<h3 class="text-xs font-600 text-text-secondary uppercase tracking-wider">Ranked Stats</h3>
 		<div class="mt-4 grid grid-cols-4 gap-4">
 			<div>
-				<p class="text-2xl font-800 tabular-nums text-accent">{data.rating.elo}</p>
+				<p class="text-2xl font-800 tabular-nums text-accent">{data.rating?.elo ?? '—'}</p>
 				<p class="mt-1 text-xs text-text-secondary">ELO Rating</p>
 			</div>
 			<div>
-				<p class="text-2xl font-800 tabular-nums text-green-400">{data.rating.wins}</p>
+				<p class="text-2xl font-800 tabular-nums text-green-400">{data.rating?.wins ?? 0}</p>
 				<p class="mt-1 text-xs text-text-secondary">Wins</p>
 			</div>
 			<div>
-				<p class="text-2xl font-800 tabular-nums text-red-400">{data.rating.losses}</p>
+				<p class="text-2xl font-800 tabular-nums text-red-400">{data.rating?.losses ?? 0}</p>
 				<p class="mt-1 text-xs text-text-secondary">Losses</p>
 			</div>
 			<div>

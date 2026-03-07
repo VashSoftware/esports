@@ -31,7 +31,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		},
 		rating: rating
 			? { elo: rating.elo, wins: rating.wins, losses: rating.losses }
-			: { elo: 1000, wins: 0, losses: 0 },
+			: null,
 		hasOsuLinked: !!osuAccount
 	};
 };
