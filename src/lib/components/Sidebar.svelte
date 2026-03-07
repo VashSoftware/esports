@@ -108,7 +108,7 @@
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/matches', label: 'Matches', icon: 'matches' },
 			{ href: '/mappools', label: 'Mappools', icon: 'mappools' },
-			{ href: '/teams', label: 'Teams', icon: 'teams' },
+			// { href: '/teams', label: 'Teams', icon: 'teams' },
 			{ href: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
 		] as item}
 			<a
