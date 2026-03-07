@@ -126,8 +126,10 @@ export const actions: Actions = {
 
 		const urlMatch = beatmapId.match(/beatmaps\/(\d+)/);
 		const setMatch = beatmapId.match(/beatmapsets\/\d+#\w+\/(\d+)/);
+		const shortMatch = beatmapId.match(/\/b\/(\d+)/);
 		if (urlMatch) beatmapId = urlMatch[1];
 		else if (setMatch) beatmapId = setMatch[1];
+		else if (shortMatch) beatmapId = shortMatch[1];
 
 		if (!/^\d+$/.test(beatmapId)) {
 			return { error: 'Invalid beatmap ID' };
