@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import {
+		queue,
+		joinQueue,
+		leaveQueue
+	} from '$lib/stores/queue.svelte';
 
 	const user = $derived(page.data?.user);
+	const activeMatch = $derived(page.data?.activeMatch);
 
 	let { open = $bindable(false) } = $props();
 
@@ -57,8 +63,47 @@
 		<span class="font-700 font-bold text-base tracking-tight text-text-primary">Vash Esports</span>
 	</a>
 
+	<!-- Queue Button -->
+	<div class="px-3 pb-4">
+		{#if activeMatch}
+			<a
+				href="/matches/{activeMatch.id}"
+				class="flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm font-600 text-yellow-300 transition-colors hover:bg-yellow-500/20"
+			>
+				<div class="relative h-2 w-2">
+					<div class="absolute inset-0 animate-ping rounded-full bg-yellow-400 opacity-75"></div>
+					<div class="h-2 w-2 rounded-full bg-yellow-400"></div>
+				</div>
+				Go to Match
+			</a>
+		{:else if queue.status?.inQueue}
+			<div class="flex flex-col gap-1.5">
+				<div class="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm font-600 text-yellow-300">
+					<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400"></span>
+					In Queue ({queue.status.queueSize})
+				</div>
+				<button
+					onclick={leaveQueue}
+					disabled={queue.loading}
+					class="flex w-full items-center justify-center rounded-md px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+				>
+					Leave Queue
+				</button>
+			</div>
+		{:else}
+			<button
+				onclick={joinQueue}
+				disabled={queue.loading}
+				class="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 3.5-3.5"/><path d="m16.5 22 5-5"/><path d="M10 5.5 6 2H3v3l4 4"/></svg>
+				{queue.loading ? 'Joining...' : 'Find Match'}
+			</button>
+		{/if}
+	</div>
+
 	<!-- Nav -->
-	<nav class="mt-2 flex flex-1 flex-col gap-0.5 px-3">
+	<nav class="mt-0 flex flex-1 flex-col gap-0.5 px-3">
 		{#each [
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/matches', label: 'Matches', icon: 'matches' },
@@ -91,6 +136,7 @@
 				Admin
 			</a>
 		{/if}
+
 	</nav>
 
 	<!-- Bottom -->
