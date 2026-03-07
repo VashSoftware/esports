@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import {
+		queue,
+		joinQueue,
+		leaveQueue
+	} from '$lib/stores/queue.svelte';
 
 	let { data } = $props();
 
@@ -16,65 +19,6 @@
 		FINISHED: { label: 'Finished', color: 'text-text-secondary' },
 		CANCELLED: { label: 'Cancelled', color: 'text-red-400' }
 	};
-
-	// Queue state
-	let queueStatus = $state<{
-		inQueue: boolean;
-		queueSize: number;
-		matchedMatchId?: string | null;
-	} | null>(null);
-	let queueLoading = $state(false);
-
-	async function fetchQueueStatus() {
-		try {
-			const res = await fetch('/api/queue');
-			if (res.ok) {
-				const status = await res.json();
-				const wasInQueue = queueStatus?.inQueue;
-				queueStatus = status;
-
-				// If we were in queue and now got matched, refresh the layout to show the active match banner
-				if (wasInQueue && !status.inQueue && status.matchedMatchId) {
-					await invalidateAll();
-				}
-			}
-		} catch {}
-	}
-
-	async function joinQueue() {
-		queueLoading = true;
-		try {
-			const res = await fetch('/api/queue', { method: 'POST' });
-			const result = await res.json();
-			if (result.matched && result.match) {
-				// Refresh layout to show banner instead of hard redirecting
-				await invalidateAll();
-				queueStatus = { inQueue: false, queueSize: 0, matchedMatchId: result.match.id };
-				queueLoading = false;
-				return;
-			}
-			await fetchQueueStatus();
-		} catch {}
-		queueLoading = false;
-	}
-
-	async function leaveQueue() {
-		queueLoading = true;
-		try {
-			await fetch('/api/queue', { method: 'DELETE' });
-			await fetchQueueStatus();
-		} catch {}
-		queueLoading = false;
-	}
-
-	// Poll queue status with a plain setInterval — no reactive dependencies,
-	// so Svelte can never re-trigger it and cause a request flood.
-	onMount(() => {
-		if (!data.user) return;
-		fetchQueueStatus();
-		const id = setInterval(fetchQueueStatus, 4000);
-		return () => clearInterval(id);
-	});
 
 	function avgSR(mappool: any): string | null {
 		const slots = mappool?.slots;
@@ -217,15 +161,15 @@
 					<h2 class="text-sm font-600">Ranked Queue</h2>
 					<p class="mt-0.5 text-xs text-text-secondary">Find a match at your skill level</p>
 				</div>
-				{#if queueStatus?.inQueue}
+				{#if queue.status?.inQueue}
 					<div class="flex items-center gap-3">
 						<span class="flex items-center gap-2 text-xs text-yellow-400">
 							<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400"></span>
-							In queue ({queueStatus.queueSize} searching)
+							In queue ({queue.status.queueSize} searching)
 						</span>
 						<button
 							onclick={leaveQueue}
-							disabled={queueLoading}
+							disabled={queue.loading}
 							class="rounded-md border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
 						>
 							Leave Queue
@@ -241,10 +185,10 @@
 				{:else}
 					<button
 						onclick={joinQueue}
-						disabled={queueLoading}
+						disabled={queue.loading}
 						class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 					>
-						{queueLoading ? 'Joining...' : 'Find Match'}
+						{queue.loading ? 'Joining...' : 'Find Match'}
 					</button>
 				{/if}
 			</div>

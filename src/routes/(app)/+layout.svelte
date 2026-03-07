@@ -3,6 +3,8 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import { startPolling, stopPolling } from '$lib/stores/queue.svelte';
 
 	let { children } = $props();
 
@@ -18,6 +20,12 @@
 		PICKING: 'Picking',
 		PLAYING: 'Playing'
 	};
+
+	onMount(() => {
+		if (!user) return;
+		startPolling();
+		return () => stopPolling();
+	});
 </script>
 
 {#if user}
