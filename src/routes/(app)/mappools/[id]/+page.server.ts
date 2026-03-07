@@ -1,10 +1,10 @@
 import { db } from '$lib/server/db';
 import { mappool, mappoolSlot } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
 import { proxyImage } from '$lib/server/storage/r2';
-import { requireAuth, requireOwnerOrAdmin } from '$lib/server/permissions';
+import { requireAuth } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -83,23 +83,24 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		})
 	);
 
-	const isOwner = pool.createdBy === locals.user!.id;
 	const isAdmin = locals.user!.role === 'admin';
 
 	return {
 		pool: { ...pool, slots: slotsWithBeatmaps },
-		canEdit: isOwner || isAdmin,
+		canEdit: isAdmin,
 		isAdmin
 	};
 };
 
 export const actions: Actions = {
 	rename: async ({ params, request, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+
 		const pool = await db.query.mappool.findFirst({
 			where: eq(mappool.id, params.id)
 		});
 		if (!pool) error(404, 'Mappool not found');
-		requireOwnerOrAdmin(locals, pool.createdBy);
 
 		const form = await request.formData();
 		const name = form.get('name')?.toString()?.trim();
@@ -110,11 +111,8 @@ export const actions: Actions = {
 	},
 
 	addSlot: async ({ params, request, locals }) => {
-		const pool = await db.query.mappool.findFirst({
-			where: eq(mappool.id, params.id)
-		});
-		if (!pool) error(404, 'Mappool not found');
-		requireOwnerOrAdmin(locals, pool.createdBy);
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
 
 		const form = await request.formData();
 		let beatmapId = form.get('beatmapId')?.toString()?.trim();
@@ -177,11 +175,8 @@ export const actions: Actions = {
 	},
 
 	removeSlot: async ({ params, request, locals }) => {
-		const pool = await db.query.mappool.findFirst({
-			where: eq(mappool.id, params.id)
-		});
-		if (!pool) error(404, 'Mappool not found');
-		requireOwnerOrAdmin(locals, pool.createdBy);
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
 
 		const form = await request.formData();
 		const slotId = form.get('slotId')?.toString();
@@ -215,12 +210,83 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	deletePool: async ({ params, locals }) => {
-		const pool = await db.query.mappool.findFirst({
-			where: eq(mappool.id, params.id)
+	moveSlot: async ({ params, request, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+
+		const form = await request.formData();
+		const slotId = form.get('slotId')?.toString();
+		const targetCategory = form.get('targetCategory')?.toString()?.trim()?.toUpperCase();
+		const targetIndex = parseInt(form.get('targetIndex')?.toString() ?? '', 10);
+
+		if (!slotId || !targetCategory || isNaN(targetIndex)) {
+			return { error: 'Missing required fields' };
+		}
+
+		// Fetch the slot being moved
+		const slot = await db.query.mappoolSlot.findFirst({
+			where: and(eq(mappoolSlot.id, slotId), eq(mappoolSlot.mappoolId, params.id))
 		});
-		if (!pool) error(404, 'Mappool not found');
-		requireOwnerOrAdmin(locals, pool.createdBy);
+		if (!slot) return { error: 'Slot not found' };
+
+		const sourceCategory = slot.category;
+		const isSameCategory = sourceCategory === targetCategory;
+
+		// Fetch target category slots (excluding the moved slot)
+		const targetSlots = await db.query.mappoolSlot.findMany({
+			where: and(
+				eq(mappoolSlot.mappoolId, params.id),
+				eq(mappoolSlot.category, targetCategory)
+			),
+			orderBy: [asc(mappoolSlot.orderInCategory)]
+		});
+		const filteredTarget = targetSlots.filter((s) => s.id !== slotId);
+
+		// Clamp targetIndex
+		const clampedIndex = Math.max(0, Math.min(filteredTarget.length, targetIndex));
+
+		// Build new order for target category
+		const newTargetOrder = [...filteredTarget];
+		newTargetOrder.splice(clampedIndex, 0, slot);
+
+		// Update the moved slot's category and mods
+		const newMods = targetCategory === 'NM' || targetCategory === 'TB' ? [] : [targetCategory];
+		await db
+			.update(mappoolSlot)
+			.set({ category: targetCategory, mods: newMods })
+			.where(eq(mappoolSlot.id, slotId));
+
+		// Re-number target category
+		for (let i = 0; i < newTargetOrder.length; i++) {
+			await db
+				.update(mappoolSlot)
+				.set({ orderInCategory: i + 1 })
+				.where(eq(mappoolSlot.id, newTargetOrder[i].id));
+		}
+
+		// If cross-category move, re-number the source category too
+		if (!isSameCategory) {
+			const sourceSlots = await db.query.mappoolSlot.findMany({
+				where: and(
+					eq(mappoolSlot.mappoolId, params.id),
+					eq(mappoolSlot.category, sourceCategory)
+				),
+				orderBy: [asc(mappoolSlot.orderInCategory)]
+			});
+			for (let i = 0; i < sourceSlots.length; i++) {
+				await db
+					.update(mappoolSlot)
+					.set({ orderInCategory: i + 1 })
+					.where(eq(mappoolSlot.id, sourceSlots[i].id));
+			}
+		}
+
+		return { success: true };
+	},
+
+	deletePool: async ({ params, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
 
 		await db.delete(mappool).where(eq(mappool.id, params.id));
 		redirect(303, '/mappools');
