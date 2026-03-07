@@ -544,12 +544,7 @@
 					<!-- Per-player score breakdown -->
 					{#if game.state === 'FINISHED' && game.scores?.length > 0}
 						<div class="mt-1.5 flex flex-col gap-1">
-							{#each [...game.scores].sort((a: any, b: any) => {
-								if (config.scoringType === 'accuracy') return b.accuracy - a.accuracy;
-								if (config.scoringType === 'combo') return b.maxCombo - a.maxCombo;
-								if (config.scoringType === 'pp') return (b.pp ?? 0) - (a.pp ?? 0);
-								return b.score - a.score;
-							}) as s}
+							{#each game.scores as s}
 								{@const username = playerNames[s.player?.userId]}
 								<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-surface-900 px-3 py-1.5 text-xs">
 									<span class="w-24 truncate font-500">{username ?? s.player?.userId ?? '?'}</span>

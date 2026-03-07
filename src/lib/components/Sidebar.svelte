@@ -110,7 +110,7 @@
 			{ href: '/mappools', label: 'Mappools', icon: 'mappools' },
 			// { href: '/teams', label: 'Teams', icon: 'teams' },
 			{ href: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
-		] as item}
+		] as item (item.href)}
 			<a
 				href={item.href}
 				class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors {isActive(item.href)

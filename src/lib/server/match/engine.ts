@@ -668,7 +668,8 @@ export async function getMatchFull(matchId: string) {
 				with: {
 					slot: true,
 					scores: {
-						with: { player: true }
+						with: { player: true },
+						orderBy: (s, { desc }) => [desc(s.score)]
 					}
 				},
 				orderBy: (g, { asc }) => [asc(g.gameNumber)]
