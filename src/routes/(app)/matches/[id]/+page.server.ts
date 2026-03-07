@@ -24,6 +24,18 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		error(404, 'Match not found');
 	}
 
+	// Sort game scores by the match win condition so clients always receive sorted data
+	const scoringType = (m.config as MatchConfig).scoringType;
+	for (const game of m.games) {
+		if (game.scores?.length > 1) {
+			game.scores.sort((a, b) => {
+				if (scoringType === 'accuracy') return b.accuracy - a.accuracy;
+				if (scoringType === 'combo') return b.maxCombo - a.maxCombo;
+				return b.score - a.score;
+			});
+		}
+	}
+
 	// Build beatmap metadata cache — prefer DB-stored R2 URLs, fall back to API
 	const beatmapCache: Record<string, any> = {};
 	if (m.mappool?.slots) {
