@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { match, matchGame, user } from '$lib/server/db/schema';
+import { match, matchGame, matchParticipant, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { getMatchFull, submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
@@ -160,11 +160,24 @@ export function onMatchStateChange(matchId: string, newState: string) {
 						const sorted = [...current.participants].sort(
 							(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 						);
+
+						// Check if this was a tiebreaker re-roll
+						const autoRollConfig = m.config as MatchConfig;
+						const autoRollWins = Math.ceil(autoRollConfig.bestOf / 2);
+						const isTBAutoRoll = current.participants.every((p) => p.score === autoRollWins - 1);
+
 						if (lobby?.isAlive) {
-							await lobby.chat(
-								`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-								`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
-							);
+							if (isTBAutoRoll) {
+								await lobby.chat(
+									`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. ` +
+									`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
+								);
+							} else {
+								await lobby.chat(
+									`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
+									`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
+								);
+							}
 						}
 					}
 				} catch (err: any) {
@@ -190,23 +203,16 @@ export function onMatchStateChange(matchId: string, newState: string) {
 					const expectedIdx = m.games.length % sorted.length;
 					const picker = sorted[expectedIdx];
 
-					// Find available (unplayed, non-TB) slots
+					// Find available slots — at match point, only TB maps are pickable
 					const playedSlotIds = new Set(m.games.map((g) => g.mappoolSlotId));
-					const available = (m.mappool?.slots ?? []).filter(
-						(s) => !playedSlotIds.has(s.id) && s.category !== 'TB'
-					);
+					const winsNeeded = Math.ceil(config.bestOf / 2);
+					const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
 
-					if (available.length === 0) {
-						// Only TB left — check if it's match point
-						const winsNeeded = Math.ceil(config.bestOf / 2);
-						const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
-						if (allAtMatchPoint) {
-							const tb = (m.mappool?.slots ?? []).find(
-								(s) => s.category === 'TB' && !playedSlotIds.has(s.id)
-							);
-							if (tb) available.push(tb);
-						}
-					}
+					const available = (m.mappool?.slots ?? []).filter((s) => {
+						if (playedSlotIds.has(s.id)) return false;
+						if (allAtMatchPoint) return s.category === 'TB';
+						return s.category !== 'TB';
+					});
 
 					if (available.length === 0) {
 						await timeoutMatch(matchId, 'No available maps to auto-pick.');
@@ -441,10 +447,23 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 					(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 				);
 				await sleep(500);
-				await lobby.chat(
-					`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-					`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
-				);
+
+				// Check if this is a tiebreaker re-roll
+				const rollConfig = updated.config as MatchConfig;
+				const rollWinsNeeded = Math.ceil(rollConfig.bestOf / 2);
+				const isTBRoll = updated.participants.every((p) => p.score === rollWinsNeeded - 1);
+
+				if (isTBRoll) {
+					await lobby.chat(
+						`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. ` +
+						`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
+					);
+				} else {
+					await lobby.chat(
+						`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
+						`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
+					);
+				}
 			} else if (isLastRoll && remaining.length === updated.participants.length) {
 				// All rolled the same value — everyone must reroll
 				await lobby.chat(`Tie! All players rolled ${value}. Please !roll again.`);
@@ -518,15 +537,18 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				return;
 			}
 
-			// ── Tiebreaker restriction ──
-			if (slot.category === 'TB') {
-				const config = m.config as MatchConfig;
-				const winsNeeded = Math.ceil(config.bestOf / 2);
-				const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
-				if (!allAtMatchPoint) {
-					await lobby.chat(`${username}: Tiebreaker can only be picked at match point!`);
-					return;
-				}
+			// ── Tiebreaker restrictions ──
+			const config = m.config as MatchConfig;
+			const winsNeeded = Math.ceil(config.bestOf / 2);
+			const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
+
+			if (slot.category === 'TB' && !allAtMatchPoint) {
+				await lobby.chat(`${username}: Tiebreaker can only be picked at match point!`);
+				return;
+			}
+			if (allAtMatchPoint && slot.category !== 'TB') {
+				await lobby.chat(`${username}: Only tiebreaker maps can be picked at match point!`);
+				return;
 			}
 
 			const game = await pickMap(matchId, expectedPicker!.id, slot.id);
@@ -826,6 +848,58 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 		expectedPlayers.delete(matchId);
 		joinedPlayers.delete(matchId);
 	} else {
+		// ── Check for tiebreaker situation ──
+		const allAtMatchPoint = updated.participants.every((p) => p.score === winsNeeded - 1);
+
+		if (allAtMatchPoint) {
+			const playedSlotIds = new Set(updated.games.map((g) => g.mappoolSlotId));
+			const tbSlots = (updated.mappool?.slots ?? []).filter(
+				(s) => s.category === 'TB' && !playedSlotIds.has(s.id)
+			);
+
+			if (tbSlots.length === 1) {
+				// Single TB — auto-pick it
+				const picker = sortedPs[updated.games.length % sortedPs.length];
+				const tbLabel = `TB${tbSlots[0].orderInCategory}`;
+				try {
+					await sleep(1000);
+					await lobby.chat(
+						`🔥 Tiebreaker! ${matchScoreStr} — auto-picking ${tbLabel}!`
+					);
+				} catch { /* ignore */ }
+
+				const game = await pickMap(matchId, picker!.id, tbSlots[0].id);
+				playPickedMap(matchId, game.id).catch((err) =>
+					console.error('[Orchestrator] TB auto-pick play failed:', err.message)
+				);
+				return;
+			} else if (tbSlots.length > 1) {
+				// Multiple TBs — re-roll to decide who picks
+				for (const p of updated.participants) {
+					await db
+						.update(matchParticipant)
+						.set({ rollValue: null, pickOrder: null })
+						.where(eq(matchParticipant.id, p.id));
+				}
+				await db
+					.update(match)
+					.set({ state: MATCH_STATES.ROLLING })
+					.where(eq(match.id, matchId));
+
+				onMatchStateChange(matchId, MATCH_STATES.ROLLING);
+
+				try {
+					await sleep(1000);
+					await lobby.chat(
+						`🔥 Tiebreaker! ${matchScoreStr} — ${tbSlots.length} tiebreaker maps available. ` +
+						`Roll to decide who picks! Type !roll. You have 5 minutes.`
+					);
+				} catch { /* ignore */ }
+				return;
+			}
+			// Zero unplayed TBs at match point — fall through to normal picking
+		}
+
 		// ── Back to PICKING — arm the pick timeout ──
 		onMatchStateChange(matchId, MATCH_STATES.PICKING);
 

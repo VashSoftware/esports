@@ -6,6 +6,7 @@ import {
 	matchGame,
 	matchGameScore,
 	matchQueue,
+	mappoolSlot,
 	playerRating,
 	teamMember
 } from '$lib/server/db/schema';
@@ -405,6 +406,24 @@ export async function pickMap(matchId: string, participantId: string, mappoolSlo
 	const alreadyPlayed = totalGames.some((g) => g.mappoolSlotId === mappoolSlotId);
 	if (alreadyPlayed) {
 		throw new Error('This map has already been played');
+	}
+
+	// ── Tiebreaker restrictions ──
+	const config = m.config as MatchConfig;
+	const winsNeeded = Math.ceil(config.bestOf / 2);
+	const allAtMatchPoint = participants.every((p) => p.score === winsNeeded - 1);
+
+	const slot = await db.query.mappoolSlot.findFirst({
+		where: eq(mappoolSlot.id, mappoolSlotId)
+	});
+
+	if (slot) {
+		if (slot.category === 'TB' && !allAtMatchPoint) {
+			throw new Error('Tiebreaker can only be picked at match point');
+		}
+		if (allAtMatchPoint && slot.category !== 'TB') {
+			throw new Error('Only tiebreaker maps can be picked at match point');
+		}
 	}
 
 	const [game] = await db

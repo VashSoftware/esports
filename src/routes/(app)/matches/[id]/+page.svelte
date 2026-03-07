@@ -253,8 +253,8 @@
 	{#if m.state === 'ROLLING'}
 		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
 			<div class="w-full max-w-md rounded-xl border border-yellow-500/30 bg-surface-800 p-8 text-center shadow-2xl">
-				<h2 class="text-lg font-700">🎲 Roll Phase</h2>
-				<p class="mt-2 text-sm text-text-secondary">Highest roll picks first</p>
+				<h2 class="text-lg font-700">{isTiebreakerAllowed ? '🔥 Tiebreaker Roll' : '🎲 Roll Phase'}</h2>
+				<p class="mt-2 text-sm text-text-secondary">{isTiebreakerAllowed ? 'Highest roll picks the tiebreaker' : 'Highest roll picks first'}</p>
 
 				<div class="mt-6 flex justify-center gap-6">
 					{#each m.participants as p}
@@ -425,11 +425,13 @@
 									{@const isPlayed = playedSlotIds.has(slot.id)}
 									{@const isTB = slot.category === 'TB'}
 									{@const tbLocked = isTB && !isTiebreakerAllowed}
+									{@const matchPointLocked = !isTB && isTiebreakerAllowed}
+									{@const slotLocked = tbLocked || matchPointLocked}
 									{@const cantPick = !isMyTurnToPick || !pickingPhase}
 
 									<div class="flex items-center gap-2 rounded-lg border p-2 transition-all {isPlayed
 										? 'border-border/50 bg-surface-900 opacity-30'
-										: tbLocked
+										: slotLocked
 											? 'border-border/50 bg-surface-900 opacity-30'
 											: 'border-border bg-surface-800'}">
 										<a
@@ -454,8 +456,8 @@
 										<span class="text-xs font-600 text-text-secondary">{category}{slot.orderInCategory}</span>
 										{#if isPlayed}
 											<span class="text-xs text-text-secondary">✓</span>
-										{:else if tbLocked}
-											<span class="text-[10px] text-pink-400/60" title="Match point only">🔒</span>
+										{:else if slotLocked}
+											<span class="text-[10px] text-pink-400/60" title={tbLocked ? 'Match point only' : 'Tiebreaker only'}>🔒</span>
 										{:else if pickingPhase}
 											<form method="post" action="?/pick" use:enhance={() => {
 												picking = true;
