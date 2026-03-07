@@ -167,9 +167,19 @@ export const actions: Actions = {
 				const sorted = [...updated.participants].sort(
 					(a: any, b: any) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
 				);
-				lobby.chat(
-					`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
-				).catch(() => {});
+				const rollConfig = updated.config as MatchConfig;
+				const rollWinsNeeded = Math.ceil(rollConfig.bestOf / 2);
+				const isTBRoll = updated.participants.every((p: any) => p.score === rollWinsNeeded - 1);
+
+				if (isTBRoll) {
+					lobby.chat(
+						`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. Use !pick TB<n> or pick in web UI.`
+					).catch(() => {});
+				} else {
+					lobby.chat(
+						`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
+					).catch(() => {});
+				}
 			} else if (isLastRoll && updated.participants.every((p: any) => p.rollValue === null)) {
 				lobby.chat(`Tie! All players rolled ${value}. Please !roll again.`).catch(() => {});
 			}
@@ -205,16 +215,17 @@ export const actions: Actions = {
 			return { error: "It's not your turn to pick" };
 		}
 
-		// ── Tiebreaker restriction ──
-		// TB maps can only be picked when both teams are at match point (e.g. 2-2 in BO5)
+		// ── Tiebreaker restrictions ──
 		const config = m.config as MatchConfig;
 		const winsNeeded = Math.ceil(config.bestOf / 2);
+		const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
 		const slot = m.mappool?.slots?.find((s) => s.id === slotId);
-		if (slot?.category === 'TB') {
-			const allAtMatchPoint = m.participants.every((p) => p.score === winsNeeded - 1);
-			if (!allAtMatchPoint) {
-				return { error: 'Tiebreaker can only be picked when both teams are at match point' };
-			}
+
+		if (slot?.category === 'TB' && !allAtMatchPoint) {
+			return { error: 'Tiebreaker can only be picked when both teams are at match point' };
+		}
+		if (allAtMatchPoint && slot?.category !== 'TB') {
+			return { error: 'Only tiebreaker maps can be picked at match point' };
 		}
 
 		try {
