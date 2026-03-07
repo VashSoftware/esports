@@ -195,6 +195,8 @@ export const playerRating = pgTable('player_rating', {
 	elo: integer('elo').default(1000).notNull(),
 	wins: integer('wins').default(0).notNull(),
 	losses: integer('losses').default(0).notNull(),
+	initialElo: integer('initial_elo'),
+	osuRankAtSeed: integer('osu_rank_at_seed'),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 });
 

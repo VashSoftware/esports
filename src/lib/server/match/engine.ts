@@ -9,9 +9,42 @@ import {
 	playerRating,
 	teamMember
 } from '$lib/server/db/schema';
-import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
+import { account } from '$lib/server/db/auth.schema';
+import { eq, and, asc, sql, inArray, lt } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/client';
+import { getUser } from '$lib/server/osu/api';
+
+// ── Initial Rating ──────────────────────────────────────────────────────
+
+async function calculateInitialElo(userId: string): Promise<{ elo: number; osuRank: number | null }> {
+	const osuAccount = await db.query.account.findFirst({
+		where: and(eq(account.userId, userId), eq(account.providerId, 'osu'))
+	});
+
+	if (!osuAccount?.accountId) {
+		return { elo: 1000, osuRank: null };
+	}
+
+	try {
+		const osuUser = await getUser(osuAccount.accountId);
+		const rank = osuUser?.statistics?.global_rank;
+
+		if (!rank || rank <= 0) {
+			return { elo: 1000, osuRank: null };
+		}
+
+		// elo = 3500 - log10(rank) * 500
+		// rank 1 → 3500, rank 1000 → 2000, rank 100k → 1000, rank 1M → 500
+		const rawElo = 3500 - Math.log10(rank) * 500;
+		const elo = Math.round(Math.max(0, Math.min(3500, rawElo)));
+
+		return { elo, osuRank: rank };
+	} catch (err) {
+		console.warn(`[Rating] Failed to fetch osu! rank for user ${userId}, defaulting to 1000:`, err);
+		return { elo: 1000, osuRank: null };
+	}
+}
 
 // ── Queue ───────────────────────────────────────────────────────────────
 
@@ -36,9 +69,10 @@ export async function joinQueue(userId: string, teamId: string) {
 	});
 
 	if (!rating) {
+		const { elo: initialElo, osuRank } = await calculateInitialElo(userId);
 		[rating] = await db
 			.insert(playerRating)
-			.values({ userId, elo: 1000 })
+			.values({ userId, elo: initialElo, initialElo, osuRankAtSeed: osuRank })
 			.returning();
 	}
 
@@ -192,8 +226,8 @@ async function selectMappoolForRating(avgElo: number) {
 
 	if (pools.length === 0) return null;
 
-	// Map ELO range (e.g. 800-1200) to star rating range (e.g. 3-7)
-	const targetStars = 3 + ((avgElo - 800) / 400) * 4;
+	// Map ELO range (0-3500) to star rating range (2-8)
+	const targetStars = 2 + avgElo / 700;
 	const clampedTarget = Math.max(2, Math.min(8, targetStars));
 
 	// Score each pool by distance from target
@@ -513,29 +547,52 @@ export async function submitGameScores(
 // ── ELO ─────────────────────────────────────────────────────────────────
 
 async function updateElo(participants: { id: string; teamId: string }[], winnerId: string) {
+	// Gather all players and their ratings per participant (team side)
+	const sides = new Map<string, { userId: string; rating: typeof playerRating.$inferSelect }[]>();
+
 	for (const p of participants) {
 		const players = await db.query.matchParticipantPlayer.findMany({
 			where: eq(matchParticipantPlayer.participantId, p.id)
 		});
 
-		const isWinner = p.id === winnerId;
-
+		const playersWithRatings = [];
 		for (const player of players) {
 			let rating = await db.query.playerRating.findFirst({
 				where: eq(playerRating.userId, player.userId)
 			});
 
 			if (!rating) {
+				const { elo: initialElo, osuRank } = await calculateInitialElo(player.userId);
 				[rating] = await db
 					.insert(playerRating)
-					.values({ userId: player.userId, elo: 1000 })
+					.values({ userId: player.userId, elo: initialElo, initialElo, osuRankAtSeed: osuRank })
 					.returning();
 			}
 
-			const K = 32;
-			const expected = 0.5;
+			playersWithRatings.push({ userId: player.userId, rating });
+		}
+		sides.set(p.id, playersWithRatings);
+	}
+
+	// Compute average ELO per side for expected-score calculation
+	const avgElo = new Map<string, number>();
+	for (const [pid, players] of sides) {
+		avgElo.set(pid, players.reduce((sum, p) => sum + p.rating.elo, 0) / players.length);
+	}
+
+	// Update each player's ELO using proper expected-score formula
+	for (const p of participants) {
+		const isWinner = p.id === winnerId;
+		const opponent = participants.find((op) => op.id !== p.id)!;
+		const opponentAvg = avgElo.get(opponent.id)!;
+
+		for (const { userId, rating } of sides.get(p.id)!) {
+			const gamesPlayed = rating.wins + rating.losses;
+			const K = gamesPlayed < 10 ? 40 : gamesPlayed < 30 ? 32 : 24;
+
+			const expected = 1 / (1 + Math.pow(10, (opponentAvg - rating.elo) / 400));
 			const actual = isWinner ? 1 : 0;
-			const newElo = Math.round(rating.elo + K * (actual - expected));
+			const newElo = Math.max(0, Math.round(rating.elo + K * (actual - expected)));
 
 			await db
 				.update(playerRating)
@@ -545,7 +602,7 @@ async function updateElo(participants: { id: string; teamId: string }[], winnerI
 					losses: isWinner ? rating.losses : rating.losses + 1,
 					updatedAt: new Date()
 				})
-				.where(eq(playerRating.userId, player.userId));
+				.where(eq(playerRating.userId, userId));
 		}
 	}
 }
