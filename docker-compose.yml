@@ -12,13 +12,15 @@ services:
       - "127.0.0.1:5432:5432" # Only accessible from host
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vash -d vash"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
 
   app:
     build: .
     restart: unless-stopped
+    stop_grace_period: 2s
     depends_on:
       db:
         condition: service_healthy
@@ -53,9 +55,10 @@ services:
       - umamidata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 2s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
 
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
