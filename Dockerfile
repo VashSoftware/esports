@@ -1,28 +1,23 @@
 FROM oven/bun AS base
 WORKDIR /app
 
-# Install dependencies
-FROM base AS install
-RUN mkdir -p /temp/dev
-COPY package.json bun.lock /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+# Install dependencies (cached unless package.json/bun.lock change)
+FROM base AS deps
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-RUN mkdir -p /temp/prod
-COPY package.json bun.lock /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
-
-# Build
+# Build (mount cache so SvelteKit reuses previous build artifacts)
 FROM base AS build
-COPY --from=install /temp/dev/node_modules node_modules
+COPY --from=deps /app/node_modules node_modules
 COPY . .
 ENV NODE_ENV=production
-RUN bun run build
+RUN --mount=type=cache,target=/app/.svelte-kit bun run build
 
-# Runtime
+# Runtime — prod deps only
 FROM base AS runtime
-COPY --from=install /temp/prod/node_modules node_modules
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 COPY --from=build /app/build build
-COPY --from=build /app/package.json .
 
 USER bun
 ENV NODE_ENV=production
