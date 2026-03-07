@@ -162,7 +162,7 @@ async function tryMatchFromQueue() {
 	await db.delete(matchQueue).where(eq(matchQueue.userId, bestPair[1].userId));
 
 	const created = await createMatch({
-		name: 'Ranked Match',
+		name: `VASH: ${bestPair[0].teamId} vs ${bestPair[1].teamId}`,
 		config: { bestOf: 5, teamSize: 1, scoringType: 'score_v2' },
 		mappoolId: selectedPool.id,
 		teams: [bestPair[0].teamId, bestPair[1].teamId],
