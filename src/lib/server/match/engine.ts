@@ -167,7 +167,10 @@ async function tryMatchFromQueue() {
 	if (Number(activeCount) >= MAX_CONCURRENT_MATCHES) return null;
 
 	const queue = await db.query.matchQueue.findMany({
-		orderBy: asc(matchQueue.elo)
+		orderBy: asc(matchQueue.elo),
+		with: {
+			team: true
+		}
 	});
 
 	if (queue.length < 2) return null;
@@ -197,7 +200,7 @@ async function tryMatchFromQueue() {
 	await db.delete(matchQueue).where(eq(matchQueue.userId, bestPair[1].userId));
 
 	const created = await createMatch({
-		name: `VASH: ${bestPair[0].teamId} vs ${bestPair[1].teamId}`,
+		name: `VASH: ${bestPair[0].team.name} vs ${bestPair[1].team.name}`,
 		config: { bestOf: 5, teamSize: 1, scoringType: 'score_v2' },
 		mappoolId: selectedPool.id,
 		teams: [bestPair[0].teamId, bestPair[1].teamId],
