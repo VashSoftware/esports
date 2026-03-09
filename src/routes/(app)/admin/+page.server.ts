@@ -12,8 +12,10 @@ import {
 	matchParticipant,
 	matchParticipantPlayer
 } from '$lib/server/db/schema';
-import { eq, desc, inArray, sql } from 'drizzle-orm';
+import { account } from '$lib/server/db/auth.schema';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { requireRole, setUserRole, isRootAdmin } from '$lib/server/permissions';
+import { getUser as getOsuUser } from '$lib/server/osu/api';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -127,11 +129,40 @@ export const actions: Actions = {
 
 	resetRatings: async ({ locals }) => {
 		requireRole(locals, 'admin');
-		const reset = await db
-			.update(playerRating)
-			.set({ elo: sql`COALESCE(initial_elo, 1000)`, wins: 0, losses: 0, updatedAt: new Date() })
-			.returning({ id: playerRating.id });
-		return { success: true, message: `Reset ${reset.length} rating${reset.length !== 1 ? 's' : ''} to initial ELO` };
+
+		const allUsers = await db.query.user.findMany();
+		let updated = 0;
+
+		for (const u of allUsers) {
+			let rank: number | null = null;
+
+			try {
+				const osuAccount = await db.query.account.findFirst({
+					where: and(eq(account.userId, u.id), eq(account.providerId, 'osu'))
+				});
+				if (osuAccount?.accountId) {
+					const osuUser = await getOsuUser(osuAccount.accountId);
+					rank = osuUser?.statistics?.global_rank ?? null;
+				}
+			} catch {
+				// API failure — treat as unranked
+			}
+
+			// Unranked → rank 100,000 (~1000 ELO)
+			const effectiveRank = rank && rank > 0 ? rank : 100_000;
+			const rawElo = 3500 - Math.log10(effectiveRank) * 500;
+			const elo = Math.round(Math.max(0, Math.min(3500, rawElo)));
+
+			await db
+				.update(playerRating)
+				.set({ elo, initialElo: elo, osuRankAtSeed: rank, wins: 0, losses: 0, updatedAt: new Date() })
+				.where(eq(playerRating.userId, u.id));
+
+			console.log(`[Admin] Reset ${u.name}: rank #${rank ?? 'unranked'} → ${elo} ELO`);
+			updated++;
+		}
+
+		return { success: true, message: `Re-seeded ${updated} rating${updated !== 1 ? 's' : ''} from osu! ranks` };
 	},
 
 	clearMatchHistory: async ({ locals }) => {
