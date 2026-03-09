@@ -4,6 +4,7 @@
 	let { data } = $props();
 
 	let actionError = $state('');
+	let actionSuccess = $state('');
 
 	const roleBadge: Record<string, { label: string; color: string }> = {
 		player: { label: 'Player', color: 'bg-surface-600 text-text-secondary border-border' },
@@ -35,6 +36,9 @@
 
 	{#if actionError}
 		<p class="mt-3 text-sm text-red-400">{actionError}</p>
+	{/if}
+	{#if actionSuccess}
+		<p class="mt-3 text-sm text-green-400">{actionSuccess}</p>
 	{/if}
 
 	<!-- Users Table -->
@@ -124,6 +128,53 @@
 				{/if}
 			</div>
 		{/each}
+	</div>
+
+	<!-- Admin Tools -->
+	<div class="mt-6 rounded-lg border border-border bg-surface-800 p-5">
+		<h2 class="text-sm font-600">Tools</h2>
+
+		<!-- Stats -->
+		<div class="mt-3 flex gap-4 text-xs text-text-secondary">
+			<span>{data.stats.activeMatches} active match{data.stats.activeMatches !== 1 ? 'es' : ''}</span>
+			<span>{data.stats.queueSize} in queue</span>
+			<span>{data.stats.pendingInvites} pending invite{data.stats.pendingInvites !== 1 ? 's' : ''}</span>
+		</div>
+
+		<!-- Actions -->
+		<div class="mt-4 flex flex-wrap gap-2">
+			{#each [
+				{ action: 'cancelAllMatches', label: 'Cancel All Matches', confirm: 'Cancel all active matches and clear the queue?', color: 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10' },
+				{ action: 'clearQueue', label: 'Clear Queue', confirm: 'Remove everyone from the queue?', color: 'border-border text-text-secondary hover:bg-surface-700' },
+				{ action: 'expireInvites', label: 'Expire All Invites', confirm: 'Expire all pending invites?', color: 'border-border text-text-secondary hover:bg-surface-700' },
+				{ action: 'clearNotifications', label: 'Clear Notifications', confirm: 'Delete all notifications?', color: 'border-border text-text-secondary hover:bg-surface-700' },
+				{ action: 'resetRatings', label: 'Reset Ratings', confirm: 'Reset all ELO ratings to initial values? This cannot be undone.', color: 'border-red-500/30 text-red-400 hover:bg-red-500/10' },
+				{ action: 'clearMatchHistory', label: 'Clear All Match Data', confirm: 'Delete ALL matches, scores, invites, and notifications? This cannot be undone.', color: 'border-red-500/30 text-red-400 hover:bg-red-500/10' },
+			] as tool}
+				<form
+					method="post"
+					action="?/{tool.action}"
+					use:enhance={() => {
+						actionError = '';
+						actionSuccess = '';
+						return async ({ result, update }) => {
+							if (result.type === 'success' && (result.data as any)?.message) {
+								actionSuccess = (result.data as any).message;
+								await update();
+							} else if (result.type === 'success' && (result.data as any)?.error) {
+								actionError = (result.data as any).error;
+							}
+						};
+					}}
+				>
+					<button
+						type="submit"
+						onclick={(e) => { if (!confirm(tool.confirm)) e.preventDefault(); }}
+						class="rounded-md border px-3 py-1.5 text-xs font-500 transition-colors {tool.color}"
+					>{tool.label}</button>
+				</form>
+			{/each}
+		</div>
 	</div>
 
 	<!-- Permission Info -->

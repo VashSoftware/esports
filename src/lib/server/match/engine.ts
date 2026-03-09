@@ -18,7 +18,7 @@ import { getUser } from '$lib/server/osu/api';
 
 // ── Initial Rating ──────────────────────────────────────────────────────
 
-async function calculateInitialElo(userId: string): Promise<{ elo: number; osuRank: number | null }> {
+export async function calculateInitialElo(userId: string): Promise<{ elo: number; osuRank: number | null }> {
 	const osuAccount = await db.query.account.findFirst({
 		where: and(eq(account.userId, userId), eq(account.providerId, 'osu'))
 	});
@@ -65,17 +65,11 @@ export async function joinQueue(userId: string, teamId: string) {
 	const activeMatchId = await findRecentActiveMatch(userId);
 	if (activeMatchId) throw new Error('You are already in an active match');
 
-	let rating = await db.query.playerRating.findFirst({
+	const rating = await db.query.playerRating.findFirst({
 		where: eq(playerRating.userId, userId)
 	});
 
-	if (!rating) {
-		const { elo: initialElo, osuRank } = await calculateInitialElo(userId);
-		[rating] = await db
-			.insert(playerRating)
-			.values({ userId, elo: initialElo, initialElo, osuRankAtSeed: osuRank })
-			.returning();
-	}
+	if (!rating) throw new Error('No rating found — please re-register');
 
 	const existing = await db.query.matchQueue.findFirst({
 		where: eq(matchQueue.userId, userId)
@@ -581,16 +575,13 @@ async function updateElo(participants: { id: string; teamId: string }[], winnerI
 
 		const playersWithRatings = [];
 		for (const player of players) {
-			let rating = await db.query.playerRating.findFirst({
+			const rating = await db.query.playerRating.findFirst({
 				where: eq(playerRating.userId, player.userId)
 			});
 
 			if (!rating) {
-				const { elo: initialElo, osuRank } = await calculateInitialElo(player.userId);
-				[rating] = await db
-					.insert(playerRating)
-					.values({ userId: player.userId, elo: initialElo, initialElo, osuRankAtSeed: osuRank })
-					.returning();
+				console.warn(`[ELO] No rating for user ${player.userId}, skipping`);
+				continue;
 			}
 
 			playersWithRatings.push({ userId: player.userId, rating });

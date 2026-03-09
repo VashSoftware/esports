@@ -6,8 +6,18 @@ import { env } from '$env/dynamic/private';
 import { getRequestEvent } from '$app/server';
 import { db } from '$lib/server/db';
 import { genericOAuth } from 'better-auth/plugins';
-import { team, teamMember } from './db/schema';
+import { team, teamMember, playerRating } from './db/schema';
 import { proxyImage } from './storage/r2';
+
+// Stash the osu! profile between mapProfileToUser and user.create.after
+// (both run in the same request, so this is safe)
+let pendingOsuProfile: { rank: number | null } | null = null;
+
+function eloFromRank(rank: number | null): { elo: number; osuRank: number | null } {
+	if (!rank || rank <= 0) return { elo: 1000, osuRank: null };
+	const rawElo = 3500 - Math.log10(rank) * 500;
+	return { elo: Math.round(Math.max(0, Math.min(3500, rawElo))), osuRank: rank };
+}
 
 export const auth = betterAuth({
 	baseURL: env.ORIGIN,
@@ -33,6 +43,17 @@ export const auth = betterAuth({
 						userId: user.id,
 						role: 'owner'
 					});
+
+					const { elo, osuRank } = eloFromRank(pendingOsuProfile?.rank ?? null);
+					pendingOsuProfile = null;
+
+					await db.insert(playerRating).values({
+						userId: user.id,
+						elo,
+						initialElo: elo,
+						osuRankAtSeed: osuRank
+					});
+					console.log(`[Auth] Seeded ${user.name} with ${elo} ELO (rank #${osuRank ?? 'unknown'})`);
 				}
 			}
 		}
@@ -81,6 +102,7 @@ export const auth = betterAuth({
 						};
 					},
 					async mapProfileToUser(profile) {
+						pendingOsuProfile = { rank: profile.statistics?.global_rank ?? null };
 						return {
 							name: profile.username,
 							image: await proxyImage(profile.avatar_url),
