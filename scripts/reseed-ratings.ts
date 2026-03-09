@@ -95,8 +95,8 @@ async function main() {
 			}
 		}
 
-		// Unranked → rank 100,000 (~1000 ELO)
-		const effectiveRank = rank && rank > 0 ? rank : 100_000;
+		// Unranked → rank 10,000,000 (yields 0 ELO)
+		const effectiveRank = rank && rank > 0 ? rank : 10_000_000;
 		const seedElo = rankToElo(effectiveRank);
 		// Adjust by win/loss differential to preserve some earned progress
 		const adjustment = (r.wins - r.losses) * 12;

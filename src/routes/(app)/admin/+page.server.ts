@@ -148,15 +148,31 @@ export const actions: Actions = {
 				// API failure — treat as unranked
 			}
 
-			// Unranked → rank 100,000 (~1000 ELO)
-			const effectiveRank = rank && rank > 0 ? rank : 100_000;
+			// Unranked → rank 10,000,000 (yields 0 ELO)
+			const effectiveRank = rank && rank > 0 ? rank : 10_000_000;
 			const rawElo = 3500 - Math.log10(effectiveRank) * 500;
 			const elo = Math.round(Math.max(0, Math.min(3500, rawElo)));
 
-			await db
-				.update(playerRating)
-				.set({ elo, initialElo: elo, osuRankAtSeed: rank, wins: 0, losses: 0, updatedAt: new Date() })
-				.where(eq(playerRating.userId, u.id));
+			// Upsert: insert if no rating row exists, update if it does
+			const existing = await db.query.playerRating.findFirst({
+				where: eq(playerRating.userId, u.id)
+			});
+
+			if (existing) {
+				await db
+					.update(playerRating)
+					.set({ elo, initialElo: elo, osuRankAtSeed: rank, wins: 0, losses: 0, updatedAt: new Date() })
+					.where(eq(playerRating.userId, u.id));
+			} else {
+				await db.insert(playerRating).values({
+					userId: u.id,
+					elo,
+					initialElo: elo,
+					osuRankAtSeed: rank,
+					wins: 0,
+					losses: 0
+				});
+			}
 
 			console.log(`[Admin] Reset ${u.name}: rank #${rank ?? 'unranked'} → ${elo} ELO`);
 			updated++;
