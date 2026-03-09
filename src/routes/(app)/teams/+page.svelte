@@ -16,8 +16,9 @@
 		data.teams.filter((t: any) => t.members.some((m: any) => m.userId === data.userId))
 	);
 	const otherTeams = $derived(
-		data.teams.filter((t: any) => !t.members.some((m: any) => m.userId === data.userId))
+		data.teams.filter((t: any) => !t.isPersonal && !t.members.some((m: any) => m.userId === data.userId))
 	);
+	const teamCount = $derived(data.teams.filter((t: any) => !t.isPersonal || t.members.some((m: any) => m.userId === data.userId)).length);
 
 	function isOwner(t: any) {
 		return t.ownerId === data.userId;
@@ -39,7 +40,7 @@
 		<div>
 			<h1 class="text-2xl font-700 tracking-tight">Teams</h1>
 			<p class="mt-1 text-sm text-text-secondary">
-				{data.teams.length} team{data.teams.length !== 1 ? 's' : ''}
+				{teamCount} team{teamCount !== 1 ? 's' : ''}
 			</p>
 		</div>
 		<button
@@ -108,7 +109,7 @@
 							{/if}
 							<div class="flex-1">
 								<div class="flex items-center gap-2">
-									<span class="text-sm font-600">{t.name}</span>
+									<a href="/teams/{t.id}" onclick={(e: MouseEvent) => e.stopPropagation()} class="text-sm font-600 hover:text-accent hover:underline">{t.name}</a>
 									{#if t.isPersonal}
 										<span
 											class="rounded bg-surface-600 px-1.5 py-0.5 text-[10px] font-500 text-text-secondary"
@@ -301,7 +302,7 @@
 			<h2 class="text-sm font-600 text-text-secondary">Other Teams</h2>
 			<div class="mt-3 flex flex-col gap-2">
 				{#each otherTeams as t}
-					<div class="flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3">
+					<a href="/teams/{t.id}" class="flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/30 hover:bg-surface-700">
 						{#if t.avatarUrl}
 							<img src={t.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
 						{:else}
@@ -317,7 +318,7 @@
 								{t.members.length} member{t.members.length !== 1 ? 's' : ''}
 							</p>
 						</div>
-					</div>
+					</a>
 				{/each}
 			</div>
 		</div>

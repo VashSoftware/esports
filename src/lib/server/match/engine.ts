@@ -549,7 +549,9 @@ export async function submitGameScores(
 			})
 			.where(eq(match.id, game.matchId));
 
-		await updateElo(participants, matchWinner.id);
+		if (config.allowEloChange !== false) {
+			await updateElo(participants, matchWinner.id);
+		}
 
 		const finishedMatch = await getMatchFull(game.matchId);
 		notifyMatchFinished(finishedMatch).catch(() => {});

@@ -1,7 +1,14 @@
 export interface MatchConfig {
 	bestOf: number;
 	teamSize: number;
+	teamSizes?: number[];
 	scoringType: 'score' | 'score_v2' | 'accuracy' | 'combo';
+	warmups?: number;
+	bans?: number;
+	freemod?: boolean;
+	forceNoFail?: boolean;
+	allowEloChange?: boolean;
+	description?: string;
 }
 
 export const MATCH_STATES = {
