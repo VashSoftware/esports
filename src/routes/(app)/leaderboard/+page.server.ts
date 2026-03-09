@@ -65,6 +65,7 @@ export const load: PageServerLoad = async () => {
 				with: { members: true }
 			});
 			if (!t) return null;
+			if (t.isPersonal) return null; // Skip personal teams
 
 			// Count total matches for this team
 			const totalMatches = await db
