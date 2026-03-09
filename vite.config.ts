@@ -9,6 +9,11 @@ export default defineConfig({
 	ssr: {
 		external: ['bun']
 	},
+	build: {
+		rollupOptions: {
+			external: ['bun']
+		}
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
