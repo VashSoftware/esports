@@ -10,10 +10,11 @@
  */
 
 import { db } from '$lib/server/db';
-import { user, playerRating, teamMember, team } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { user, playerRating, teamMember, team, matchInvite } from '$lib/server/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import { setDMHandler, sendDM, getClient } from './client';
 import { joinQueue, leaveQueue, getQueueStatus } from '../match/engine';
+import { acceptInvite, declineInvite, getInvitesForUser } from '../match/invites';
 
 let initialized = false;
 
@@ -60,6 +61,15 @@ export async function initDMHandler() {
 				case '!status':
 					await handleStatus(ircUsername);
 					break;
+				case '!invites':
+					await handleInvites(ircUsername);
+					break;
+				case '!accept':
+					await handleAccept(ircUsername, args[0]);
+					break;
+				case '!decline':
+					await handleDecline(ircUsername, args[0]);
+					break;
 				default:
 					await sendDM(ircUsername, `Unknown command: ${command}. Type !help for available commands.`);
 			}
@@ -100,6 +110,9 @@ async function handleHelp(ircUsername: string) {
 			'!leave — Leave queue | ' +
 			'!elo — Check your rating | ' +
 			'!status — Queue status | ' +
+			'!invites — Pending invites | ' +
+			'!accept <id> — Accept invite | ' +
+			'!decline <id> — Decline invite | ' +
 			'!help — This message'
 	);
 }
@@ -182,4 +195,61 @@ async function handleStatus(ircUsername: string) {
 	} else {
 		await sendDM(ircUsername, `Not in queue. Type !queue to find a match.`);
 	}
+}
+
+async function handleInvites(ircUsername: string) {
+	const u = await resolveUser(ircUsername);
+	const { received } = await getInvitesForUser(u.id);
+	const pending = received.filter((i) => i.status === 'pending');
+
+	if (pending.length === 0) {
+		await sendDM(ircUsername, 'No pending invites.');
+		return;
+	}
+
+	const lines = pending.map((i) => {
+		const config = i.config as any;
+		const shortId = i.id.slice(0, 8);
+		return `[${shortId}] ${i.creatorTeam.name} — BO${config.bestOf} ${config.scoringType}`;
+	});
+
+	await sendDM(ircUsername, `Pending invites (${pending.length}): ${lines.join(' | ')}. Reply !accept <id> or !decline <id>`);
+}
+
+async function handleAccept(ircUsername: string, inviteIdPrefix?: string) {
+	if (!inviteIdPrefix) {
+		await sendDM(ircUsername, 'Usage: !accept <invite-id>');
+		return;
+	}
+
+	const u = await resolveUser(ircUsername);
+	const { received } = await getInvitesForUser(u.id);
+	const invite = received.find((i) => i.id.startsWith(inviteIdPrefix) && i.status === 'pending');
+
+	if (!invite) {
+		await sendDM(ircUsername, `No pending invite found matching "${inviteIdPrefix}".`);
+		return;
+	}
+
+	const match = await acceptInvite(invite.id, u.id);
+	await sendDM(ircUsername, `Accepted! Match created. Check osu! for the lobby invite or visit the web UI.`);
+}
+
+async function handleDecline(ircUsername: string, inviteIdPrefix?: string) {
+	if (!inviteIdPrefix) {
+		await sendDM(ircUsername, 'Usage: !decline <invite-id>');
+		return;
+	}
+
+	const u = await resolveUser(ircUsername);
+	const { received } = await getInvitesForUser(u.id);
+	const invite = received.find((i) => i.id.startsWith(inviteIdPrefix) && i.status === 'pending');
+
+	if (!invite) {
+		await sendDM(ircUsername, `No pending invite found matching "${inviteIdPrefix}".`);
+		return;
+	}
+
+	await declineInvite(invite.id, u.id);
+	await sendDM(ircUsername, 'Invite declined.');
 }

@@ -1,10 +1,68 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 
 	let { data } = $props();
 
 	let showCreate = $state(false);
+	let showInvite = $state(false);
 	let createError = $state('');
+	let inviteError = $state('');
+	let inviteSuccess = $state(false);
+
+	// Challenge form state
+	let selectedCreatorTeamId = $state('');
+	let selectedInvitedTeamId = $state('');
+	let bestOf = $state(5);
+	let customBestOf = $state('');
+	let useCustomBo = $state(false);
+	let opponentSearch = $state('');
+
+	const personalTeam = $derived((data as any).userTeams?.find((t: any) => t.isPersonal));
+	const nonPersonalUserTeams = $derived((data as any).userTeams?.filter((t: any) => !t.isPersonal) ?? []);
+	const hasMultipleTeams = $derived(nonPersonalUserTeams.length > 0);
+
+	// Auto-select personal team if no other teams
+	$effect(() => {
+		if (!hasMultipleTeams && personalTeam) {
+			selectedCreatorTeamId = personalTeam.id;
+		}
+	});
+
+	const selectedCreatorTeam = $derived(data.teams.find((t: any) => t.id === selectedCreatorTeamId));
+	const selectedInvitedTeam = $derived(data.teams.find((t: any) => t.id === selectedInvitedTeamId));
+	const creatorIsPersonal = $derived(selectedCreatorTeam?.isPersonal ?? true);
+
+	const creatorMaxSize = $derived(selectedCreatorTeam?.memberCount ?? 1);
+	const invitedMaxSize = $derived(selectedInvitedTeam?.memberCount ?? 1);
+
+	const effectiveBestOf = $derived(useCustomBo ? parseInt(customBestOf) || 5 : bestOf);
+
+	// Filter opponent teams for search
+	const filteredOpponentTeams = $derived(
+		data.teams.filter((t: any) => {
+			if (t.id === selectedCreatorTeamId) return false;
+			if (!opponentSearch) return true;
+			return t.name.toLowerCase().includes(opponentSearch.toLowerCase());
+		})
+	);
+
+	function teamDisplayName(t: any): string {
+		return t.name;
+	}
+
+	function mappoolSummary(p: any): string {
+		const slots = p.slots ?? [];
+		if (!slots.length) return '0 maps';
+		const avg = slots.reduce((s: number, sl: any) => s + (sl.starRating ?? 0), 0) / slots.length;
+		// Count per category
+		const counts: Record<string, number> = {};
+		for (const sl of slots) {
+			counts[sl.category] = (counts[sl.category] ?? 0) + 1;
+		}
+		const parts = Object.entries(counts).map(([cat, n]) => `${n}${cat}`);
+		return `${avg.toFixed(1)}★ · ${parts.join(', ')}`;
+	}
 
 	const stateConfig: Record<string, { label: string; color: string; dot?: string }> = {
 		CREATED: { label: 'Created', color: 'text-text-secondary border-border' },
@@ -80,14 +138,24 @@
 				{/if}
 			</p>
 		</div>
-		{#if data.canCreateMatch}
-			<button
-				onclick={() => (showCreate = !showCreate)}
-				class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
-			>
-				{showCreate ? 'Cancel' : 'New Match'}
-			</button>
-		{/if}
+		<div class="flex gap-2">
+			{#if (data as any).userTeams?.length > 0}
+				<button
+					onclick={() => { showInvite = !showInvite; if (showInvite) showCreate = false; }}
+					class="rounded-md border border-accent/30 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10"
+				>
+					{showInvite ? 'Cancel' : 'Challenge'}
+				</button>
+			{/if}
+			{#if data.canCreateMatch}
+				<button
+					onclick={() => { showCreate = !showCreate; if (showCreate) showInvite = false; }}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+				>
+					{showCreate ? 'Cancel' : 'New Match'}
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Create Match Modal -->
@@ -151,7 +219,7 @@
 					>
 						<option value="">Select team...</option>
 						{#each data.teams as t}
-							<option value={t.id}>{t.name}{t.isPersonal ? ' (solo)' : ''}</option>
+							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
 				</div>
@@ -166,7 +234,7 @@
 					>
 						<option value="">Select team...</option>
 						{#each data.teams as t}
-							<option value={t.id}>{t.name}{t.isPersonal ? ' (solo)' : ''}</option>
+							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
 				</div>
@@ -193,6 +261,201 @@
 					class="rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
 				>
 					Create &amp; Start
+				</button>
+			</div>
+		</form>
+	{/if}
+
+	<!-- Challenge / Invite Form -->
+	{#if showInvite}
+		<form
+			method="post"
+			action="?/createInvite"
+			use:enhance={() => {
+				inviteError = '';
+				inviteSuccess = false;
+				return async ({ result, update }) => {
+					if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
+						inviteError = (result.data as any)?.error ?? 'Failed to send invite';
+					} else if (result.type === 'success' && (result.data as any)?.inviteSuccess) {
+						inviteSuccess = true;
+						await invalidateAll();
+						setTimeout(() => { showInvite = false; inviteSuccess = false; }, 2000);
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
+		>
+			<h2 class="text-sm font-600">Challenge</h2>
+
+			{#if inviteError}
+				<p class="mt-2 text-sm text-red-400">{inviteError}</p>
+			{/if}
+			{#if inviteSuccess}
+				<p class="mt-2 text-sm text-green-400">Invite sent!</p>
+			{/if}
+
+			<input type="hidden" name="bestOf" value={effectiveBestOf} />
+			<input type="hidden" name="creatorTeamId" value={selectedCreatorTeamId} />
+			<input type="hidden" name="invitedTeamId" value={selectedInvitedTeamId} />
+
+			<div class="mt-4 flex flex-col gap-4">
+				<!-- Your Team (only shown if you have non-personal teams) -->
+				{#if hasMultipleTeams}
+					<div>
+						<label for="inv-myTeam" class="text-xs font-500 text-text-secondary">Your Team</label>
+						<select id="inv-myTeam" bind:value={selectedCreatorTeamId} class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+							{#if personalTeam}
+								<option value={personalTeam.id}>{teamDisplayName(personalTeam)}</option>
+							{/if}
+							{#each nonPersonalUserTeams as t}
+								<option value={t.id}>{t.name}</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
+
+				<!-- Opponent (searchable) -->
+				<div>
+					<label for="inv-opponent-search" class="text-xs font-500 text-text-secondary">Opponent</label>
+					<input
+						type="text"
+						id="inv-opponent-search"
+						bind:value={opponentSearch}
+						placeholder="Search players or teams..."
+						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
+						autocomplete="off"
+					/>
+					{#if selectedInvitedTeam}
+						<div class="mt-1.5 flex items-center gap-2 rounded-md bg-accent/10 px-3 py-1.5 text-xs text-accent">
+							<span class="font-600">{teamDisplayName(selectedInvitedTeam)}</span>
+							<span class="text-text-secondary">({selectedInvitedTeam.memberCount} player{selectedInvitedTeam.memberCount !== 1 ? 's' : ''})</span>
+							<button type="button" onclick={() => { selectedInvitedTeamId = ''; opponentSearch = ''; }} class="ml-auto text-text-secondary hover:text-red-400">&times;</button>
+						</div>
+					{:else if opponentSearch}
+						<div class="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-surface-700">
+							{#each filteredOpponentTeams.slice(0, 20) as t}
+								<button
+									type="button"
+									onclick={() => { selectedInvitedTeamId = t.id; opponentSearch = ''; }}
+									class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-600"
+								>
+									{#if t.avatarUrl}
+										<img src={t.avatarUrl} alt="" class="h-5 w-5 rounded-full" />
+									{/if}
+									<span class="font-500">{teamDisplayName(t)}</span>
+									{#if !t.isPersonal}
+										<span class="text-xs text-text-secondary">({t.memberCount}p)</span>
+									{/if}
+								</button>
+							{:else}
+								<div class="px-3 py-2 text-xs text-text-secondary">No results</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+
+				<!-- Best Of -->
+				<div>
+					<span class="text-xs font-500 text-text-secondary">Best Of</span>
+					<div class="mt-1.5 flex flex-wrap gap-1.5">
+						{#each [3, 5, 7, 9, 11, 13] as n}
+							<button
+								type="button"
+								onclick={() => { bestOf = n; useCustomBo = false; customBestOf = ''; }}
+								class="rounded-md px-3 py-1.5 text-xs font-600 transition-colors {!useCustomBo && bestOf === n ? 'bg-accent text-surface-900' : 'border border-border bg-surface-700 text-text-secondary hover:border-accent/40 hover:text-text-primary'}"
+							>BO{n}</button>
+						{/each}
+						<input
+							type="number"
+							min="1"
+							step="2"
+							placeholder="Custom"
+							bind:value={customBestOf}
+							onfocus={() => (useCustomBo = true)}
+							oninput={() => (useCustomBo = true)}
+							class="w-20 rounded-md border {useCustomBo ? 'border-accent' : 'border-border'} bg-surface-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
+						/>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 gap-4">
+					<!-- Team sizes (only if creator is not personal team) -->
+					{#if !creatorIsPersonal && creatorMaxSize > 1}
+						<div>
+							<label for="inv-ts1" class="text-xs font-500 text-text-secondary">Your Team Size</label>
+							<select id="inv-ts1" name="teamSize1" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+								{#each Array.from({ length: creatorMaxSize }, (_, i) => i + 1) as n}
+									<option value={n} selected={n === creatorMaxSize}>{n}v</option>
+								{/each}
+							</select>
+						</div>
+					{:else}
+						<input type="hidden" name="teamSize1" value="1" />
+					{/if}
+
+					{#if selectedInvitedTeam && !selectedInvitedTeam.isPersonal && invitedMaxSize > 1}
+						<div>
+							<label for="inv-ts2" class="text-xs font-500 text-text-secondary">Opponent Team Size</label>
+							<select id="inv-ts2" name="teamSize2" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+								{#each Array.from({ length: invitedMaxSize }, (_, i) => i + 1) as n}
+									<option value={n} selected={n === invitedMaxSize}>v{n}</option>
+								{/each}
+							</select>
+						</div>
+					{:else}
+						<input type="hidden" name="teamSize2" value="1" />
+					{/if}
+
+					<!-- Scoring -->
+					<div>
+						<label for="inv-scoring" class="text-xs font-500 text-text-secondary">Scoring</label>
+						<select id="inv-scoring" name="scoringType" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+							<option value="score_v2" selected>ScoreV2</option>
+							<option value="score">Score</option>
+							<option value="accuracy">Accuracy</option>
+							<option value="combo">Combo</option>
+						</select>
+					</div>
+
+					<!-- Mappool -->
+					<div>
+						<label for="inv-mappool" class="text-xs font-500 text-text-secondary">Mappool</label>
+						<select id="inv-mappool" name="mappool" required class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+							<option value="">Select mappool...</option>
+							{#each data.mappools as p}
+								<option value={p.id}>{p.name} — {mappoolSummary(p)}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<!-- ELO toggle (default on) -->
+				<div class="flex items-center gap-3">
+					<label class="flex items-center gap-2 text-xs text-text-secondary">
+						<input type="checkbox" name="allowEloChange" checked class="rounded border-border bg-surface-700 text-accent focus:ring-accent" />
+						Affects ELO
+					</label>
+				</div>
+
+				<!-- Message + Schedule -->
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="inv-message" class="text-xs font-500 text-text-secondary">Message (optional)</label>
+						<input type="text" id="inv-message" name="message" placeholder="e.g. ggs only" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none" />
+					</div>
+					<div>
+						<label for="inv-schedule" class="text-xs font-500 text-text-secondary">Schedule (optional)</label>
+						<input type="datetime-local" id="inv-schedule" name="scheduledAt" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none" />
+					</div>
+				</div>
+			</div>
+
+			<div class="mt-4 flex justify-end">
+				<button type="submit" disabled={!selectedInvitedTeamId} class="rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-40">
+					Send Challenge
 				</button>
 			</div>
 		</form>

@@ -8,8 +8,12 @@
 
 	const user = $derived(page.data?.user);
 	const activeMatch = $derived(page.data?.activeMatch);
+	const unreadCount = $derived((page.data as any)?.unreadNotificationCount ?? 0);
 
 	let { open = $bindable(false) } = $props();
+	let notifOpen = $state(false);
+	let notifications = $state<any[]>([]);
+	let loadingNotifs = $state(false);
 
 	function isActive(href: string) {
 		if (href === '/') return page.url.pathname === '/';
@@ -22,7 +26,66 @@
 	$effect(() => {
 		page.url.pathname;
 		open = false;
+		notifOpen = false;
 	});
+
+	async function toggleNotifications() {
+		notifOpen = !notifOpen;
+		if (notifOpen) {
+			await loadNotifications();
+		}
+	}
+
+	async function loadNotifications() {
+		loadingNotifs = true;
+		try {
+			const res = await fetch('/api/notifications');
+			if (res.ok) notifications = await res.json();
+		} finally {
+			loadingNotifs = false;
+		}
+	}
+
+	async function handleAcceptInvite(referenceId: string) {
+		const res = await fetch(`/api/invites/${referenceId}/accept`, { method: 'POST' });
+		if (res.ok) {
+			const match = await res.json();
+			notifications = notifications.map((n) =>
+				n.referenceId === referenceId ? { ...n, actionedAt: new Date().toISOString(), read: true } : n
+			);
+			window.location.href = `/matches/${match.id}`;
+		}
+	}
+
+	async function handleDeclineInvite(referenceId: string) {
+		const res = await fetch(`/api/invites/${referenceId}/decline`, { method: 'POST' });
+		if (res.ok) {
+			notifications = notifications.map((n) =>
+				n.referenceId === referenceId ? { ...n, actionedAt: new Date().toISOString(), read: true } : n
+			);
+		}
+	}
+
+	async function markAllRead() {
+		await fetch('/api/notifications/read', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ all: true })
+		});
+		notifications = notifications.map((n) => ({ ...n, read: true }));
+	}
+
+	function timeAgo(date: string | Date) {
+		const d = new Date(date);
+		const diff = Date.now() - d.getTime();
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'just now';
+		if (mins < 60) return `${mins}m ago`;
+		const hours = Math.floor(mins / 60);
+		if (hours < 24) return `${hours}h ago`;
+		const days = Math.floor(hours / 24);
+		return `${days}d ago`;
+	}
 </script>
 
 {#snippet navIcon(name: string)}
@@ -57,15 +120,87 @@
 		? 'translate-x-0'
 		: '-translate-x-full'} lg:translate-x-0 lg:z-40"
 >
-	<!-- Logo -->
-	<a href="/" class="flex items-center gap-2.5 px-5 py-5">
-		<img src="/logo.png" alt="Vash Esports" class="h-8 w-8" />
-		<span class="font-700 font-bold text-base tracking-tight text-text-primary">Vash Esports</span>
-	</a>
+	<!-- Logo + Notifications -->
+	<div class="flex items-center justify-between px-5 py-5">
+		<a href="/" class="flex items-center gap-2.5">
+			<img src="/logo.png" alt="Vash Esports" class="h-8 w-8" />
+			<span class="font-700 font-bold text-base tracking-tight text-text-primary">Vash Esports</span>
+		</a>
+		{#if user}
+			<div class="relative">
+				<button
+					onclick={toggleNotifications}
+					class="relative rounded-md p-1.5 text-text-secondary transition-colors hover:bg-surface-700 hover:text-text-primary"
+					aria-label="Notifications"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+					{#if unreadCount > 0}
+						<span class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-700 text-surface-900">{unreadCount > 99 ? '99+' : unreadCount}</span>
+					{/if}
+				</button>
+
+				{#if notifOpen}
+					<!-- Backdrop -->
+					<button
+						class="fixed inset-0 z-50"
+						onclick={() => (notifOpen = false)}
+						aria-label="Close notifications"
+					></button>
+
+					<!-- Dropdown -->
+					<div class="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border border-border bg-surface-800 shadow-xl">
+						<div class="flex items-center justify-between border-b border-border px-3 py-2">
+							<span class="text-xs font-600 text-text-secondary">Notifications</span>
+							{#if notifications.some((n) => !n.read)}
+								<button onclick={markAllRead} class="text-[10px] text-accent hover:underline">Mark all read</button>
+							{/if}
+						</div>
+						<div class="max-h-80 overflow-y-auto">
+							{#if loadingNotifs}
+								<div class="px-3 py-6 text-center text-xs text-text-secondary">Loading...</div>
+							{:else if notifications.length === 0}
+								<div class="px-3 py-6 text-center text-xs text-text-secondary">No notifications</div>
+							{:else}
+								{#each notifications as n}
+									<div class="border-b border-border/50 px-3 py-2.5 {n.read ? 'opacity-60' : ''}">
+										<div class="flex items-start gap-2">
+											{#if !n.read}
+												<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>
+											{/if}
+											<div class="min-w-0 flex-1">
+												<p class="text-xs font-600 text-text-primary">{n.title}</p>
+												{#if n.message}
+													<p class="mt-0.5 text-[11px] text-text-secondary">{n.message}</p>
+												{/if}
+												<p class="mt-0.5 text-[10px] text-text-secondary/60">{timeAgo(n.createdAt)}</p>
+
+												{#if n.type === 'match_invite' && !n.actionedAt && n.referenceId}
+													<div class="mt-1.5 flex gap-1.5">
+														<button
+															onclick={() => handleAcceptInvite(n.referenceId)}
+															class="rounded bg-green-500/20 px-2 py-0.5 text-[10px] font-600 text-green-400 transition-colors hover:bg-green-500/30"
+														>Accept</button>
+														<button
+															onclick={() => handleDeclineInvite(n.referenceId)}
+															class="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-600 text-red-400 transition-colors hover:bg-red-500/30"
+														>Decline</button>
+													</div>
+												{/if}
+											</div>
+										</div>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+	</div>
 
 	<!-- Queue Button -->
 	<div class="px-3 pb-4">
-		{#if activeMatch}
+		{#if activeMatch && page.url.pathname !== `/matches/${activeMatch.id}`}
 			<a
 				href="/matches/{activeMatch.id}"
 				class="flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm font-600 text-yellow-300 transition-colors hover:bg-yellow-500/20"
@@ -90,7 +225,7 @@
 					Leave Queue
 				</button>
 			</div>
-		{:else}
+		{:else if !activeMatch}
 			<button
 				onclick={joinQueue}
 				disabled={queue.loading}
@@ -108,7 +243,7 @@
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/matches', label: 'Matches', icon: 'matches' },
 			{ href: '/mappools', label: 'Mappools', icon: 'mappools' },
-			// { href: '/teams', label: 'Teams', icon: 'teams' },
+			{ href: '/teams', label: 'Teams', icon: 'teams' },
 			{ href: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
 		] as item (item.href)}
 			<a
