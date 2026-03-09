@@ -14,8 +14,9 @@ import { proxyImage } from './storage/r2';
 let pendingOsuProfile: { rank: number | null } | null = null;
 
 function eloFromRank(rank: number | null): { elo: number; osuRank: number | null } {
-	if (!rank || rank <= 0) return { elo: 1000, osuRank: null };
-	const rawElo = 3500 - Math.log10(rank) * 500;
+	// Unranked → treat as rank 10,000,000 (yields 0 ELO)
+	const effectiveRank = rank && rank > 0 ? rank : 10_000_000;
+	const rawElo = 3500 - Math.log10(effectiveRank) * 500;
 	return { elo: Math.round(Math.max(0, Math.min(3500, rawElo))), osuRank: rank };
 }
 
