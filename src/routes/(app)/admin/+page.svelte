@@ -148,7 +148,7 @@
 				{ action: 'clearQueue', label: 'Clear Queue', confirm: 'Remove everyone from the queue?', color: 'border-border text-text-secondary hover:bg-surface-700' },
 				{ action: 'expireInvites', label: 'Expire All Invites', confirm: 'Expire all pending invites?', color: 'border-border text-text-secondary hover:bg-surface-700' },
 				{ action: 'clearNotifications', label: 'Clear Notifications', confirm: 'Delete all notifications?', color: 'border-border text-text-secondary hover:bg-surface-700' },
-				{ action: 'resetRatings', label: 'Reset Ratings', confirm: 'Reset all ELO ratings to initial values? This cannot be undone.', color: 'border-red-500/30 text-red-400 hover:bg-red-500/10' },
+				{ action: 'resetRatings', label: 'Re-seed Ratings from osu!', confirm: 'Fetch all osu! ranks and re-seed ELO ratings? W/L records will be reset. Unranked players get 10M rank. This cannot be undone.', color: 'border-red-500/30 text-red-400 hover:bg-red-500/10' },
 				{ action: 'clearMatchHistory', label: 'Clear All Match Data', confirm: 'Delete ALL matches, scores, invites, and notifications? This cannot be undone.', color: 'border-red-500/30 text-red-400 hover:bg-red-500/10' },
 			] as tool}
 				<form

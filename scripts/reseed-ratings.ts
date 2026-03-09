@@ -80,42 +80,39 @@ async function main() {
 		const [acc] = await sql`SELECT account_id FROM account
 			WHERE user_id = ${r.user_id} AND provider_id = 'osu' LIMIT 1`;
 
+		let rank: number | null = null;
+
 		if (!acc) {
-			console.log(`  [SKIP] user ${r.user_id} — no osu! account linked`);
-			skipped++;
-			continue;
-		}
-
-		try {
-			const osuUser = await getOsuUser(acc.account_id);
-			const rank = osuUser?.statistics?.global_rank;
-
-			if (!rank || rank <= 0) {
-				console.log(`  [SKIP] user ${r.user_id} (osu! ${acc.account_id}) — unranked`);
+			console.log(`  [WARN] user ${r.user_id} — no osu! account linked, treating as unranked`);
+		} else {
+			try {
+				const osuUser = await getOsuUser(acc.account_id);
+				rank = osuUser?.statistics?.global_rank ?? null;
+			} catch (err: any) {
+				console.error(`  [ERR] user ${r.user_id} (osu! ${acc.account_id}):`, err.message);
 				skipped++;
 				continue;
 			}
-
-			const seedElo = rankToElo(rank);
-			// Adjust by win/loss differential to preserve some earned progress
-			const adjustment = (r.wins - r.losses) * 12;
-			const finalElo = Math.max(0, Math.min(3500, seedElo + adjustment));
-
-			await sql`UPDATE player_rating SET
-				elo = ${finalElo},
-				initial_elo = ${seedElo},
-				osu_rank_at_seed = ${rank},
-				updated_at = now()
-				WHERE id = ${r.id}`;
-
-			console.log(
-				`  [OK] user ${r.user_id} — rank #${rank.toLocaleString()} → seed ${seedElo}, adj ${adjustment > 0 ? '+' : ''}${adjustment} → final ${finalElo} (was ${r.elo})`
-			);
-			updated++;
-		} catch (err: any) {
-			console.error(`  [ERR] user ${r.user_id} (osu! ${acc.account_id}):`, err.message);
-			skipped++;
 		}
+
+		// Unranked → rank 100,000 (~1000 ELO)
+		const effectiveRank = rank && rank > 0 ? rank : 100_000;
+		const seedElo = rankToElo(effectiveRank);
+		// Adjust by win/loss differential to preserve some earned progress
+		const adjustment = (r.wins - r.losses) * 12;
+		const finalElo = Math.max(0, Math.min(3500, seedElo + adjustment));
+
+		await sql`UPDATE player_rating SET
+			elo = ${finalElo},
+			initial_elo = ${seedElo},
+			osu_rank_at_seed = ${rank},
+			updated_at = now()
+			WHERE id = ${r.id}`;
+
+		console.log(
+			`  [OK] user ${r.user_id} — rank #${rank ? rank.toLocaleString() : 'unranked (10M)'} → seed ${seedElo}, adj ${adjustment > 0 ? '+' : ''}${adjustment} → final ${finalElo} (was ${r.elo})`
+		);
+		updated++;
 
 		// Rate limit: 500ms between API calls
 		await new Promise((resolve) => setTimeout(resolve, 500));
