@@ -22,6 +22,12 @@
 	let dropTarget = $state<{ category: string; index: number } | null>(null);
 	const isDragging = $derived(draggedSlot !== null);
 
+	// Bulk import state
+	let bulkOpen = $state(false);
+	let bulkData = $state('');
+	let bulkImporting = $state(false);
+	let bulkResult = $state<{ successCount: number; errors: string[] } | null>(null);
+
 	// Rename state
 	let editing = $state(false);
 	let editName = $derived(data.pool.name);
@@ -332,6 +338,82 @@
 				<p class="mt-2 text-sm text-red-400">{addError}</p>
 			{/if}
 		</form>
+	{/if}
+
+	<!-- Bulk Import -->
+	{#if data.isAdmin}
+		<div class="mt-4 rounded-lg border border-border bg-surface-800">
+			<button
+				type="button"
+				onclick={() => { bulkOpen = !bulkOpen; }}
+				class="flex w-full items-center justify-between px-4 py-3 text-sm font-600 text-text-secondary hover:text-text-primary transition-colors"
+			>
+				Bulk Import
+				<span class="text-xs">{bulkOpen ? '▲' : '▼'}</span>
+			</button>
+
+			{#if bulkOpen}
+				<form
+					method="post"
+					action="?/bulkImport"
+					use:enhance={() => {
+						bulkImporting = true;
+						bulkResult = null;
+						return async ({ result, update }) => {
+							bulkImporting = false;
+							if (result.type === 'success') {
+								const r = (result.data as any)?.bulkImportResult;
+								if (r) {
+									bulkResult = r;
+									if (r.successCount > 0) {
+										bulkData = '';
+										await update();
+									}
+								}
+							} else if (result.type === 'failure') {
+								bulkResult = { successCount: 0, errors: [(result.data as any)?.error ?? 'Import failed'] };
+							}
+						};
+					}}
+					class="px-4 pb-4"
+				>
+					<textarea
+						name="data"
+						bind:value={bulkData}
+						placeholder={"NM1\t181589\nNM2\t2603758\nHR1\t948389\nTB\t457061"}
+						rows="6"
+						class="w-full rounded-md border border-border bg-surface-700 px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
+					></textarea>
+					<div class="mt-2 flex items-center gap-3">
+						<button
+							type="submit"
+							disabled={bulkImporting || !bulkData.trim()}
+							class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+						>
+							{bulkImporting ? 'Importing...' : 'Import'}
+						</button>
+						<span class="text-xs text-text-secondary">
+							Paste tab-separated lines: mod code + beatmap ID/URL
+						</span>
+					</div>
+
+					{#if bulkResult}
+						<div class="mt-3 rounded-md border border-border bg-surface-700 p-3 text-sm">
+							{#if bulkResult.successCount > 0}
+								<p class="text-green-400">{bulkResult.successCount} map{bulkResult.successCount !== 1 ? 's' : ''} imported successfully.</p>
+							{/if}
+							{#if bulkResult.errors.length > 0}
+								<div class="mt-1 space-y-1">
+									{#each bulkResult.errors as err}
+										<p class="text-red-400">{err}</p>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</form>
+			{/if}
+		</div>
 	{/if}
 
 	<!-- Map List -->
