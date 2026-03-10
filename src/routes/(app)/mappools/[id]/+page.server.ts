@@ -284,6 +284,94 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	bulkImport: async ({ params, request, locals }) => {
+		requireAuth(locals);
+		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+
+		const form = await request.formData();
+		const raw = form.get('data')?.toString()?.trim();
+		if (!raw) return { error: 'No data provided' };
+
+		const lines = raw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+		const validMods = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
+		const errors: string[] = [];
+		let successCount = 0;
+
+		for (let i = 0; i < lines.length; i++) {
+			const lineNum = i + 1;
+			const parts = lines[i].split(/[\t\s]+/);
+			if (parts.length < 2) {
+				errors.push(`Line ${lineNum}: expected mod code and beatmap ID`);
+				continue;
+			}
+
+			const modCode = parts[0];
+			const modMatch = modCode.match(/^(NM|HD|HR|DT|FM|TB)\d*$/i);
+			if (!modMatch) {
+				errors.push(`Line ${lineNum}: unknown mod "${modCode}"`);
+				continue;
+			}
+			const category = modMatch[1].toUpperCase();
+
+			let beatmapId = parts[1];
+			const urlMatch = beatmapId.match(/beatmaps\/(\d+)/);
+			const setMatch = beatmapId.match(/beatmapsets\/\d+#\w+\/(\d+)/);
+			const shortMatch = beatmapId.match(/\/b\/(\d+)/);
+			if (urlMatch) beatmapId = urlMatch[1];
+			else if (setMatch) beatmapId = setMatch[1];
+			else if (shortMatch) beatmapId = shortMatch[1];
+
+			if (!/^\d+$/.test(beatmapId)) {
+				errors.push(`Line ${lineNum}: invalid beatmap ID "${parts[1]}"`);
+				continue;
+			}
+
+			let beatmap;
+			try {
+				beatmap = await getBeatmap(beatmapId);
+			} catch {
+				errors.push(`Line ${lineNum}: beatmap ${beatmapId} not found on osu!`);
+				continue;
+			}
+
+			const existing = await db.query.mappoolSlot.findMany({
+				where: and(eq(mappoolSlot.mappoolId, params.id), eq(mappoolSlot.category, category))
+			});
+
+			let coverUrl: string | null = null;
+			let listCoverUrl: string | null = null;
+			try {
+				coverUrl = await proxyImage(beatmap.beatmapset.covers['card@2x']);
+				listCoverUrl = await proxyImage(beatmap.beatmapset.covers['list@2x']);
+			} catch (err: any) {
+				console.warn('[Mappool] Failed to proxy covers to R2:', err.message);
+			}
+
+			await db.insert(mappoolSlot).values({
+				mappoolId: params.id,
+				beatmapId,
+				category,
+				orderInCategory: existing.length + 1,
+				starRating: beatmap.difficulty_rating,
+				bpm: beatmap.bpm,
+				totalLength: beatmap.total_length,
+				mods: category === 'NM' || category === 'TB' ? [] : [category],
+				title: beatmap.beatmapset.title,
+				artist: beatmap.beatmapset.artist,
+				version: beatmap.version,
+				coverUrl,
+				listCoverUrl
+			});
+
+			successCount++;
+		}
+
+		if (errors.length > 0) {
+			return { bulkImportResult: { successCount, errors } };
+		}
+		return { bulkImportResult: { successCount, errors: [] } };
+	},
+
 	deletePool: async ({ params, locals }) => {
 		requireAuth(locals);
 		if (locals.user!.role !== 'admin') error(403, 'Admins only');
