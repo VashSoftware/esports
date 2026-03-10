@@ -305,15 +305,26 @@ export const actions: Actions = {
 				continue;
 			}
 
-			const modCode = parts[0];
-			const modMatch = modCode.match(/^(NM|HD|HR|DT|FM|TB)\d*$/i);
-			if (!modMatch) {
-				errors.push(`Line ${lineNum}: unknown mod "${modCode}"`);
+			// Detect column order: mod+id or id+mod
+			const modRegex = /^(NM|HD|HR|DT|FM|TB)\d*$/i;
+			let modCode: string;
+			let beatmapRaw: string;
+
+			if (modRegex.test(parts[0])) {
+				modCode = parts[0];
+				beatmapRaw = parts[1];
+			} else if (modRegex.test(parts[parts.length - 1])) {
+				modCode = parts[parts.length - 1];
+				beatmapRaw = parts[0];
+			} else {
+				errors.push(`Line ${lineNum}: no valid mod code found`);
 				continue;
 			}
+
+			const modMatch = modCode.match(modRegex)!;
 			const category = modMatch[1].toUpperCase();
 
-			let beatmapId = parts[1];
+			let beatmapId = beatmapRaw;
 			const urlMatch = beatmapId.match(/beatmaps\/(\d+)/);
 			const setMatch = beatmapId.match(/beatmapsets\/\d+#\w+\/(\d+)/);
 			const shortMatch = beatmapId.match(/\/b\/(\d+)/);
