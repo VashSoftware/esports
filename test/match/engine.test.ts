@@ -52,7 +52,7 @@ mock.module('$lib/server/osu/api', () => ({
 
 const { pickMap } = await import('../../src/lib/server/match/engine');
 
-	describe('pickMap', () => {
+describe('pickMap', () => {
 	beforeEach(() => {
 		mocks.db.query.match.findFirst.mockReset();
 		mocks.db.query.matchParticipant.findMany.mockReset();
