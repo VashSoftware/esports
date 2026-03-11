@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { MATCH_STATES } from '../../src/lib/server/match/types';
 
 const mocks = {
@@ -35,6 +35,12 @@ mock.module('$lib/server/match/engine', () => ({
 const { joinQueue } = await import('../../src/lib/server/match/queue');
 
 describe('joinQueue', () => {
+	beforeEach(() => {
+		mocks.db.query.matchParticipantPlayer.findMany.mockReset();
+		mocks.db.query.playerRating.findFirst.mockReset();
+		mocks.db.delete.mockReset();
+	});
+
 	it('throws when user is already in an active match', async () => {
 		mocks.db.delete.mockReturnValue({
 			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
@@ -50,5 +56,18 @@ describe('joinQueue', () => {
 
 		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow('You are already in an active match');
 		expect(mocks.db.query.playerRating.findFirst).not.toHaveBeenCalled();
+	});
+
+	it('throws when user has no rating', async () => {
+		mocks.db.delete.mockReturnValue({
+			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+		});
+
+		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
+		mocks.db.query.playerRating.findFirst.mockResolvedValue(null);
+
+		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow(
+			'No rating found — please re-register'
+		);
 	});
 });
