@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, test, mock } from 'bun:test';
 import { MATCH_STATES } from '../../src/lib/server/match/types';
 
 const mocks = {
@@ -43,7 +43,7 @@ describe('joinQueue', () => {
 		mocks.db.delete.mockReset();
 	});
 
-	it('throws when user is already in an active match', async () => {
+	test('throws when user is already in an active match', async () => {
 		mocks.db.delete.mockReturnValue({
 			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
 		});
@@ -60,7 +60,7 @@ describe('joinQueue', () => {
 		expect(mocks.db.query.playerRating.findFirst).not.toHaveBeenCalled();
 	});
 
-	it('throws when user has no rating', async () => {
+	test('throws when user has no rating', async () => {
 		mocks.db.delete.mockReturnValue({
 			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
 		});
@@ -73,7 +73,7 @@ describe('joinQueue', () => {
 		);
 	});
 
-    it('throws when user is already in queue', async() => {
+    test('throws when user is already in queue', async() => {
         mocks.db.delete.mockReturnValue({
             where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
         });
