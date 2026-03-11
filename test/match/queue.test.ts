@@ -5,7 +5,8 @@ const mocks = {
 	db: {
 		query: {
 			matchParticipantPlayer: { findMany: mock() },
-			playerRating: { findFirst: mock() }
+			playerRating: { findFirst: mock() },
+            matchQueue: { findFirst: mock() }
 		},
 		delete: mock()
 	}
@@ -38,6 +39,7 @@ describe('joinQueue', () => {
 	beforeEach(() => {
 		mocks.db.query.matchParticipantPlayer.findMany.mockReset();
 		mocks.db.query.playerRating.findFirst.mockReset();
+		mocks.db.query.matchQueue.findFirst.mockReset();
 		mocks.db.delete.mockReset();
 	});
 
@@ -70,4 +72,16 @@ describe('joinQueue', () => {
 			'No rating found — please re-register'
 		);
 	});
+
+    it('throws when user is already in queue', async() => {
+        mocks.db.delete.mockReturnValue({
+            where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+        });
+
+        mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
+        mocks.db.query.playerRating.findFirst.mockResolvedValue({ elo: 1500 });
+        mocks.db.query.matchQueue.findFirst.mockResolvedValue({ userId: 'user-1', teamId: 'team-1' });
+
+        await expect(joinQueue('user-1', 'team-1')).rejects.toThrow('Already in queue');
+    });
 });
