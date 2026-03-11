@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, test, mock } from 'bun:test';
 import { MATCH_STATES } from '../../src/lib/server/match/types';
 
 const mocks = {
@@ -77,12 +77,12 @@ const { pickMap } = await import('../../src/lib/server/match/engine');
 		mocks.db.query.matchGame.findMany.mockResolvedValue([]);
 	});
 
-	it('throws when a non-current picker tries to pick', async () => {
+	test('throws when a non-current picker tries to pick', async () => {
 		await expect(pickMap('match-1', 'p2', 'slot-1')).rejects.toThrow('Not your turn to pick');
 		expect(mocks.db.query.mappoolSlot.findFirst).not.toHaveBeenCalled();
 	});
 
-	it('rejects tiebreaker picks before match point', async () => {
+	test('rejects tiebreaker picks before match point', async () => {
 		mocks.db.query.mappoolSlot.findFirst.mockResolvedValue({
 			id: 'slot-tb',
 			category: 'TB'
