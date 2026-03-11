@@ -1,6 +1,6 @@
 // src/routes/api/queue/+server.ts
 import { json, error } from '@sveltejs/kit';
-import { joinQueue, leaveQueue, getQueueStatus } from '$lib/server/match/engine';
+import { joinQueue, leaveQueue, getQueueStatus } from '$lib/server/match/queue';
 import { db } from '$lib/server/db';
 import { teamMember } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
