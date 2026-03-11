@@ -6,6 +6,7 @@ import { eq, and, or, lt, inArray, desc } from 'drizzle-orm';
 import { createNotification, markActionedByReference } from '$lib/server/notifications';
 import { createMatch } from './engine';
 import type { MatchConfig } from './types';
+import { matchEvents } from './events';
 import { sendDM } from '$lib/server/bancho/client';
 
 const DEFAULT_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -145,14 +146,7 @@ export async function acceptInvite(inviteId: string, userId: string) {
 
 	// Start lobby if immediate (no scheduledAt)
 	if (!invite.scheduledAt) {
-		try {
-			const { initMatchLobby } = await import('./orchestrator');
-			initMatchLobby(created.id).catch((err) => {
-				console.error('[Invites] IRC lobby creation failed:', err.message);
-			});
-		} catch (err: any) {
-			console.error('[Invites] Failed to import orchestrator:', err.message);
-		}
+		matchEvents.emit('match-created', created.id);
 	}
 
 	return created;

@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { getMatchFull, submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
 import { env } from '$env/dynamic/private';
+import { matchEvents } from './events';
 
 // matchId → lowercase usernames of all expected players
 const expectedPlayers = new Map<string, Set<string>>();
@@ -927,3 +928,9 @@ export async function closeLobby(matchId: string) {
 	expectedPlayers.delete(matchId);
 	joinedPlayers.delete(matchId);
 }
+
+matchEvents.on('match-created', (matchId: string) => {
+    initMatchLobby(matchId).catch((err) => {
+        console.error('[Queue] IRC lobby creation failed:', err.message);
+    });
+});
