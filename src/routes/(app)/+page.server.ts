@@ -2,7 +2,7 @@
 import { db } from '$lib/server/db';
 import { match, team, mappool } from '$lib/server/db/schema';
 import { eq, desc, count, inArray } from 'drizzle-orm';
-import { getQueueStatus } from '$lib/server/match/engine';
+import { getQueueStatus } from '$lib/server/match/queue';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {

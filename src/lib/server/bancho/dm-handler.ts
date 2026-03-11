@@ -13,7 +13,7 @@ import { db } from '$lib/server/db';
 import { user, playerRating, teamMember, team, matchInvite } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { setDMHandler, sendDM, getClient } from './client';
-import { joinQueue, leaveQueue, getQueueStatus } from '../match/engine';
+import { joinQueue, leaveQueue, getQueueStatus } from '../match/queue';
 import { acceptInvite, declineInvite, getInvitesForUser } from '../match/invites';
 
 let initialized = false;
