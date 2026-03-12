@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/client';
 import { updateElo } from './rating';
+import { getExpectedPicker, getMatchOrThrow, assertState, getMatchFull } from './helpers';
 
 // ── Create Match ────────────────────────────────────────────────────────
 
@@ -342,59 +343,4 @@ export async function cancelMatch(matchId: string) {
 		.where(eq(match.id, matchId));
 
 	return getMatchFull(matchId);
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-
-function getExpectedPicker(
-	participants: { id: string; pickOrder: number | null; score: number }[],
-	gameCount: number
-) {
-	const sorted = [...participants].sort((a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99));
-	const pickerIndex = gameCount % sorted.length;
-	return sorted[pickerIndex];
-}
-
-export async function getMatchFull(matchId: string) {
-	const m = await db.query.match.findFirst({
-		where: eq(match.id, matchId),
-		with: {
-			mappool: {
-				with: { slots: true }
-			},
-			participants: {
-				with: {
-					team: true,
-					players: true
-				}
-			},
-			games: {
-				with: {
-					slot: true,
-					scores: {
-						with: { player: true },
-						orderBy: (s, { desc }) => [desc(s.score)]
-					}
-				},
-				orderBy: (g, { asc }) => [asc(g.gameNumber)]
-			}
-		}
-	});
-
-	if (!m) throw new Error('Match not found');
-	return m;
-}
-
-async function getMatchOrThrow(matchId: string) {
-	const m = await db.query.match.findFirst({
-		where: eq(match.id, matchId)
-	});
-	if (!m) throw new Error('Match not found');
-	return m;
-}
-
-function assertState(current: string, expected: string) {
-	if (current !== expected) {
-		throw new Error(`Match is ${current}, expected ${expected}`);
-	}
 }
