@@ -238,7 +238,7 @@
 	</div>
 
 	<!-- Nav -->
-	<nav class="mt-0 flex flex-1 flex-col gap-0.5 px-3">
+    <nav class="mt-0 flex flex-1 flex-col gap-0.5 px-3">
 		{#each [
 			{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 			{ href: '/matches', label: 'Matches', icon: 'matches' },
