@@ -4,15 +4,13 @@
  * Usage: bun scripts/cancel-matches.ts
  */
 
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/bun-sql';
 import { sql } from 'drizzle-orm';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error('DATABASE_URL not set');
 
-const client = postgres(DATABASE_URL);
-const db = drizzle(client);
+const db = drizzle(DATABASE_URL);
 
 async function main() {
 	const result = await db.execute(sql`

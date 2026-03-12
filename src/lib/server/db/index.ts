@@ -1,10 +1,11 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
 import * as schema from './schema';
 import { env } from '$env/dynamic/private';
 
 if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+if (!process.versions.bun) {
+	throw new Error('Bun SQL requires the Bun runtime. If in a dev environment, try running the app with `bun --bun vite dev`.');
+}
 
-const client = postgres(env.DATABASE_URL);
+const { drizzle } = await import('drizzle-orm/bun-sql');
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(env.DATABASE_URL, { schema });
