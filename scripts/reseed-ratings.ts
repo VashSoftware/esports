@@ -7,7 +7,7 @@
  * Run with: bun run scripts/reseed-ratings.ts
  */
 
-import postgres from 'postgres';
+import { SQL } from 'bun';
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 const OSU_CLIENT_ID = process.env.OSU_CLIENT_ID!;
@@ -20,7 +20,7 @@ for (const [k, v] of Object.entries({ DATABASE_URL, OSU_CLIENT_ID, OSU_CLIENT_SE
 	}
 }
 
-const sql = postgres(DATABASE_URL);
+const sql = new SQL(DATABASE_URL);
 
 // ── osu! API ───────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ async function main() {
 	}
 
 	console.log(`\nDone: ${updated} updated, ${skipped} skipped`);
-	await sql.end();
+	await sql.close();
 }
 
 main().catch((err) => {

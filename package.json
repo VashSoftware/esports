@@ -4,10 +4,10 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
+		"dev": "bun --bun vite dev",
+		"build": "bun --bun vite build",
 		"start": "bun ./build/index.js",
-		"preview": "vite preview",
+		"preview": "bun --bun vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -20,7 +20,7 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-		"auth:schema": "npx @better-auth/cli generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
+		"auth:schema": "bun x @better-auth/cli generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.2",
@@ -57,7 +57,6 @@
 	},
 	"dependencies": {
 		"bancho.js": "^0.12.3",
-		"discord.js": "^14.25.1",
-		"postgres": "^3.4.8"
+		"discord.js": "^14.25.1"
 	}
 }

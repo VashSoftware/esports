@@ -11,8 +11,7 @@
  * then run this script to populate them.
  */
 
-import postgres from 'postgres';
-import { S3Client } from 'bun';
+import { SQL, S3Client } from 'bun';
 
 // ── Config ─────────────────────────────────────────────────────────────
 
@@ -130,7 +129,7 @@ async function getBeatmap(beatmapId: string): Promise<BeatmapData | null> {
 
 // ── Main ───────────────────────────────────────────────────────────────
 
-const sql = postgres(DATABASE_URL);
+const sql = new SQL(DATABASE_URL);
 
 // ════════════════════════════════════════════════════════════════════════
 // 1. MAPPOOL SLOTS — backfill title/artist/version/coverUrl/listCoverUrl
@@ -263,4 +262,4 @@ console.log(`  Mappool slots:  ${slotOk} backfilled, ${slotFail} failed`);
 console.log(`  User avatars:   ${avatarOk} re-proxied, ${avatarSkip} already R2`);
 console.log(`  Team avatars:   ${teamOk} re-proxied, ${teamSkip} already R2`);
 
-await sql.end();
+await sql.close();
