@@ -3,6 +3,7 @@ import { match, matchQueue, matchParticipantPlayer, playerRating } from '$lib/se
 import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
 import { MATCH_STATES } from './types';
 import { createMatch } from './engine';
+import { matchEvents } from './events';
 
 const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -156,16 +157,8 @@ async function tryMatchFromQueue() {
 		createdBy: 'system'
 	});
 
-	// Start the IRC lobby in the background
-	// Import dynamically to avoid circular dependency
-	try {
-		const { initMatchLobby } = await import('./orchestrator');
-		initMatchLobby(created.id).catch((err) => {
-			console.error('[Queue] IRC lobby creation failed:', err.message);
-		});
-	} catch (err: any) {
-		console.error('[Queue] Failed to import orchestrator:', err.message);
-	}
+    // Start the IRC lobby in the background
+    matchEvents.emit('match-created', created.id);
 
 	return created;
 }
