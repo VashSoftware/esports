@@ -16,10 +16,12 @@ mock.module('$lib/server/db', () => ({ db: mocks.db }));
 
 mock.module('drizzle-orm', () => ({
 	eq: mock(() => ({})),
+	and: mock(() => ({})),
 	asc: mock(() => ({})),
 	lt: mock(() => ({})),
 	inArray: mock(() => ({})),
-	sql: mock(() => ({}))
+	sql: mock(() => ({})),
+	isNotNull: mock(() => ({}))
 }));
 
 mock.module('$lib/server/db/schema', () => ({
@@ -27,6 +29,12 @@ mock.module('$lib/server/db/schema', () => ({
 	matchQueue: {},
 	matchParticipantPlayer: {},
 	playerRating: {}
+}));
+
+mock.module('$lib/server/db/auth.schema', () => ({ account: {} }));
+
+mock.module('$lib/server/osu/api', () => ({
+	getUser: mock()
 }));
 
 mock.module('$lib/server/match/engine', () => ({
