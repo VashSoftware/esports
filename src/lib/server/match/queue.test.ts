@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, mock } from 'bun:test';
-import { MATCH_STATES } from '../../src/lib/server/match/types';
+import { MATCH_STATES } from './types';
 
 const mocks = {
 	db: {
@@ -41,7 +41,7 @@ mock.module('$lib/server/match/engine', () => ({
 	createMatch: mock()
 }));
 
-const { joinQueue } = await import('../../src/lib/server/match/queue');
+const { joinQueue } = await import('./queue');
 
 describe('joinQueue', () => {
 	beforeEach(() => {

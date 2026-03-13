@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, mock } from 'bun:test';
-import { MATCH_STATES } from '../../src/lib/server/match/types';
+import { MATCH_STATES } from './types';
 
 const mocks = {
 	db: {
@@ -51,7 +51,7 @@ mock.module('$lib/server/osu/api', () => ({
 	getUser: mock()
 }));
 
-const { pickMap } = await import('../../src/lib/server/match/engine');
+const { pickMap } = await import('./engine');
 
 describe('pickMap', () => {
 	beforeEach(() => {
