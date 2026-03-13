@@ -8,8 +8,30 @@ on:
 
 jobs:
   ci:
-    name: Lint, Check & Build
+    name: Lint, Check, Build & Test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: esports_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgres://test:test@localhost:5432/esports_test
+      BETTER_AUTH_SECRET: ci-test-secret
+      OSU_CLIENT_ID: '0'
+      OSU_CLIENT_SECRET: ci-test-secret
+
     steps:
       - uses: actions/checkout@v4
 
@@ -26,11 +48,17 @@ jobs:
       - name: Type check
         run: bun run check
 
+      - name: Push DB schema
+        run: bun run db:push
+
       - name: Build
         run: bun run build
 
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
-      - name: Tests
-        run: bun run test
+      - name: Unit tests
+        run: bun run test:unit --run
+
+      - name: E2E tests
+        run: bun run test:e2e
