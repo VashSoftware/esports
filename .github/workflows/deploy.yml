@@ -30,7 +30,7 @@ jobs:
 
               docker compose build
               docker compose up -d
-              docker compose exec app bunx drizzle-kit push --force
+              docker compose exec app drizzle-kit push --force
             else
               cd /opt/esports-staging
               git fetch origin staging
@@ -39,5 +39,5 @@ jobs:
 
               docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging build
               docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging up -d
-              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging exec staging-app bunx drizzle-kit push --force
+              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging exec staging-app drizzle-kit push --force
             fi
