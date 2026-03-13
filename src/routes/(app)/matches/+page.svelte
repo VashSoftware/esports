@@ -21,24 +21,28 @@
 	let opponentSearch = $state('');
 
 	// Load form data when create/invite modals open
-	$effect(async () => {
+	$effect(() => {
 		if ((showCreate || showInvite) && !formData && !formDataLoading) {
 			formDataLoading = true;
-			const formData_elem = new FormData();
-			const response = await fetch('?/loadCreateFormData', {
-				method: 'POST',
-				body: formData_elem
-			});
-			const result = await response.json();
-			if (result.data) {
-				formData = result.data;
-			}
-			formDataLoading = false;
+			(async () => {
+				const formData_elem = new FormData();
+				const response = await fetch('?/loadCreateFormData', {
+					method: 'POST',
+					body: formData_elem
+				});
+				const result = await response.json();
+				if (result.data) {
+					formData = result.data;
+				}
+				formDataLoading = false;
+			})();
 		}
 	});
 
 	const personalTeam = $derived((formData ?? data).userTeams?.find((t: any) => t.isPersonal));
-	const nonPersonalUserTeams = $derived((formData ?? data).userTeams?.filter((t: any) => !t.isPersonal) ?? []);
+	const nonPersonalUserTeams = $derived(
+		(formData ?? data).userTeams?.filter((t: any) => !t.isPersonal) ?? []
+	);
 	const hasMultipleTeams = $derived(nonPersonalUserTeams.length > 0);
 
 	// Auto-select personal team by default
@@ -48,8 +52,12 @@
 		}
 	});
 
-	const selectedCreatorTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId));
-	const selectedInvitedTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId));
+	const selectedCreatorTeam = $derived(
+		(formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId)
+	);
+	const selectedInvitedTeam = $derived(
+		(formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId)
+	);
 	const creatorIsPersonal = $derived(selectedCreatorTeam?.isPersonal ?? true);
 
 	const creatorMaxSize = $derived(selectedCreatorTeam?.memberCount ?? 1);
@@ -160,18 +168,24 @@
 		<div class="flex gap-2">
 			{#if (formData ?? data).userTeams?.length > 0}
 				<button
-					onclick={() => { showInvite = !showInvite; if (showInvite) showCreate = false; }}
+					onclick={() => {
+						showInvite = !showInvite;
+						if (showInvite) showCreate = false;
+					}}
 					disabled={formDataLoading && showInvite}
-					class="rounded-md border border-accent/30 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
+					class="font-600 rounded-md border border-accent/30 px-4 py-2 text-sm text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
 				>
 					{showInvite && formDataLoading ? 'Loading...' : showInvite ? 'Cancel' : 'Challenge'}
 				</button>
 			{/if}
 			{#if data.canCreateMatch}
 				<button
-					onclick={() => { showCreate = !showCreate; if (showCreate) showInvite = false; }}
+					onclick={() => {
+						showCreate = !showCreate;
+						if (showCreate) showInvite = false;
+					}}
 					disabled={formDataLoading && showCreate}
-					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+					class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 				>
 					{showCreate && formDataLoading ? 'Loading...' : showCreate ? 'Cancel' : 'New Match'}
 				</button>
@@ -239,7 +253,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each data.teams as t}
+						{#each formData?.teams as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
@@ -254,7 +268,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each data.teams as t}
+						{#each formData?.teams as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
@@ -269,7 +283,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select mappool...</option>
-						{#each data.mappools as p}
+						{#each formData?.mappools as p}
 							<option value={p.id}>{p.name} ({p.slots.length} maps)</option>
 						{/each}
 					</select>
@@ -507,7 +521,7 @@
 							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 						>
 							<option value="">Select mappool...</option>
-							{#each data.mappools as p}
+							{#each formData?.mappools as p}
 								<option value={p.id}>{p.name} — {mappoolSummary(p)}</option>
 							{/each}
 						</select>
