@@ -39,6 +39,184 @@ const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error('DATABASE_URL not set');
 const db = drizzle(DATABASE_URL);
 
+// ── Inline table defs (mirrors schema.ts, avoids $lib imports) ──────────
+
+const user = pgTable('user', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	email: text('email').notNull().unique(),
+	emailVerified: boolean('email_verified').default(false).notNull(),
+	image: text('image'),
+	role: text('role').default('player').notNull(),
+	createdAt: timestamp('created_at').defaultNow().notNull(),
+	updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+const account = pgTable('account', {
+	id: text('id').primaryKey(),
+	accountId: text('account_id').notNull(),
+	providerId: text('provider_id').notNull(),
+	userId: text('user_id').notNull(),
+	accessToken: text('access_token'),
+	refreshToken: text('refresh_token'),
+	idToken: text('id_token'),
+	accessTokenExpiresAt: timestamp('access_token_expires_at'),
+	refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+	scope: text('scope'),
+	password: text('password'),
+	createdAt: timestamp('created_at').defaultNow().notNull(),
+	updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+const team = pgTable('team', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	name: text('name').notNull(),
+	isPersonal: boolean('is_personal').default(false).notNull(),
+	ownerId: text('owner_id'),
+	avatarUrl: text('avatar_url'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+const teamMember = pgTable('team_member', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	teamId: uuid('team_id').notNull(),
+	userId: text('user_id').notNull(),
+	role: text('role').default('member'),
+	joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow()
+});
+
+const mappool = pgTable('mappool', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	name: text('name').notNull(),
+	createdBy: text('created_by'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+	verifiedAt: timestamp('verified_at', { withTimezone: true })
+});
+
+const mappoolSlot = pgTable('mappool_slot', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	mappoolId: uuid('mappool_id').notNull(),
+	category: text('category').notNull(),
+	orderInCategory: integer('order_in_category').notNull(),
+	beatmapId: text('beatmap_id').notNull(),
+	starRating: real('star_rating'),
+	bpm: real('bpm'),
+	totalLength: integer('total_length'),
+	mods: text('mods').array().default([]).notNull(),
+	title: text('title'),
+	artist: text('artist'),
+	version: text('version'),
+	coverUrl: text('cover_url'),
+	listCoverUrl: text('list_cover_url')
+});
+
+const match = pgTable('match', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	name: text('name'),
+	state: text('state').default('CREATED').notNull(),
+	config: jsonb('config').notNull(),
+	mappoolId: uuid('mappool_id'),
+	osuLobbyId: integer('osu_lobby_id'),
+	scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+	startedAt: timestamp('started_at', { withTimezone: true }),
+	finishedAt: timestamp('finished_at', { withTimezone: true }),
+	winnerId: uuid('winner_id'),
+	createdBy: text('created_by'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+const matchParticipant = pgTable('match_participant', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	matchId: uuid('match_id').notNull(),
+	teamId: uuid('team_id').notNull(),
+	slot: integer('slot').notNull(),
+	score: integer('score').default(0).notNull(),
+	rollValue: integer('roll_value'),
+	pickOrder: integer('pick_order')
+});
+
+const matchParticipantPlayer = pgTable('match_participant_player', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	participantId: uuid('participant_id').notNull(),
+	userId: text('user_id').notNull()
+});
+
+const matchGame = pgTable('match_game', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	matchId: uuid('match_id').notNull(),
+	gameNumber: integer('game_number').notNull(),
+	mappoolSlotId: uuid('mappool_slot_id').notNull(),
+	pickedByParticipantId: uuid('picked_by_participant_id'),
+	winnerParticipantId: uuid('winner_participant_id'),
+	state: text('state').default('PENDING').notNull(),
+	startedAt: timestamp('started_at', { withTimezone: true }),
+	finishedAt: timestamp('finished_at', { withTimezone: true })
+});
+
+const matchGameScore = pgTable('match_game_score', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	matchGameId: uuid('match_game_id').notNull(),
+	playerId: uuid('player_id').notNull(),
+	score: integer('score').default(0).notNull(),
+	accuracy: real('accuracy').default(0).notNull(),
+	maxCombo: integer('max_combo').default(0).notNull(),
+	count300: integer('count_300').default(0).notNull(),
+	count100: integer('count_100').default(0).notNull(),
+	count50: integer('count_50').default(0).notNull(),
+	countMiss: integer('count_miss').default(0).notNull(),
+	mods: text('mods').array().default([]).notNull(),
+	passed: boolean('passed').default(false).notNull(),
+	pp: real('pp')
+});
+
+const playerRating = pgTable('player_rating', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: text('user_id').notNull().unique(),
+	elo: integer('elo').default(1000).notNull(),
+	wins: integer('wins').default(0).notNull(),
+	losses: integer('losses').default(0).notNull(),
+	initialElo: integer('initial_elo'),
+	osuRankAtSeed: integer('osu_rank_at_seed'),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+const notification = pgTable('notification', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: text('user_id').notNull(),
+	type: text('type').notNull(),
+	title: text('title').notNull(),
+	message: text('message'),
+	referenceId: text('reference_id'),
+	read: boolean('read').default(false).notNull(),
+	actionedAt: timestamp('actioned_at', { withTimezone: true }),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+const matchInvite = pgTable('match_invite', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	createdBy: text('created_by').notNull(),
+	creatorTeamId: uuid('creator_team_id').notNull(),
+	invitedTeamId: uuid('invited_team_id').notNull(),
+	config: jsonb('config').notNull(),
+	mappoolId: uuid('mappool_id').notNull(),
+	name: text('name'),
+	message: text('message'),
+	scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+	expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+	status: text('status').default('pending').notNull(),
+	matchId: uuid('match_id'),
+	respondedAt: timestamp('responded_at', { withTimezone: true }),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+const matchQueue = pgTable('match_queue', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	userId: text('user_id').notNull(),
+	teamId: uuid('team_id').notNull(),
+	elo: integer('elo').default(1000).notNull(),
+	joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull()
+});
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 /** Seeded PRNG for reproducible data */
