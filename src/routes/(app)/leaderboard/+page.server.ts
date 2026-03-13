@@ -80,7 +80,7 @@ export const load: PageServerLoad = async () => {
 		})
 	);
 
-	const topTeams = teamsWithDetails.filter(Boolean);
+	const topTeams = teamsWithDetails.filter((x): x is NonNullable<typeof x> => Boolean(x));
 
 	// ── High scores — sorted by pp (nulls last) then score ──
 	const recentHighScores = await db
@@ -131,7 +131,7 @@ export const load: PageServerLoad = async () => {
 				matchId: s.game.matchId
 			};
 		})
-	).then((rows) => rows.filter(Boolean));
+	).then((rows) => rows.filter((x): x is NonNullable<typeof x> => Boolean(x)));
 
 	return {
 		topPlayers: playersWithUsers,

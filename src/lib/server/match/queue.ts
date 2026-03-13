@@ -3,7 +3,6 @@ import { match, matchQueue, matchParticipantPlayer, playerRating } from '$lib/se
 import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
 import { MATCH_STATES } from './types';
 import { createMatch } from './engine';
-import { selectMappoolForRating } from './rating';
 
 const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -202,6 +201,11 @@ async function selectMappoolForRating(avgElo: number) {
 	return bestPool;
 }
 
-function getAverageMappoolSR(pool): number {
-	return pool.slots.reduce((acc, slot) => acc + slot.starRating!, 0) / pool.slots.length;
+function getAverageMappoolSR(pool: { slots: { starRating: number | null }[] }): number {
+	return (
+		pool.slots.reduce(
+			(acc: number, slot: { starRating: number | null }) => acc + (slot.starRating ?? 0),
+			0
+		) / pool.slots.length
+	);
 }

@@ -55,15 +55,22 @@
 	const MOD_ORDER = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 
 	// Group mappool slots by category
+	type MappoolSlot = {
+		id: string;
+		beatmapId: string;
+		category: string;
+		orderInCategory: number;
+		starRating: number | null;
+	};
 	const groupedSlots = $derived(() => {
-		if (!m.mappool?.slots) return {};
-		const groups: Record<string, unknown[]> = {};
-		for (const slot of m.mappool.slots) {
+		if (!m.mappool?.slots) return {} as Record<string, MappoolSlot[]>;
+		const groups: Record<string, MappoolSlot[]> = {};
+		for (const slot of m.mappool.slots as MappoolSlot[]) {
 			if (!groups[slot.category]) groups[slot.category] = [];
 			groups[slot.category].push(slot);
 		}
 		for (const cat of Object.keys(groups)) {
-			groups[cat].sort((a: unknown, b: unknown) => a.orderInCategory - b.orderInCategory);
+			groups[cat].sort((a, b) => a.orderInCategory - b.orderInCategory);
 		}
 		// Return entries sorted by canonical mod order
 		return Object.fromEntries(
@@ -97,10 +104,10 @@
 
 	// Mappool avg SR
 	const mappoolAvgSR = $derived(() => {
-		const slots = m.mappool?.slots;
+		const slots = m.mappool?.slots as MappoolSlot[] | undefined;
 		if (!slots?.length) return null;
 		const avg =
-			slots.reduce((sum: number, s: unknown) => sum + (s.starRating ?? 0), 0) / slots.length;
+			slots.reduce((sum: number, s: MappoolSlot) => sum + (s.starRating ?? 0), 0) / slots.length;
 		return avg.toFixed(2);
 	});
 

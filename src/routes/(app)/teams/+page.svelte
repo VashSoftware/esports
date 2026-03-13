@@ -161,6 +161,7 @@
 											class="mb-3 flex items-center gap-2"
 										>
 											<input type="hidden" name="teamId" value={t.id} />
+											<!-- svelte-ignore a11y_autofocus -->
 											<input
 												type="text"
 												name="name"
