@@ -13,7 +13,6 @@ import { eq } from 'drizzle-orm';
 import type { MatchConfig } from '$lib/server/match/types';
 import { playerRating } from '$lib/server/db/schema';
 
-
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(302, '/');
 
@@ -45,7 +44,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				if (slot.title !== null) {
 					// Sanitize any stale ppy.sh fallback URLs (image was unavailable when first fetched)
 					const coverUrl = slot.coverUrl?.includes('ppy.sh') ? null : (slot.coverUrl ?? null);
-					const listCoverUrl = slot.listCoverUrl?.includes('ppy.sh') ? null : (slot.listCoverUrl ?? null);
+					const listCoverUrl = slot.listCoverUrl?.includes('ppy.sh')
+						? null
+						: (slot.listCoverUrl ?? null);
 					beatmapCache[slot.beatmapId] = {
 						title: slot.title,
 						artist: slot.artist ?? '',
@@ -90,7 +91,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 							totalLength: bm.total_length
 						})
 						.where(eq(mappoolSlot.id, slot.id));
-				} catch { /* skip */ }
+				} catch {
+					/* skip */
+				}
 			})
 		);
 	}
@@ -120,7 +123,15 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}
 	}
 
-	return { match: m, beatmapCache, userId: locals.user.id, isStaff, lobbyStatus, playerNames, playerRatings };
+	return {
+		match: m,
+		beatmapCache,
+		userId: locals.user.id,
+		isStaff,
+		lobbyStatus,
+		playerNames,
+		playerRatings
+	};
 };
 
 export const actions: Actions = {
@@ -171,7 +182,9 @@ export const actions: Actions = {
 		// Announce in IRC lobby
 		const lobby = getLobby(params.id);
 		if (lobby) {
-			lobby.chat(`${myParticipant.team?.name ?? 'Player'} rolled ${value} (via web)`).catch(() => {});
+			lobby
+				.chat(`${myParticipant.team?.name ?? 'Player'} rolled ${value} (via web)`)
+				.catch(() => {});
 
 			// Check if all rolled → announce pick order or tie
 			const updated = await getMatchFull(params.id);
@@ -184,13 +197,17 @@ export const actions: Actions = {
 				const isTBRoll = updated.participants.every((p: any) => p.score === rollWinsNeeded - 1);
 
 				if (isTBRoll) {
-					lobby.chat(
-						`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. Use !pick TB<n> or pick in web UI.`
-					).catch(() => {});
+					lobby
+						.chat(
+							`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. Use !pick TB<n> or pick in web UI.`
+						)
+						.catch(() => {});
 				} else {
-					lobby.chat(
-						`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
-					).catch(() => {});
+					lobby
+						.chat(
+							`Rolls complete! ${sorted[0]?.team.name} picks first. Use !pick <slot> (e.g. !pick NM1) or pick in web UI.`
+						)
+						.catch(() => {});
 				}
 			} else if (isLastRoll && updated.participants.every((p: any) => p.rollValue === null)) {
 				lobby.chat(`Tie! All players rolled ${value}. Please !roll again.`).catch(() => {});
@@ -210,9 +227,7 @@ export const actions: Actions = {
 		const m = await getMatchFull(params.id);
 
 		// Find the expected picker based on pick order and game count
-		const sorted = [...m.participants].sort(
-			(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
-		);
+		const sorted = [...m.participants].sort((a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99));
 		const expectedIdx = m.games.length % sorted.length;
 		const expectedPicker = sorted[expectedIdx];
 
@@ -220,9 +235,7 @@ export const actions: Actions = {
 
 		// ── Verify the logged-in user is on the expected picker's team ──
 		// No staff bypass here — even admins can't pick for another team
-		const isOnPickerTeam = expectedPicker.players.some(
-			(pl) => pl.userId === locals.user!.id
-		);
+		const isOnPickerTeam = expectedPicker.players.some((pl) => pl.userId === locals.user!.id);
 		if (!isOnPickerTeam) {
 			return { error: "It's not your turn to pick" };
 		}

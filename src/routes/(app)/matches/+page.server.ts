@@ -11,36 +11,77 @@ import type { PageServerLoad, Actions } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	requireAuth(locals);
 
-	const [matches, teams, mappools, userTeamMemberships] = await Promise.all([
-		db.query.match.findMany({
-			with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
-			orderBy: desc(match.createdAt),
-			limit: 50
-		}),
-		db.query.team.findMany({
-			with: { members: true },
-			orderBy: (t, { asc }) => [asc(t.name)]
-		}),
-		db.query.mappool.findMany({
-			with: { slots: true },
-			orderBy: (m, { desc }) => [desc(m.createdAt)]
-		}),
-		db.query.teamMember.findMany({
-			where: eq(teamMember.userId, locals.user!.id),
-			with: { team: true }
-		})
-	]);
+	const matches = await db.query.match.findMany({
+		columns: {
+			id: true,
+			name: true,
+			state: true,
+			config: true,
+			createdAt: true,
+			finishedAt: true,
+			winnerId: true
+		},
+		with: {
+			participants: {
+				columns: {
+					teamId: true,
+					score: true,
+					slot: true
+				},
+				orderBy: (p, { asc }) => [asc(p.slot)],
+				with: {
+					team: {
+						columns: {
+							id: true,
+							name: true,
+							avatarUrl: true
+						}
+					}
+				}
+			},
+			mappool: {
+				columns: {
+					id: true,
+					name: true
+				}
+			}
+		},
+		orderBy: desc(match.createdAt),
+		limit: 50
+	});
 
 	return {
 		matches,
-		teams: teams.map((t) => ({ ...t, memberCount: t.members.length })),
-		mappools,
-		userTeams: userTeamMemberships.map((m) => m.team),
 		canCreateMatch: hasRole(locals.user!.role, 'referee')
 	};
 };
 
 export const actions: Actions = {
+	loadCreateFormData: async ({ locals }) => {
+		requireAuth(locals);
+
+		const [teams, mappools, userTeamMemberships] = await Promise.all([
+			db.query.team.findMany({
+				with: { members: true },
+				orderBy: (t, { asc }) => [asc(t.name)]
+			}),
+			db.query.mappool.findMany({
+				with: { slots: true },
+				orderBy: (m, { desc }) => [desc(m.createdAt)]
+			}),
+			db.query.teamMember.findMany({
+				where: eq(teamMember.userId, locals.user!.id),
+				with: { team: true }
+			})
+		]);
+
+		return {
+			teams: teams.map((t) => ({ ...t, memberCount: t.members.length })),
+			mappools,
+			userTeams: userTeamMemberships.map((m) => m.team)
+		};
+	},
+
 	createMatch: async ({ request, locals }) => {
 		// Only referees and admins can create matches manually
 		requireRole(locals, 'referee', 'Only referees and admins can create matches');
@@ -91,7 +132,11 @@ export const actions: Actions = {
 		const bestOf = parseInt(form.get('bestOf')?.toString() ?? '5');
 		const teamSize1 = parseInt(form.get('teamSize1')?.toString() ?? '1');
 		const teamSize2 = parseInt(form.get('teamSize2')?.toString() ?? '1');
-		const scoringType = (form.get('scoringType')?.toString() ?? 'score_v2') as 'score' | 'score_v2' | 'accuracy' | 'combo';
+		const scoringType = (form.get('scoringType')?.toString() ?? 'score_v2') as
+			| 'score'
+			| 'score_v2'
+			| 'accuracy'
+			| 'combo';
 		const allowEloChange = form.get('allowEloChange') === 'on';
 		const message = form.get('message')?.toString()?.trim() || '';
 		const scheduledAtStr = form.get('scheduledAt')?.toString();

@@ -8,13 +8,13 @@
 		"build": "bun --bun vite build",
 		"start": "bun ./build/index.js",
 		"preview": "bun --bun vite preview",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "svelte-kit sync || echo '' && husky",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run && npm run test:e2e",
+		"test": "bun run test:unit -- --run && bun run test:e2e",
 		"test:e2e": "playwright test",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
@@ -23,6 +23,8 @@
 		"auth:schema": "bun x @better-auth/cli generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},
 	"devDependencies": {
+		"@commitlint/cli": "^20.4.4",
+		"@commitlint/config-conventional": "^20.4.4",
 		"@eslint/compat": "^2.0.2",
 		"@eslint/js": "^9.39.2",
 		"@playwright/test": "^1.58.1",
@@ -41,7 +43,10 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.14.0",
 		"globals": "^17.3.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.3.3",
 		"playwright": "^1.58.1",
+		"postgres": "^3.4.8",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.4.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
@@ -54,6 +59,15 @@
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vitest": "^4.1.0",
 		"vitest-browser-svelte": "^2.1.0"
+	},
+	"lint-staged": {
+		"*.{js,ts,svelte}": [
+			"prettier --write",
+			"eslint --fix"
+		],
+		"*.{json,css,md,yml,yaml,html}": [
+			"prettier --write"
+		]
 	},
 	"dependencies": {
 		"bancho.js": "^0.12.3",

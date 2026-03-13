@@ -29,9 +29,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			role: locals.user.role ?? 'player',
 			createdAt: locals.user.createdAt
 		},
-		rating: rating
-			? { elo: rating.elo, wins: rating.wins, losses: rating.losses }
-			: null,
+		rating: rating ? { elo: rating.elo, wins: rating.wins, losses: rating.losses } : null,
 		hasOsuLinked: !!osuAccount
 	};
 };

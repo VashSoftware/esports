@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  push:
+    branches: [staging, prod]
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'prod' && 'production' || 'staging' }}
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            if [ "${{ github.ref_name }}" = "prod" ]; then
+              cd /opt/esports
+              git fetch origin prod
+              git checkout prod
+              git reset --hard origin/prod
+
+              docker compose build
+              docker compose up -d
+              docker compose exec app bunx drizzle-kit push --force
+            else
+              cd /opt/esports-staging
+              git fetch origin staging
+              git checkout staging
+              git reset --hard origin/staging
+
+              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging build
+              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging up -d
+              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging exec staging-app bunx drizzle-kit push --force
+            fi

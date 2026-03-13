@@ -1,8 +1,8 @@
 import { dev } from '$app/environment';
 import { db } from '$lib/server/db';
-import { matchInvite, teamMember, notification } from '$lib/server/db/schema';
+import { matchInvite, teamMember } from '$lib/server/db/schema';
 import { user } from '$lib/server/db/auth.schema';
-import { eq, and, or, lt, inArray, desc } from 'drizzle-orm';
+import { eq, and, lt, inArray, desc } from 'drizzle-orm';
 import { createNotification, markActionedByReference } from '$lib/server/notifications';
 import { createMatch } from './engine';
 import type { MatchConfig } from './types';
@@ -20,7 +20,8 @@ export async function createInvite(opts: {
 	message?: string;
 	scheduledAt?: Date | null;
 }) {
-	const { createdBy, creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } = opts;
+	const { createdBy, creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } =
+		opts;
 
 	if (creatorTeamId === invitedTeamId && !dev) {
 		throw new Error('Cannot invite your own team');

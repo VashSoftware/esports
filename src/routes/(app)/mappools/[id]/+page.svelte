@@ -3,7 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	const categories = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 
@@ -13,9 +13,9 @@
 	let searching = $state(false);
 
 	// Inline per-category add state
-	let inlineInputs = $state<Record<string, string>>({});
-	let inlineSearching = $state<Record<string, boolean>>({});
-	let inlineErrors = $state<Record<string, string>>({});
+	const inlineInputs = $state<Record<string, string>>({});
+	const inlineSearching = $state<Record<string, boolean>>({});
+	const inlineErrors = $state<Record<string, string>>({});
 
 	// Drag-and-drop state
 	let draggedSlot = $state<{ id: string; category: string; index: number } | null>(null);
@@ -30,7 +30,7 @@
 
 	// Rename state
 	let editing = $state(false);
-	let editName = $derived(data.pool.name);
+	const editName = $derived(data.pool.name);
 
 	// Check if pool has any maps at all
 	const hasAnySlots = $derived(data.pool.slots.length > 0);
@@ -152,13 +152,6 @@
 	};
 </script>
 
-<style>
-	:global([draggable='true']) {
-		-webkit-user-select: none;
-		user-select: none;
-	}
-</style>
-
 <svelte:head>
 	<title>{data.pool.name} — Mappool | Vash Esports</title>
 	<meta
@@ -200,11 +193,11 @@
 							type="text"
 							name="name"
 							value={editName}
-							class="rounded-md border border-accent bg-surface-700 px-3 py-1 text-xl font-700 text-text-primary focus:outline-none"
+							class="font-700 rounded-md border border-accent bg-surface-700 px-3 py-1 text-xl text-text-primary focus:outline-none"
 						/>
 						<button
 							type="submit"
-							class="rounded-md bg-accent px-3 py-1 text-xs font-600 text-surface-900 hover:bg-accent-hover"
+							class="font-600 rounded-md bg-accent px-3 py-1 text-xs text-surface-900 hover:bg-accent-hover"
 						>
 							Save
 						</button>
@@ -220,10 +213,10 @@
 					</form>
 				{:else}
 					<div class="flex items-center gap-2">
-						<h1 class="text-2xl font-700 tracking-tight">{data.pool.name}</h1>
+						<h1 class="font-700 text-2xl tracking-tight">{data.pool.name}</h1>
 						{#if data.pool.verifiedAt}
 							<span
-								class="flex items-center gap-1 rounded border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-600 text-green-400"
+								class="font-600 flex items-center gap-1 rounded border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs text-green-400"
 							>
 								&#10003; Verified
 							</span>
@@ -305,7 +298,7 @@
 			}}
 			class="mt-6 rounded-lg border border-border bg-surface-800 p-4"
 		>
-			<h2 class="text-sm font-600">Add Map</h2>
+			<h2 class="font-600 text-sm">Add Map</h2>
 			<div class="mt-3 flex gap-3">
 				<select
 					name="category"
@@ -328,7 +321,7 @@
 				<button
 					type="submit"
 					disabled={searching || !beatmapInput.trim()}
-					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+					class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 				>
 					{searching ? 'Adding...' : 'Add'}
 				</button>
@@ -345,8 +338,10 @@
 		<div class="mt-4 rounded-lg border border-border bg-surface-800">
 			<button
 				type="button"
-				onclick={() => { bulkOpen = !bulkOpen; }}
-				class="flex w-full items-center justify-between px-4 py-3 text-sm font-600 text-text-secondary hover:text-text-primary transition-colors"
+				onclick={() => {
+					bulkOpen = !bulkOpen;
+				}}
+				class="font-600 flex w-full items-center justify-between px-4 py-3 text-sm text-text-secondary transition-colors hover:text-text-primary"
 			>
 				Bulk Import
 				<span class="text-xs">{bulkOpen ? '▲' : '▼'}</span>
@@ -371,7 +366,10 @@
 									}
 								}
 							} else if (result.type === 'failure') {
-								bulkResult = { successCount: 0, errors: [(result.data as any)?.error ?? 'Import failed'] };
+								bulkResult = {
+									successCount: 0,
+									errors: [(result.data as any)?.error ?? 'Import failed']
+								};
 							}
 						};
 					}}
@@ -380,7 +378,7 @@
 					<textarea
 						name="data"
 						bind:value={bulkData}
-						placeholder={"NM1\t181589\nNM2\t2603758\nHR1\t948389\nTB\t457061"}
+						placeholder={'NM1\t181589\nNM2\t2603758\nHR1\t948389\nTB\t457061'}
 						rows="6"
 						class="w-full rounded-md border border-border bg-surface-700 px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
 					></textarea>
@@ -388,7 +386,7 @@
 						<button
 							type="submit"
 							disabled={bulkImporting || !bulkData.trim()}
-							class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+							class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 						>
 							{bulkImporting ? 'Importing...' : 'Import'}
 						</button>
@@ -400,7 +398,9 @@
 					{#if bulkResult}
 						<div class="mt-3 rounded-md border border-border bg-surface-700 p-3 text-sm">
 							{#if bulkResult.successCount > 0}
-								<p class="text-green-400">{bulkResult.successCount} map{bulkResult.successCount !== 1 ? 's' : ''} imported successfully.</p>
+								<p class="text-green-400">
+									{bulkResult.successCount} map{bulkResult.successCount !== 1 ? 's' : ''} imported successfully.
+								</p>
 							{/if}
 							{#if bulkResult.errors.length > 0}
 								<div class="mt-1 space-y-1">
@@ -431,9 +431,8 @@
 							ondrop={handleDrop}
 						>
 							<span
-								class="rounded border px-2 py-0.5 text-xs font-600 {categoryColors[
-									category
-								] ?? 'bg-surface-600 text-text-secondary border-border'}"
+								class="font-600 rounded border px-2 py-0.5 text-xs {categoryColors[category] ??
+									'border-border bg-surface-600 text-text-secondary'}"
 							>
 								{category}
 							</span>
@@ -471,7 +470,9 @@
 									<div
 										class="group relative flex items-center gap-3 rounded-lg border bg-surface-800 p-2 transition-colors
 											{data.canEdit ? 'cursor-grab active:cursor-grabbing' : ''}
-											{draggedSlot?.id === slot.id ? 'border-accent/50 opacity-40' : 'border-border hover:border-accent/30'}"
+											{draggedSlot?.id === slot.id
+											? 'border-accent/50 opacity-40'
+											: 'border-border hover:border-accent/30'}"
 										style={dropTarget?.category === category && dropTarget.index === i
 											? `box-shadow: 0 -3px 0 0 var(--color-accent, #8b5cf6); margin-top: 4px;`
 											: dropTarget?.category === category &&
@@ -482,16 +483,17 @@
 										ondragover={(e) => handleDragOver(e, category, i)}
 										ondrop={handleDrop}
 										role={data.canEdit ? 'listitem' : undefined}
-										use:makeDraggable={{ slotId: slot.id, category, index: i, enabled: data.canEdit }}
+										use:makeDraggable={{
+											slotId: slot.id,
+											category,
+											index: i,
+											enabled: data.canEdit
+										}}
 									>
 										<!-- Drag grip icon -->
 										{#if data.canEdit}
 											<div class="flex flex-col gap-0.5 text-text-secondary/40">
-												<svg
-													class="h-4 w-4"
-													fill="currentColor"
-													viewBox="0 0 24 24"
-												>
+												<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
 													<circle cx="9" cy="6" r="1.5" />
 													<circle cx="15" cy="6" r="1.5" />
 													<circle cx="9" cy="12" r="1.5" />
@@ -523,25 +525,15 @@
 												<button
 													type="button"
 													onclick={() => window.open(slot.beatmap?.url, '_blank')}
-													class="truncate text-left text-sm font-500 hover:text-accent"
+													class="font-500 truncate text-left text-sm hover:text-accent"
 												>
 													{slot.beatmap.artist} - {slot.beatmap.title}
 												</button>
-												<div
-													class="mt-0.5 flex items-center gap-3 text-xs text-text-secondary"
-												>
+												<div class="mt-0.5 flex items-center gap-3 text-xs text-text-secondary">
 													<span>[{slot.beatmap.version}]</span>
-													<span
-														>{slot.beatmap.starRating.toFixed(
-															2
-														)}&#9733;</span
-													>
+													<span>{slot.beatmap.starRating.toFixed(2)}&#9733;</span>
 													<span>{slot.beatmap.bpm} BPM</span>
-													<span
-														>{formatLength(
-															slot.beatmap.totalLength
-														)}</span
-													>
+													<span>{formatLength(slot.beatmap.totalLength)}</span>
 												</div>
 											{:else}
 												<p class="text-sm text-text-secondary">
@@ -551,21 +543,17 @@
 										</div>
 
 										<!-- Slot label -->
-										<span class="text-xs font-600 text-text-secondary">
+										<span class="font-600 text-xs text-text-secondary">
 											{category}{i + 1}
 										</span>
 
 										<!-- Delete -->
 										{#if data.canEdit}
 											<form method="post" action="?/removeSlot" use:enhance>
-												<input
-													type="hidden"
-													name="slotId"
-													value={slot.id}
-												/>
+												<input type="hidden" name="slotId" value={slot.id} />
 												<button
 													type="submit"
-													class="rounded p-1 text-text-secondary opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+													class="rounded p-1 text-text-secondary opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400"
 												>
 													&#10005;
 												</button>
@@ -590,35 +578,26 @@
 														await update();
 													} else if (result.type === 'failure') {
 														inlineErrors[category] =
-															(result.data as { error?: string })
-																?.error ?? 'Failed to add map';
+															(result.data as { error?: string })?.error ?? 'Failed to add map';
 													}
 												};
 											}}
 											class="flex items-center gap-2"
 										>
-											<input
-												type="hidden"
-												name="category"
-												value={category}
-											/>
+											<input type="hidden" name="category" value={category} />
 											<input
 												type="text"
 												name="beatmapId"
 												bind:value={inlineInputs[category]}
-												placeholder="Add {category}{slots.length +
-													1} — paste beatmap ID or URL"
+												placeholder="Add {category}{slots.length + 1} — paste beatmap ID or URL"
 												class="flex-1 rounded-md border border-dashed border-border bg-transparent px-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
 											/>
 											<button
 												type="submit"
-												disabled={inlineSearching[category] ||
-													!inlineInputs[category]?.trim()}
-												class="rounded-md bg-accent/10 px-3 py-1.5 text-xs font-600 text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
+												disabled={inlineSearching[category] || !inlineInputs[category]?.trim()}
+												class="font-600 rounded-md bg-accent/10 px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
 											>
-												{inlineSearching[category]
-													? 'Adding...'
-													: '+ Add'}
+												{inlineSearching[category] ? 'Adding...' : '+ Add'}
 											</button>
 										</form>
 										{#if inlineErrors[category]}
@@ -640,3 +619,10 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	:global([draggable='true']) {
+		-webkit-user-select: none;
+		user-select: none;
+	}
+</style>

@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 
-	let { children } = $props();
+	const { children } = $props();
 
 	const umamiUrl = env.PUBLIC_UMAMI_URL;
 	const umamiId = env.PUBLIC_UMAMI_WEBSITE_ID;

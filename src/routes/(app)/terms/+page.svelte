@@ -3,9 +3,9 @@
 	<meta name="description" content="Terms of Service for Vash Esports." />
 </svelte:head>
 
-<div class="prose prose-invert mx-auto max-w-3xl">
+<div class="mx-auto prose max-w-3xl prose-invert">
 	<h1>Terms of Service</h1>
-	<p class="text-text-secondary text-sm">Last updated: {new Date().getFullYear()}</p>
+	<p class="text-sm text-text-secondary">Last updated: {new Date().getFullYear()}</p>
 
 	<h2>1. Acceptance of Terms</h2>
 	<p>
@@ -15,8 +15,8 @@
 
 	<h2>2. Use of the Service</h2>
 	<p>
-		Vash Esports is an event management platform. You may use the Service only for lawful
-		purposes and in accordance with these Terms. You agree not to:
+		Vash Esports is an event management platform. You may use the Service only for lawful purposes
+		and in accordance with these Terms. You agree not to:
 	</p>
 	<ul>
 		<li>Use the Service in any way that violates applicable laws or regulations</li>

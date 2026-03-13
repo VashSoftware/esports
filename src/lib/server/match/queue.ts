@@ -1,9 +1,14 @@
 import { db } from '$lib/server/db';
-import { match, matchQueue, matchParticipantPlayer, playerRating } from '$lib/server/db/schema';
-import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
+import {
+	match,
+	matchParticipant,
+	matchParticipantPlayer,
+	matchQueue,
+	playerRating
+} from '$lib/server/db/schema';
+import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { MATCH_STATES } from './types';
 import { createMatch } from './engine';
-import { selectMappoolForRating } from './rating';
 
 const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -12,7 +17,9 @@ async function purgeExpiredQueueEntries() {
 	const deleted = await db.delete(matchQueue).where(lt(matchQueue.joinedAt, cutoff)).returning();
 
 	if (deleted.length > 0) {
-		console.log(`[Queue] Purged ${deleted.length} expired queue entr${deleted.length === 1 ? 'y' : 'ies'}`);
+		console.log(
+			`[Queue] Purged ${deleted.length} expired queue entr${deleted.length === 1 ? 'y' : 'ies'}`
+		);
 	}
 }
 
@@ -52,9 +59,7 @@ export async function getQueueStatus(userId: string) {
 		where: eq(matchQueue.userId, userId)
 	});
 
-	const count = await db
-		.select({ count: sql<number>`count(*)` })
-		.from(matchQueue);
+	const count = await db.select({ count: sql<number>`count(*)` }).from(matchQueue);
 
 	// If NOT in queue, check if there's a recent active match for this user
 	// (they may have been matched while polling)
@@ -76,19 +81,6 @@ export async function getQueueStatus(userId: string) {
  * Used to redirect players who were matched via queue while polling.
  */
 async function findRecentActiveMatch(userId: string): Promise<string | null> {
-	// Find matchParticipantPlayer records for this user
-	const playerEntries = await db.query.matchParticipantPlayer.findMany({
-		where: eq(matchParticipantPlayer.userId, userId),
-		with: {
-			participant: {
-				with: {
-					match: true
-				}
-			}
-		}
-	});
-
-	// Find the most recent match that's still active (not finished/cancelled)
 	const activeStates = [
 		MATCH_STATES.CREATED,
 		MATCH_STATES.LOBBY,
@@ -97,12 +89,16 @@ async function findRecentActiveMatch(userId: string): Promise<string | null> {
 		MATCH_STATES.PLAYING
 	];
 
-	const activeMatches = playerEntries
-		.filter((pe) => activeStates.includes(pe.participant.match.state as any))
-		.map((pe) => pe.participant.match)
-		.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+	const [activeMatch] = await db
+		.select({ id: match.id })
+		.from(matchParticipantPlayer)
+		.innerJoin(matchParticipant, eq(matchParticipantPlayer.participantId, matchParticipant.id))
+		.innerJoin(match, eq(matchParticipant.matchId, match.id))
+		.where(and(eq(matchParticipantPlayer.userId, userId), inArray(match.state, activeStates)))
+		.orderBy(desc(match.createdAt))
+		.limit(1);
 
-	return activeMatches[0]?.id ?? null;
+	return activeMatch?.id ?? null;
 }
 
 const MAX_CONCURRENT_MATCHES = 4;
@@ -112,7 +108,14 @@ async function tryMatchFromQueue() {
 	const [{ activeCount }] = await db
 		.select({ activeCount: sql<number>`count(*)` })
 		.from(match)
-		.where(inArray(match.state, [MATCH_STATES.LOBBY, MATCH_STATES.ROLLING, MATCH_STATES.PICKING, MATCH_STATES.PLAYING]));
+		.where(
+			inArray(match.state, [
+				MATCH_STATES.LOBBY,
+				MATCH_STATES.ROLLING,
+				MATCH_STATES.PICKING,
+				MATCH_STATES.PLAYING
+			])
+		);
 
 	if (Number(activeCount) >= MAX_CONCURRENT_MATCHES) return null;
 
@@ -169,4 +172,37 @@ async function tryMatchFromQueue() {
 	}
 
 	return created;
+}
+
+async function selectMappoolForRating(avgElo: number) {
+	// Only use verified mappools
+	const pools = await db.query.mappool.findMany({
+		where: (m, { isNotNull }) => isNotNull(m.verifiedAt),
+		with: { slots: true }
+	});
+
+	if (pools.length === 0) return null;
+
+	// Map ELO range (0-3500) to star rating range (2-8)
+	const targetStars = 2 + avgElo / 700;
+
+	let bestPool = pools[0];
+	for (const pool of pools) {
+		const avgSR = getAverageMappoolSR(pool);
+		const diff = Math.abs(avgSR - targetStars);
+		if (diff < Math.abs(getAverageMappoolSR(bestPool) - targetStars)) {
+			bestPool = pool;
+		}
+	}
+
+	return bestPool;
+}
+
+function getAverageMappoolSR(pool: { slots: { starRating: number | null }[] }): number {
+	return (
+		pool.slots.reduce(
+			(acc: number, slot: { starRating: number | null }) => acc + (slot.starRating ?? 0),
+			0
+		) / pool.slots.length
+	);
 }

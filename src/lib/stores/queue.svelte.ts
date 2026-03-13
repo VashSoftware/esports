@@ -12,6 +12,8 @@ const queue = $state({
 	loading: false
 });
 
+const QUEUE_POLL_INTERVAL_MS = 8000;
+
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 async function fetchQueueStatus() {
@@ -57,7 +59,7 @@ async function leaveQueue() {
 function startPolling() {
 	if (pollInterval) return;
 	fetchQueueStatus();
-	pollInterval = setInterval(fetchQueueStatus, 4000);
+	pollInterval = setInterval(fetchQueueStatus, QUEUE_POLL_INTERVAL_MS);
 }
 
 function stopPolling() {
@@ -67,11 +69,4 @@ function stopPolling() {
 	}
 }
 
-export {
-	queue,
-	fetchQueueStatus,
-	joinQueue,
-	leaveQueue,
-	startPolling,
-	stopPolling
-};
+export { queue, fetchQueueStatus, joinQueue, leaveQueue, startPolling, stopPolling };

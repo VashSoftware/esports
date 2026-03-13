@@ -3,13 +3,13 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 
-	let { data } = $props();
+	const { data } = $props();
 
-	let m = $derived(data.match);
-	let lobbyStatus = $derived(data.lobbyStatus);
-	let playerNames = $derived(data.playerNames);
-	let p1 = $derived(m.participants[0]);
-	let p2 = $derived(m.participants[1]);
+	const m = $derived(data.match);
+	const lobbyStatus = $derived(data.lobbyStatus);
+	const playerNames = $derived(data.playerNames);
+	const p1 = $derived(m.participants[0]);
+	const p2 = $derived(m.participants[1]);
 
 	const config = $derived(m.config as { bestOf: number; teamSize: number; scoringType: string });
 	const winsNeeded = $derived(Math.ceil(config.bestOf / 2));
@@ -38,9 +38,7 @@
 	);
 
 	// Should the mappool be visible?
-	const showMappool = $derived(
-		['PICKING', 'PLAYING', 'ROLLING', 'FINISHED'].includes(m.state)
-	);
+	const showMappool = $derived(['PICKING', 'PLAYING', 'ROLLING', 'FINISHED'].includes(m.state));
 
 	// Can picks actually be made right now?
 	const pickingPhase = $derived(m.state === 'PICKING');
@@ -57,15 +55,22 @@
 	const MOD_ORDER = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 
 	// Group mappool slots by category
+	type MappoolSlot = {
+		id: string;
+		beatmapId: string;
+		category: string;
+		orderInCategory: number;
+		starRating: number | null;
+	};
 	const groupedSlots = $derived(() => {
-		if (!m.mappool?.slots) return {};
-		const groups: Record<string, unknown[]> = {};
-		for (const slot of m.mappool.slots) {
+		if (!m.mappool?.slots) return {} as Record<string, MappoolSlot[]>;
+		const groups: Record<string, MappoolSlot[]> = {};
+		for (const slot of m.mappool.slots as MappoolSlot[]) {
 			if (!groups[slot.category]) groups[slot.category] = [];
 			groups[slot.category].push(slot);
 		}
 		for (const cat of Object.keys(groups)) {
-			groups[cat].sort((a: unknown, b: unknown) => a.orderInCategory - b.orderInCategory);
+			groups[cat].sort((a, b) => a.orderInCategory - b.orderInCategory);
 		}
 		// Return entries sorted by canonical mod order
 		return Object.fromEntries(
@@ -77,7 +82,9 @@
 	let now = $state(Date.now());
 	$effect(() => {
 		if (m.startedAt && !['FINISHED', 'CANCELLED'].includes(m.state)) {
-			const interval = setInterval(() => { now = Date.now(); }, 1000);
+			const interval = setInterval(() => {
+				now = Date.now();
+			}, 1000);
 			return () => clearInterval(interval);
 		}
 	});
@@ -97,9 +104,10 @@
 
 	// Mappool avg SR
 	const mappoolAvgSR = $derived(() => {
-		const slots = m.mappool?.slots;
+		const slots = m.mappool?.slots as MappoolSlot[] | undefined;
 		if (!slots?.length) return null;
-		const avg = slots.reduce((sum: number, s: unknown) => sum + (s.starRating ?? 0), 0) / slots.length;
+		const avg =
+			slots.reduce((sum: number, s: MappoolSlot) => sum + (s.starRating ?? 0), 0) / slots.length;
 		return avg.toFixed(2);
 	});
 
@@ -129,16 +137,44 @@
 	}
 
 	function stateLabel(s: string) {
-		return ({ CREATED: 'Waiting', LOBBY: 'In Lobby', ROLLING: 'Rolling', PICKING: 'Pick Phase', PLAYING: 'Playing', FINISHED: 'Finished', CANCELLED: 'Cancelled' })[s] ?? s;
+		return (
+			{
+				CREATED: 'Waiting',
+				LOBBY: 'In Lobby',
+				ROLLING: 'Rolling',
+				PICKING: 'Pick Phase',
+				PLAYING: 'Playing',
+				FINISHED: 'Finished',
+				CANCELLED: 'Cancelled'
+			}[s] ?? s
+		);
 	}
 
 	function stateBorder(s: string) {
-		return ({ ROLLING: 'border-yellow-500/30', PICKING: 'border-blue-500/30', PLAYING: 'border-green-500/30', FINISHED: 'border-accent/30' })[s] ?? 'border-border';
+		return (
+			{
+				ROLLING: 'border-yellow-500/30',
+				PICKING: 'border-blue-500/30',
+				PLAYING: 'border-green-500/30',
+				FINISHED: 'border-accent/30'
+			}[s] ?? 'border-border'
+		);
 	}
 
-	const stateLabels: Record<string, string> = { LOBBY: 'In Lobby', ROLLING: 'Rolling', PICKING: 'Picking', PLAYING: 'Live Now', FINISHED: 'Finished', CANCELLED: 'Cancelled' };
-	const ogTitle = $derived(`${p1?.team?.name ?? 'TBD'} vs ${p2?.team?.name ?? 'TBD'} — ${m.name} | Vash Esports`);
-	const ogDesc = $derived(`${stateLabels[m.state] ?? m.state} · Best of ${(m.config as any)?.bestOf ?? '?'} · Watch on Vash Esports`);
+	const stateLabels: Record<string, string> = {
+		LOBBY: 'In Lobby',
+		ROLLING: 'Rolling',
+		PICKING: 'Picking',
+		PLAYING: 'Live Now',
+		FINISHED: 'Finished',
+		CANCELLED: 'Cancelled'
+	};
+	const ogTitle = $derived(
+		`${p1?.team?.name ?? 'TBD'} vs ${p2?.team?.name ?? 'TBD'} — ${m.name} | Vash Esports`
+	);
+	const ogDesc = $derived(
+		`${stateLabels[m.state] ?? m.state} · Best of ${(m.config as any)?.bestOf ?? '?'} · Watch on Vash Esports`
+	);
 </script>
 
 <svelte:head>
@@ -155,10 +191,17 @@
 
 <!-- Shared reinvite snippet -->
 {#snippet reinviteButton()}
-	<form method="post" action="?/reinvite" use:enhance={() => {
-		reinviting = true;
-		return async ({ update }) => { reinviting = false; await update(); };
-	}}>
+	<form
+		method="post"
+		action="?/reinvite"
+		use:enhance={() => {
+			reinviting = true;
+			return async ({ update }) => {
+				reinviting = false;
+				await update();
+			};
+		}}
+	>
 		<button
 			type="submit"
 			disabled={reinviting}
@@ -172,24 +215,39 @@
 <div class="mx-auto max-w-5xl">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<a href="/matches" class="text-text-secondary transition-colors hover:text-text-primary">&larr;</a>
+		<a href="/matches" class="text-text-secondary transition-colors hover:text-text-primary"
+			>&larr;</a
+		>
 		<div class="flex-1">
-			<h1 class="text-xl font-700 tracking-tight">{m.name || 'Match'}</h1>
+			<h1 class="font-700 text-xl tracking-tight">{m.name || 'Match'}</h1>
 			<p class="mt-0.5 text-xs text-text-secondary">
 				Best of {config.bestOf} &middot; First to {winsNeeded}
 				{#if duration}
 					&middot; {duration}
 				{/if}
 				{#if m.osuLobbyId}
-					&middot; <a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a>
+					&middot; <a
+						href="https://osu.ppy.sh/mp/{m.osuLobbyId}"
+						target="_blank"
+						class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a
+					>
 				{/if}
 			</p>
 		</div>
-		<span class="rounded border px-2.5 py-1 text-xs font-600 {stateBorder(m.state)}">{stateLabel(m.state)}</span>
+		<span class="font-600 rounded border px-2.5 py-1 text-xs {stateBorder(m.state)}"
+			>{stateLabel(m.state)}</span
+		>
 
 		{#if !['FINISHED', 'CANCELLED'].includes(m.state) && data.isStaff}
 			<form method="post" action="?/cancel" use:enhance>
-				<button type="submit" onclick={(e) => { if (!confirm('Cancel this match?')) e.preventDefault() }} class="rounded-md border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10">Cancel</button>
+				<button
+					type="submit"
+					onclick={(e) => {
+						if (!confirm('Cancel this match?')) e.preventDefault();
+					}}
+					class="rounded-md border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
+					>Cancel</button
+				>
 			</form>
 		{/if}
 	</div>
@@ -197,12 +255,16 @@
 	<!-- Scoreboard -->
 	{#if p1 && p2}
 		<div class="mt-6 flex items-center gap-4">
-			<div class="flex flex-1 items-center gap-4 rounded-lg border p-4 {m.winnerId === p1.teamId ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-surface-800'}">
+			<div
+				class="flex flex-1 items-center gap-4 rounded-lg border p-4 {m.winnerId === p1.teamId
+					? 'border-green-500/40 bg-green-500/5'
+					: 'border-border bg-surface-800'}"
+			>
 				{#if p1.team.avatarUrl}
 					<img src={p1.team.avatarUrl} alt="" class="h-10 w-10 rounded-full" />
 				{/if}
 				<div class="flex-1">
-					<p class="text-sm font-600">{p1.team.name}</p>
+					<p class="font-600 text-sm">{p1.team.name}</p>
 					{#if config.teamSize === 1}
 						{@const r1 = data.playerRatings?.[p1.players[0]?.userId]}
 						{#if r1}
@@ -210,18 +272,32 @@
 						{/if}
 					{/if}
 					{#if p1.rollValue != null}
-						<p class="text-xs text-text-secondary">Roll: {p1.rollValue}{p1.pickOrder === 1 ? ' ★' : ''}</p>
+						<p class="text-xs text-text-secondary">
+							Roll: {p1.rollValue}{p1.pickOrder === 1 ? ' ★' : ''}
+						</p>
 					{/if}
 				</div>
-				<span class="text-3xl font-800 tabular-nums {p1.score >= winsNeeded ? 'text-green-400' : 'text-text-primary'}">{p1.score}</span>
+				<span
+					class="font-800 text-3xl tabular-nums {p1.score >= winsNeeded
+						? 'text-green-400'
+						: 'text-text-primary'}">{p1.score}</span
+				>
 			</div>
 
-			<span class="text-lg font-700 text-text-secondary">vs</span>
+			<span class="font-700 text-lg text-text-secondary">vs</span>
 
-			<div class="flex flex-1 items-center gap-4 rounded-lg border p-4 {m.winnerId === p2.teamId ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-surface-800'}">
-				<span class="text-3xl font-800 tabular-nums {p2.score >= winsNeeded ? 'text-green-400' : 'text-text-primary'}">{p2.score}</span>
+			<div
+				class="flex flex-1 items-center gap-4 rounded-lg border p-4 {m.winnerId === p2.teamId
+					? 'border-green-500/40 bg-green-500/5'
+					: 'border-border bg-surface-800'}"
+			>
+				<span
+					class="font-800 text-3xl tabular-nums {p2.score >= winsNeeded
+						? 'text-green-400'
+						: 'text-text-primary'}">{p2.score}</span
+				>
 				<div class="flex-1 text-right">
-					<p class="text-sm font-600">{p2.team.name}</p>
+					<p class="font-600 text-sm">{p2.team.name}</p>
 					{#if config.teamSize === 1}
 						{@const r2 = data.playerRatings?.[p2.players[0]?.userId]}
 						{#if r2}
@@ -229,7 +305,9 @@
 						{/if}
 					{/if}
 					{#if p2.rollValue != null}
-						<p class="text-xs text-text-secondary">{p2.pickOrder === 1 ? '★ ' : ''}Roll: {p2.rollValue}</p>
+						<p class="text-xs text-text-secondary">
+							{p2.pickOrder === 1 ? '★ ' : ''}Roll: {p2.rollValue}
+						</p>
 					{/if}
 				</div>
 				{#if p2.team.avatarUrl}
@@ -244,7 +322,11 @@
 		<div class="mt-3 flex items-center justify-center gap-3">
 			{@render reinviteButton()}
 			{#if m.osuLobbyId}
-				<a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-xs text-text-secondary hover:text-accent">Open lobby →</a>
+				<a
+					href="https://osu.ppy.sh/mp/{m.osuLobbyId}"
+					target="_blank"
+					class="text-xs text-text-secondary hover:text-accent">Open lobby →</a
+				>
 			{/if}
 		</div>
 	{/if}
@@ -252,41 +334,66 @@
 	<!-- ROLLING MODAL (stays as overlay — it's a brief phase) -->
 	{#if m.state === 'ROLLING'}
 		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-			<div class="w-full max-w-md rounded-xl border border-yellow-500/30 bg-surface-800 p-8 text-center shadow-2xl">
-				<h2 class="text-lg font-700">{isTiebreakerAllowed ? '🔥 Tiebreaker Roll' : '🎲 Roll Phase'}</h2>
-				<p class="mt-2 text-sm text-text-secondary">{isTiebreakerAllowed ? 'Highest roll picks the tiebreaker' : 'Highest roll picks first'}</p>
+			<div
+				class="w-full max-w-md rounded-xl border border-yellow-500/30 bg-surface-800 p-8 text-center shadow-2xl"
+			>
+				<h2 class="font-700 text-lg">
+					{isTiebreakerAllowed ? '🔥 Tiebreaker Roll' : '🎲 Roll Phase'}
+				</h2>
+				<p class="mt-2 text-sm text-text-secondary">
+					{isTiebreakerAllowed ? 'Highest roll picks the tiebreaker' : 'Highest roll picks first'}
+				</p>
 
 				<div class="mt-6 flex justify-center gap-6">
 					{#each m.participants as p}
 						<div class="rounded-lg border border-border bg-surface-700 px-6 py-4">
 							<p class="text-xs text-text-secondary">{p.team.name}</p>
 							{#if p.rollValue != null}
-								<p class="mt-1 text-2xl font-800 text-yellow-400">{p.rollValue}</p>
+								<p class="font-800 mt-1 text-2xl text-yellow-400">{p.rollValue}</p>
 							{:else}
-								<p class="mt-1 text-2xl font-800 text-text-secondary/30">—</p>
+								<p class="font-800 mt-1 text-2xl text-text-secondary/30">—</p>
 							{/if}
 						</div>
 					{/each}
 				</div>
 
 				{#if canRoll}
-					<form method="post" action="?/roll" use:enhance={() => {
-						rolling = true;
-						return async ({ update }) => { rolling = false; await update(); };
-					}}>
-						<button type="submit" disabled={rolling} class="mt-6 rounded-md bg-accent px-8 py-3 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50">
+					<form
+						method="post"
+						action="?/roll"
+						use:enhance={() => {
+							rolling = true;
+							return async ({ update }) => {
+								rolling = false;
+								await update();
+							};
+						}}
+					>
+						<button
+							type="submit"
+							disabled={rolling}
+							class="font-600 mt-6 rounded-md bg-accent px-8 py-3 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+						>
 							{rolling ? 'Rolling...' : '🎲 Roll!'}
 						</button>
 					</form>
-					<p class="mt-3 text-xs text-text-secondary">or type <code class="rounded bg-surface-700 px-1.5 py-0.5 font-mono text-accent">!roll</code> in osu! chat</p>
+					<p class="mt-3 text-xs text-text-secondary">
+						or type <code class="rounded bg-surface-700 px-1.5 py-0.5 font-mono text-accent"
+							>!roll</code
+						> in osu! chat
+					</p>
 				{:else}
-					<p class="mt-6 text-sm text-text-secondary animate-pulse">Waiting for all rolls...</p>
+					<p class="mt-6 animate-pulse text-sm text-text-secondary">Waiting for all rolls...</p>
 				{/if}
 
 				<div class="mt-6 flex flex-col items-center gap-2 border-t border-border pt-4">
 					{@render reinviteButton()}
 					{#if m.osuLobbyId}
-						<a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-xs text-text-secondary hover:text-accent">Open lobby in browser →</a>
+						<a
+							href="https://osu.ppy.sh/mp/{m.osuLobbyId}"
+							target="_blank"
+							class="text-xs text-text-secondary hover:text-accent">Open lobby in browser →</a
+						>
 					{/if}
 				</div>
 			</div>
@@ -303,13 +410,17 @@
 					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 					<div class="relative h-3 w-3 rounded-full bg-green-400"></div>
 				</div>
-				<span class="text-sm font-600 text-green-400">
+				<span class="font-600 text-sm text-green-400">
 					{lobbyStatus?.gameInProgress ? 'Playing' : 'Now Playing — Waiting for ready'}
 				</span>
 			</div>
 			{#if bm}
-				<p class="mt-2 text-center text-sm">{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span></p>
-				<p class="mt-1 text-center text-xs text-text-secondary">{bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}</p>
+				<p class="mt-2 text-center text-sm">
+					{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span>
+				</p>
+				<p class="mt-1 text-center text-xs text-text-secondary">
+					{bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm &middot; {formatLength(bm.totalLength)}
+				</p>
 			{/if}
 
 			<!-- Per-player lobby status -->
@@ -320,17 +431,31 @@
 							{@const username = playerNames[player.userId]}
 							{@const inLobby = username && lobbyStatus.inLobby.includes(username)}
 							{@const isReady = username && lobbyStatus.readyPlayers.includes(username)}
-							<div class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs">
+							<div
+								class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs"
+							>
 								<span class="font-500">{username ?? player.userId}</span>
 								<span class="ml-auto flex items-center gap-1.5">
 									{#if lobbyStatus.gameInProgress}
-										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">Playing</span>
+										<span
+											class="font-600 rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400"
+											>Playing</span
+										>
 									{:else if isReady}
-										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">Ready</span>
+										<span
+											class="font-600 rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400"
+											>Ready</span
+										>
 									{:else if inLobby}
-										<span class="rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-600 text-yellow-400">In Lobby</span>
+										<span
+											class="font-600 rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400"
+											>In Lobby</span
+										>
 									{:else}
-										<span class="rounded bg-surface-700 px-1.5 py-0.5 text-[10px] font-600 text-text-secondary">Not in lobby</span>
+										<span
+											class="font-600 rounded bg-surface-700 px-1.5 py-0.5 text-[10px] text-text-secondary"
+											>Not in lobby</span
+										>
 									{/if}
 								</span>
 							</div>
@@ -338,21 +463,28 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="mt-3 text-center text-xs text-text-secondary animate-pulse">
+				<p class="mt-3 animate-pulse text-center text-xs text-text-secondary">
 					Waiting for players to ready up &amp; play in osu!...
 				</p>
 			{/if}
 
 			{#if data.isStaff}
 				<div class="mt-3 text-center">
-					<form method="post" action="?/forceStart" use:enhance={() => {
-						forceStarting = true;
-						return async ({ update }) => { forceStarting = false; await update(); };
-					}}>
+					<form
+						method="post"
+						action="?/forceStart"
+						use:enhance={() => {
+							forceStarting = true;
+							return async ({ update }) => {
+								forceStarting = false;
+								await update();
+							};
+						}}
+					>
 						<button
 							type="submit"
 							disabled={forceStarting}
-							class="rounded-md border border-yellow-500/30 px-4 py-1.5 text-xs font-600 text-yellow-400 transition-colors hover:bg-yellow-500/10 disabled:opacity-50"
+							class="font-600 rounded-md border border-yellow-500/30 px-4 py-1.5 text-xs text-yellow-400 transition-colors hover:bg-yellow-500/10 disabled:opacity-50"
 						>
 							{forceStarting ? 'Starting...' : 'Force Start (skip ready)'}
 						</button>
@@ -367,9 +499,11 @@
 		<div class="mt-6">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
-					<h2 class="text-sm font-600">
+					<h2 class="font-600 text-sm">
 						{#if m.mappool}
-							<a href="/mappools/{m.mappool.id}" class="hover:text-accent hover:underline">{m.mappool.name}</a>
+							<a href="/mappools/{m.mappool.id}" class="hover:text-accent hover:underline"
+								>{m.mappool.name}</a
+							>
 						{:else}
 							Mappool
 						{/if}
@@ -378,17 +512,21 @@
 						<span class="text-xs text-text-secondary">avg {mappoolAvgSR()}★</span>
 					{/if}
 					{#if pickingPhase}
-						<span class="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-600 text-blue-400">
+						<span class="font-600 rounded bg-blue-500/20 px-2 py-0.5 text-[10px] text-blue-400">
 							{isMyTurnToPick ? 'Your pick!' : `${expectedPicker?.team.name}'s pick`}
 						</span>
 					{:else if m.state === 'PLAYING'}
-						<span class="rounded bg-green-500/20 px-2 py-0.5 text-[10px] font-600 text-green-400">In progress</span>
+						<span class="font-600 rounded bg-green-500/20 px-2 py-0.5 text-[10px] text-green-400"
+							>In progress</span
+						>
 					{:else if m.state === 'ROLLING'}
-						<span class="rounded bg-yellow-500/20 px-2 py-0.5 text-[10px] font-600 text-yellow-400">Rolling...</span>
+						<span class="font-600 rounded bg-yellow-500/20 px-2 py-0.5 text-[10px] text-yellow-400"
+							>Rolling...</span
+						>
 					{/if}
 				</div>
 				<button
-					onclick={() => mappoolCollapsed = !mappoolCollapsed}
+					onclick={() => (mappoolCollapsed = !mappoolCollapsed)}
 					class="text-xs text-text-secondary hover:text-text-primary"
 				>
 					{mappoolCollapsed ? 'Show ▼' : 'Hide ▲'}
@@ -397,12 +535,18 @@
 
 			{#if pickingPhase && !isMyTurnToPick}
 				<p class="mt-1 text-xs text-text-secondary">
-					Waiting for <span class="text-accent">{expectedPicker?.team.name}</span> to pick...
-					You can also type <code class="rounded bg-surface-700 px-1 py-0.5 font-mono text-[10px] text-accent">!pick NM1</code> in osu! chat when it's your turn.
+					Waiting for <span class="text-accent">{expectedPicker?.team.name}</span> to pick... You
+					can also type
+					<code class="rounded bg-surface-700 px-1 py-0.5 font-mono text-[10px] text-accent"
+						>!pick NM1</code
+					> in osu! chat when it's your turn.
 				</p>
 			{:else if pickingPhase && isMyTurnToPick}
 				<p class="mt-1 text-xs text-text-secondary">
-					Pick a map below, or type <code class="rounded bg-surface-700 px-1 py-0.5 font-mono text-[10px] text-accent">!pick NM1</code> in osu! chat.
+					Pick a map below, or type <code
+						class="rounded bg-surface-700 px-1 py-0.5 font-mono text-[10px] text-accent"
+						>!pick NM1</code
+					> in osu! chat.
 				</p>
 			{/if}
 
@@ -415,7 +559,11 @@
 					{#each Object.entries(groupedSlots()) as [category, slots] (category)}
 						<!-- Grouped slots -->
 						<div>
-							<span class="mb-1.5 inline-block rounded border px-2 py-0.5 text-xs font-600 {catColors[category] ?? 'border-border'}">
+							<span
+								class="font-600 mb-1.5 inline-block rounded border px-2 py-0.5 text-xs {catColors[
+									category
+								] ?? 'border-border'}"
+							>
 								{category}
 							</span>
 							<div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -429,55 +577,82 @@
 									{@const slotLocked = tbLocked || matchPointLocked}
 									{@const cantPick = !isMyTurnToPick || !pickingPhase}
 
-									<div class="flex items-center gap-2 rounded-lg border p-2 transition-all {isPlayed
-										? 'border-border/50 bg-surface-900 opacity-30'
-										: slotLocked
+									<div
+										class="flex items-center gap-2 rounded-lg border p-2 transition-all {isPlayed
 											? 'border-border/50 bg-surface-900 opacity-30'
-											: 'border-border bg-surface-800'}">
+											: slotLocked
+												? 'border-border/50 bg-surface-900 opacity-30'
+												: 'border-border bg-surface-800'}"
+									>
 										<a
 											href="https://osu.ppy.sh/beatmaps/{slot.beatmapId}"
 											target="_blank"
 											class="flex min-w-0 flex-1 items-center gap-3"
 										>
 											{#if bm?.listCoverUrl}
-												<img src={bm.listCoverUrl} alt="" class="h-10 w-20 shrink-0 rounded object-cover" />
+												<img
+													src={bm.listCoverUrl}
+													alt=""
+													class="h-10 w-20 shrink-0 rounded object-cover"
+												/>
 											{:else}
-												<div class="flex h-10 w-20 shrink-0 items-center justify-center rounded bg-surface-600 text-xs text-text-secondary">?</div>
+												<div
+													class="flex h-10 w-20 shrink-0 items-center justify-center rounded bg-surface-600 text-xs text-text-secondary"
+												>
+													?
+												</div>
 											{/if}
 											<div class="min-w-0 flex-1">
 												{#if bm}
-													<p class="truncate text-sm font-500">{bm.artist} - {bm.title}</p>
-													<p class="text-xs text-text-secondary">[{bm.version}] &middot; {bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm</p>
+													<p class="font-500 truncate text-sm">{bm.artist} - {bm.title}</p>
+													<p class="text-xs text-text-secondary">
+														[{bm.version}] &middot; {bm.starRating.toFixed(2)}★ &middot; {bm.bpm}bpm
+													</p>
 												{:else}
 													<p class="text-xs text-text-secondary">#{slot.beatmapId}</p>
 												{/if}
 											</div>
 										</a>
-										<span class="text-xs font-600 text-text-secondary">{category}{slot.orderInCategory}</span>
+										<span class="font-600 text-xs text-text-secondary"
+											>{category}{slot.orderInCategory}</span
+										>
 										{#if isPlayed}
 											<span class="text-xs text-text-secondary">✓</span>
 										{:else if slotLocked}
-											<span class="text-[10px] text-pink-400/60" title={tbLocked ? 'Match point only' : 'Tiebreaker only'}>🔒</span>
+											<span
+												class="text-[10px] text-pink-400/60"
+												title={tbLocked ? 'Match point only' : 'Tiebreaker only'}>🔒</span
+											>
 										{:else if pickingPhase}
-											<form method="post" action="?/pick" use:enhance={() => {
-												picking = true;
-												pickError = '';
-												return async ({ result, update }) => {
-													picking = false;
-													if (result.type === 'failure' || (result.type === 'success' && (result.data as Record<string, unknown>)?.error)) {
-														pickError = (result.data as Record<string, unknown>)?.error as string ?? 'Pick failed';
-													} else {
-														await update();
-													}
-												};
-											}}>
+											<form
+												method="post"
+												action="?/pick"
+												use:enhance={() => {
+													picking = true;
+													pickError = '';
+													return async ({ result, update }) => {
+														picking = false;
+														if (
+															result.type === 'failure' ||
+															(result.type === 'success' &&
+																(result.data as Record<string, unknown>)?.error)
+														) {
+															pickError =
+																((result.data as Record<string, unknown>)?.error as string) ??
+																'Pick failed';
+														} else {
+															await update();
+														}
+													};
+												}}
+											>
 												<input type="hidden" name="slotId" value={slot.id} />
 												<button
 													type="submit"
 													disabled={picking || cantPick}
-													class="rounded px-2 py-1 text-[10px] font-700 transition-colors {cantPick
-														? 'bg-surface-600 text-text-secondary/40 cursor-default'
-														: 'bg-white text-black hover:bg-white/80 cursor-pointer'}"
+													class="font-700 rounded px-2 py-1 text-[10px] transition-colors {cantPick
+														? 'cursor-default bg-surface-600 text-text-secondary/40'
+														: 'cursor-pointer bg-white text-black hover:bg-white/80'}"
 												>
 													PICK
 												</button>
@@ -498,10 +673,10 @@
 		{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
 		<div class="mt-6 rounded-xl border border-accent/30 bg-surface-800 p-6 text-center">
 			<div class="text-3xl">🏆</div>
-			<h2 class="mt-3 text-xl font-800">
+			<h2 class="font-800 mt-3 text-xl">
 				<span class="text-accent">{winner?.team.name}</span> wins!
 			</h2>
-			<p class="mt-1 text-base font-700 tabular-nums text-text-secondary">
+			<p class="font-700 mt-1 text-base text-text-secondary tabular-nums">
 				{p1?.score} – {p2?.score}
 			</p>
 		</div>
@@ -510,15 +685,21 @@
 	<!-- GAME HISTORY -->
 	{#if m.games.length > 0}
 		<div class="mt-6">
-			<h2 class="text-sm font-600">Games Played</h2>
+			<h2 class="font-600 text-sm">Games Played</h2>
 			<div class="mt-3 flex flex-col gap-2">
 				{#each m.games as game}
 					{@const bm = data.beatmapCache[game.slot?.beatmapId]}
-					{@const pickerTeam = m.participants.find((p: any) => p.id === game.pickedByParticipantId)?.team}
-					{@const winnerTeam = m.participants.find((p: any) => p.id === game.winnerParticipantId)?.team}
+					{@const pickerTeam = m.participants.find(
+						(p: any) => p.id === game.pickedByParticipantId
+					)?.team}
+					{@const winnerTeam = m.participants.find(
+						(p: any) => p.id === game.winnerParticipantId
+					)?.team}
 
 					<div class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 p-3">
-						<span class="w-6 text-center text-xs font-600 text-text-secondary">{game.gameNumber}</span>
+						<span class="font-600 w-6 text-center text-xs text-text-secondary"
+							>{game.gameNumber}</span
+						>
 						{#if bm?.listCoverUrl}
 							<img src={bm.listCoverUrl} alt="" class="h-8 w-16 rounded object-cover" />
 						{:else}
@@ -526,16 +707,21 @@
 						{/if}
 						<div class="min-w-0 flex-1">
 							{#if bm}
-								<p class="truncate text-sm font-500">{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span></p>
+								<p class="font-500 truncate text-sm">
+									{bm.artist} - {bm.title} <span class="text-text-secondary">[{bm.version}]</span>
+								</p>
 							{/if}
 							<div class="flex items-center gap-2 text-xs text-text-secondary">
-								<span class="rounded border px-1.5 py-0.5 {catColors[game.slot?.category] ?? 'border-border'}">{game.slot?.category}{game.slot?.orderInCategory}</span>
+								<span
+									class="rounded border px-1.5 py-0.5 {catColors[game.slot?.category] ??
+										'border-border'}">{game.slot?.category}{game.slot?.orderInCategory}</span
+								>
 								{#if pickerTeam}<span>Picked by {pickerTeam.name}</span>{/if}
 							</div>
 						</div>
 
 						{#if game.state === 'PLAYING'}
-							<span class="text-xs text-green-400 animate-pulse">Live</span>
+							<span class="animate-pulse text-xs text-green-400">Live</span>
 						{:else if winnerTeam}
 							<span class="text-xs text-green-400">✓ {winnerTeam.name}</span>
 						{/if}
@@ -546,9 +732,13 @@
 						<div class="mt-1.5 flex flex-col gap-1">
 							{#each game.scores as s}
 								{@const username = playerNames[s.player?.userId]}
-								<div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-surface-900 px-3 py-1.5 text-xs">
-									<span class="w-24 truncate font-500">{username ?? s.player?.userId ?? '?'}</span>
-									<span class="font-mono tabular-nums text-text-primary">{s.score.toLocaleString()}</span>
+								<div
+									class="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-surface-900 px-3 py-1.5 text-xs"
+								>
+									<span class="font-500 w-24 truncate">{username ?? s.player?.userId ?? '?'}</span>
+									<span class="font-mono text-text-primary tabular-nums"
+										>{s.score.toLocaleString()}</span
+									>
 									{#if s.accuracy > 0}
 										<span class="text-text-secondary">{(s.accuracy * 100).toFixed(2)}%</span>
 									{/if}
@@ -581,7 +771,7 @@
 	<!-- CREATED / LOBBY waiting states -->
 	{#if m.state === 'CREATED'}
 		<div class="mt-6 rounded-lg border border-border bg-surface-800 p-6 text-center">
-			<p class="text-sm text-text-secondary animate-pulse">Creating osu! lobby...</p>
+			<p class="animate-pulse text-sm text-text-secondary">Creating osu! lobby...</p>
 		</div>
 	{/if}
 
@@ -590,7 +780,11 @@
 			<p class="text-sm text-text-secondary">Lobby created. Waiting for players to join...</p>
 			{#if m.osuLobbyId}
 				<p class="mt-2 text-xs text-text-secondary">
-					<a href="https://osu.ppy.sh/mp/{m.osuLobbyId}" target="_blank" class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a>
+					<a
+						href="https://osu.ppy.sh/mp/{m.osuLobbyId}"
+						target="_blank"
+						class="text-accent hover:underline">osu! mp/{m.osuLobbyId}</a
+					>
 				</p>
 			{/if}
 			{#if lobbyStatus}
@@ -599,13 +793,21 @@
 						{#each participant.players as player}
 							{@const username = playerNames[player.userId]}
 							{@const inLobby = username && lobbyStatus.inLobby.includes(username)}
-							<div class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs">
+							<div
+								class="flex items-center gap-2 rounded border border-border bg-surface-800/50 px-3 py-1.5 text-xs"
+							>
 								<span class="font-500">{username ?? player.userId}</span>
 								<span class="ml-auto">
 									{#if inLobby}
-										<span class="rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-600 text-green-400">In Lobby</span>
+										<span
+											class="font-600 rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] text-green-400"
+											>In Lobby</span
+										>
 									{:else}
-										<span class="rounded bg-surface-700 px-1.5 py-0.5 text-[10px] font-600 text-text-secondary">Not in lobby</span>
+										<span
+											class="font-600 rounded bg-surface-700 px-1.5 py-0.5 text-[10px] text-text-secondary"
+											>Not in lobby</span
+										>
 									{/if}
 								</span>
 							</div>

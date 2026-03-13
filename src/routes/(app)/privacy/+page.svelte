@@ -3,24 +3,24 @@
 	<meta name="description" content="Privacy Policy for Vash Esports." />
 </svelte:head>
 
-<div class="prose prose-invert mx-auto max-w-3xl">
+<div class="mx-auto prose max-w-3xl prose-invert">
 	<h1>Privacy Policy</h1>
-	<p class="text-text-secondary text-sm">Last updated: {new Date().getFullYear()}</p>
+	<p class="text-sm text-text-secondary">Last updated: {new Date().getFullYear()}</p>
 
 	<h2>1. Information We Collect</h2>
 	<p>When you use Vash Esports, we collect:</p>
 	<ul>
 		<li>
-			<strong>osu! account data</strong> — your osu! username, user ID, and profile information
-			provided via osu! OAuth
+			<strong>osu! account data</strong> — your osu! username, user ID, and profile information provided
+			via osu! OAuth
 		</li>
 		<li>
-			<strong>Tournament data</strong> — match results, scores, and team membership you create or
-			participate in
+			<strong>Tournament data</strong> — match results, scores, and team membership you create or participate
+			in
 		</li>
 		<li>
-			<strong>Usage analytics</strong> — anonymized page views and interactions via Umami, a
-			privacy-focused analytics tool. No cookies are used and no personal data is collected.
+			<strong>Usage analytics</strong> — anonymized page views and interactions via Umami, a privacy-focused
+			analytics tool. No cookies are used and no personal data is collected.
 		</li>
 	</ul>
 
@@ -34,9 +34,10 @@
 
 	<h2>3. Data Sharing</h2>
 	<p>
-		We do not sell or share your personal data with third parties, except as required by law.
-		osu! account data is obtained via osu!'s OAuth API and subject to
-		<a href="https://osu.ppy.sh/legal/privacy" target="_blank" rel="noopener">osu!'s Privacy Policy</a
+		We do not sell or share your personal data with third parties, except as required by law. osu!
+		account data is obtained via osu!'s OAuth API and subject to
+		<a href="https://osu.ppy.sh/legal/privacy" target="_blank" rel="noopener"
+			>osu!'s Privacy Policy</a
 		>.
 	</p>
 

@@ -17,23 +17,30 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	// ── LOGGED IN → dashboard data ──
-	const [recentMatches, liveMatches, [matchCount], [teamCount], [poolCount], [finishedCount], queueStatus] =
-		await Promise.all([
-			db.query.match.findMany({
-				with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
-				orderBy: desc(match.createdAt),
-				limit: 5
-			}),
-			db.query.match.findMany({
-				with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
-				where: inArray(match.state, ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'])
-			}),
-			db.select({ count: count() }).from(match),
-			db.select({ count: count() }).from(team),
-			db.select({ count: count() }).from(mappool),
-			db.select({ count: count() }).from(match).where(eq(match.state, 'FINISHED')),
-			getQueueStatus(locals.user.id)
-		]);
+	const [
+		recentMatches,
+		liveMatches,
+		[matchCount],
+		[teamCount],
+		[poolCount],
+		[finishedCount],
+		queueStatus
+	] = await Promise.all([
+		db.query.match.findMany({
+			with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
+			orderBy: desc(match.createdAt),
+			limit: 5
+		}),
+		db.query.match.findMany({
+			with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
+			where: inArray(match.state, ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'])
+		}),
+		db.select({ count: count() }).from(match),
+		db.select({ count: count() }).from(team),
+		db.select({ count: count() }).from(mappool),
+		db.select({ count: count() }).from(match).where(eq(match.state, 'FINISHED')),
+		getQueueStatus(locals.user.id)
+	]);
 
 	return {
 		authenticated: true as const,

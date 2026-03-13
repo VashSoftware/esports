@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { data } = $props();
+	const { data } = $props();
 	let creating = $state(false);
 </script>
 
@@ -9,7 +9,10 @@
 	<title>Mappools — Vash Esports</title>
 	<meta name="description" content="Browse and manage osu! tournament mappools on Vash Esports." />
 	<meta property="og:title" content="Mappools — Vash Esports" />
-	<meta property="og:description" content="Browse and manage osu! tournament mappools on Vash Esports." />
+	<meta
+		property="og:description"
+		content="Browse and manage osu! tournament mappools on Vash Esports."
+	/>
 	<meta property="og:site_name" content="Vash Esports" />
 	<meta name="twitter:card" content="summary" />
 </svelte:head>
@@ -17,12 +20,12 @@
 <div class="mx-auto max-w-4xl">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-700 tracking-tight">Mappools</h1>
+			<h1 class="font-700 text-2xl tracking-tight">Mappools</h1>
 			<p class="mt-1 text-sm text-text-secondary">Create and manage your beatmap pools</p>
 		</div>
 		<button
 			onclick={() => (creating = !creating)}
-			class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+			class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover"
 		>
 			{creating ? 'Cancel' : 'New Pool'}
 		</button>
@@ -44,7 +47,7 @@
 			/>
 			<button
 				type="submit"
-				class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+				class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover"
 			>
 				Create
 			</button>
@@ -54,16 +57,22 @@
 	<div class="mt-6 flex flex-col gap-3">
 		{#each data.mappools as pool}
 			{@const rated = pool.slots.filter((s: any) => s.starRating != null)}
-			{@const avgSr = rated.length > 0 ? (rated.reduce((sum: number, s: any) => sum + s.starRating, 0) / rated.length).toFixed(2) : null}
+			{@const avgSr =
+				rated.length > 0
+					? (rated.reduce((sum: number, s: any) => sum + s.starRating, 0) / rated.length).toFixed(2)
+					: null}
 			<a
 				href="/mappools/{pool.id}"
 				class="group flex items-center justify-between rounded-lg border border-border bg-surface-800 p-4 transition-colors hover:border-accent/40 hover:bg-surface-700"
 			>
 				<div>
 					<div class="flex items-center gap-2">
-						<h2 class="text-sm font-600">{pool.name}</h2>
+						<h2 class="font-600 text-sm">{pool.name}</h2>
 						{#if pool.verifiedAt}
-							<span class="rounded border border-green-500/30 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-600 text-green-400">✓ Verified</span>
+							<span
+								class="font-600 rounded border border-green-500/30 bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-400"
+								>✓ Verified</span
+							>
 						{/if}
 					</div>
 					<p class="mt-1 text-xs text-text-secondary">

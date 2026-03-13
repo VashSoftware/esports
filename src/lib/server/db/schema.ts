@@ -45,25 +45,29 @@ export const mappool = pgTable('mappool', {
 });
 
 // ── Mappool Slots ───────────────────────────────────────────────────────
-export const mappoolSlot = pgTable('mappool_slot', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	mappoolId: uuid('mappool_id')
-		.notNull()
-		.references(() => mappool.id, { onDelete: 'cascade' }),
-	category: text('category').notNull(),
-	orderInCategory: integer('order_in_category').notNull(),
-	beatmapId: text('beatmap_id').notNull(),
-	starRating: real('star_rating'),
-	bpm: real('bpm'),
-	totalLength: integer('total_length'),
-	mods: text('mods').array().default([]).notNull(),
-	// ── Cached beatmap metadata (stored at insert time → zero API calls on page load) ──
-	title: text('title'),
-	artist: text('artist'),
-	version: text('version'),
-	coverUrl: text('cover_url'),
-	listCoverUrl: text('list_cover_url')
-});
+export const mappoolSlot = pgTable(
+	'mappool_slot',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		mappoolId: uuid('mappool_id')
+			.notNull()
+			.references(() => mappool.id, { onDelete: 'cascade' }),
+		category: text('category').notNull(),
+		orderInCategory: integer('order_in_category').notNull(),
+		beatmapId: text('beatmap_id').notNull(),
+		starRating: real('star_rating'),
+		bpm: real('bpm'),
+		totalLength: integer('total_length'),
+		mods: text('mods').array().default([]).notNull(),
+		// ── Cached beatmap metadata (stored at insert time → zero API calls on page load) ──
+		title: text('title'),
+		artist: text('artist'),
+		version: text('version'),
+		coverUrl: text('cover_url'),
+		listCoverUrl: text('list_cover_url')
+	},
+	(t) => [index('idx_mappool_slot_mappool').on(t.mappoolId)]
+);
 
 // ── Matches ─────────────────────────────────────────────────────────────
 export const match = pgTable(
@@ -82,7 +86,7 @@ export const match = pgTable(
 		createdBy: text('created_by'),
 		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 	},
-	(t) => [index('idx_match_state').on(t.state)]
+	(t) => [index('idx_match_state').on(t.state), index('idx_match_created_at').on(t.createdAt)]
 );
 
 // ── Match Participants (a team in a match) ──────────────────────────────
@@ -120,7 +124,8 @@ export const matchParticipantPlayer = pgTable(
 	},
 	(t) => [
 		uniqueIndex('idx_mpp_participant_user').on(t.participantId, t.userId),
-		index('idx_mpp_participant').on(t.participantId)
+		index('idx_mpp_participant').on(t.participantId),
+		index('idx_mpp_user').on(t.userId)
 	]
 );
 
@@ -182,10 +187,7 @@ export const matchQueue = pgTable(
 		elo: integer('elo').default(1000).notNull(),
 		joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull()
 	},
-	(t) => [
-		uniqueIndex('idx_queue_user').on(t.userId),
-		index('idx_queue_elo').on(t.elo)
-	]
+	(t) => [uniqueIndex('idx_queue_user').on(t.userId), index('idx_queue_elo').on(t.elo)]
 );
 
 // ── Player ELO ──────────────────────────────────────────────────────────
@@ -201,42 +203,56 @@ export const playerRating = pgTable('player_rating', {
 });
 
 // ── Notifications ────────────────────────────────────────────────────
-export const notification = pgTable('notification', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: text('user_id').notNull(),
-	type: text('type').notNull(),
-	title: text('title').notNull(),
-	message: text('message'),
-	referenceId: text('reference_id'),
-	read: boolean('read').default(false).notNull(),
-	actionedAt: timestamp('actioned_at', { withTimezone: true }),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-}, (t) => [
-	index('idx_notification_user').on(t.userId),
-	index('idx_notification_user_read').on(t.userId, t.read)
-]);
+export const notification = pgTable(
+	'notification',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: text('user_id').notNull(),
+		type: text('type').notNull(),
+		title: text('title').notNull(),
+		message: text('message'),
+		referenceId: text('reference_id'),
+		read: boolean('read').default(false).notNull(),
+		actionedAt: timestamp('actioned_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_notification_user').on(t.userId),
+		index('idx_notification_user_read').on(t.userId, t.read)
+	]
+);
 
 // ── Match Invites ────────────────────────────────────────────────────
-export const matchInvite = pgTable('match_invite', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	createdBy: text('created_by').notNull(),
-	creatorTeamId: uuid('creator_team_id').notNull().references(() => team.id),
-	invitedTeamId: uuid('invited_team_id').notNull().references(() => team.id),
-	config: jsonb('config').notNull(),
-	mappoolId: uuid('mappool_id').notNull().references(() => mappool.id),
-	name: text('name'),
-	message: text('message'),
-	scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
-	expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-	status: text('status').default('pending').notNull(),
-	matchId: uuid('match_id').references(() => match.id),
-	respondedAt: timestamp('responded_at', { withTimezone: true }),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-}, (t) => [
-	index('idx_invite_invited_team').on(t.invitedTeamId),
-	index('idx_invite_created_by').on(t.createdBy),
-	index('idx_invite_status').on(t.status)
-]);
+export const matchInvite = pgTable(
+	'match_invite',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		createdBy: text('created_by').notNull(),
+		creatorTeamId: uuid('creator_team_id')
+			.notNull()
+			.references(() => team.id),
+		invitedTeamId: uuid('invited_team_id')
+			.notNull()
+			.references(() => team.id),
+		config: jsonb('config').notNull(),
+		mappoolId: uuid('mappool_id')
+			.notNull()
+			.references(() => mappool.id),
+		name: text('name'),
+		message: text('message'),
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+		status: text('status').default('pending').notNull(),
+		matchId: uuid('match_id').references(() => match.id),
+		respondedAt: timestamp('responded_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_invite_invited_team').on(t.invitedTeamId),
+		index('idx_invite_created_by').on(t.createdBy),
+		index('idx_invite_status').on(t.status)
+	]
+);
 
 // ── Relations ───────────────────────────────────────────────────────────
 
@@ -293,11 +309,19 @@ export const matchQueueRelations = relations(matchQueue, ({ one }) => ({
 	team: one(team, { fields: [matchQueue.teamId], references: [team.id] })
 }));
 
-export const notificationRelations = relations(notification, ({ }) => ({}));
+export const notificationRelations = relations(notification, ({}) => ({}));
 
 export const matchInviteRelations = relations(matchInvite, ({ one }) => ({
-	creatorTeam: one(team, { fields: [matchInvite.creatorTeamId], references: [team.id], relationName: 'inviteCreatorTeam' }),
-	invitedTeam: one(team, { fields: [matchInvite.invitedTeamId], references: [team.id], relationName: 'inviteInvitedTeam' }),
+	creatorTeam: one(team, {
+		fields: [matchInvite.creatorTeamId],
+		references: [team.id],
+		relationName: 'inviteCreatorTeam'
+	}),
+	invitedTeam: one(team, {
+		fields: [matchInvite.invitedTeamId],
+		references: [team.id],
+		relationName: 'inviteInvitedTeam'
+	}),
 	mappool: one(mappool, { fields: [matchInvite.mappoolId], references: [mappool.id] }),
 	match: one(match, { fields: [matchInvite.matchId], references: [match.id] })
 }));

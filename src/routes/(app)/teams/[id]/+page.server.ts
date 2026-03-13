@@ -45,7 +45,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		.slice(0, 20);
 
 	const wins = recentMatches.filter((m) => m.winnerId === params.id).length;
-	const losses = recentMatches.filter((m) => m.state === 'FINISHED' && m.winnerId !== params.id).length;
+	const losses = recentMatches.filter(
+		(m) => m.state === 'FINISHED' && m.winnerId !== params.id
+	).length;
 
 	return {
 		team: { ...t, members: membersWithUsers },
