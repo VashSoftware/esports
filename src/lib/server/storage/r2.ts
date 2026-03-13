@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { env } from '$env/dynamic/private';
 
 type S3ClientType = import('bun').S3Client;
@@ -66,13 +67,13 @@ export async function proxyImage(osuUrl: string): Promise<string | null> {
 			if (!res.ok) throw new Error(`fetch ${osuUrl} → ${res.status}`);
 			const contentType = res.headers.get('content-type') ?? 'image/jpeg';
 			await file.write(res, { type: contentType });
-			console.log(`[R2] uploaded ${key}`);
+			log.r2.info({ key }, 'uploaded');
 		}
 
 		knownKeys.add(key);
 		return cdnUrl;
 	} catch (err: unknown) {
-		console.error('[R2] proxyImage failed for', key, '—', err instanceof Error ? err.message : err);
+		log.r2.error({ err, key }, 'proxyImage failed');
 		return null;
 	}
 }

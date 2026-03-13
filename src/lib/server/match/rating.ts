@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import { playerRating, matchParticipantPlayer } from '$lib/server/db/schema';
 import { account } from '$lib/server/db/auth.schema';
@@ -32,7 +33,7 @@ export async function calculateInitialElo(
 
 		return { elo, osuRank: rank };
 	} catch (err) {
-		console.warn(`[Rating] Failed to fetch osu! rank for user ${userId}, defaulting to 1000:`, err);
+		log.rating.warn({ err, userId }, 'failed to fetch osu! rank, defaulting to 1000');
 		return { elo: 1000, osuRank: null };
 	}
 }
@@ -55,7 +56,7 @@ export async function updateElo(participants: { id: string; teamId: string }[], 
 			});
 
 			if (!rating) {
-				console.warn(`[ELO] No rating for user ${player.userId}, skipping`);
+				log.rating.warn({ userId: player.userId }, 'no rating found, skipping');
 				continue;
 			}
 

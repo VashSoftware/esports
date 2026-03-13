@@ -1,4 +1,5 @@
 // src/routes/(app)/admin/+page.server.ts
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/auth.schema';
 import {
@@ -193,7 +194,7 @@ export const actions: Actions = {
 				});
 			}
 
-			console.log(`[Admin] Reset ${u.name}: rank #${rank ?? 'unranked'} → ${elo} ELO`);
+			log.admin.info({ name: u.name, rank, elo }, 'reset user rating');
 			updated++;
 		}
 

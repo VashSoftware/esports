@@ -1,6 +1,8 @@
 // src/hooks.server.ts
 import type { Handle, HandleServerError } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
+import * as Sentry from '@sentry/sveltekit';
 import { auth } from '$lib/server/auth';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { db } from '$lib/server/db';
@@ -8,27 +10,64 @@ import { user as userTable } from '$lib/server/db/auth.schema';
 import { eq } from 'drizzle-orm';
 import { ensureRootAdminRole } from '$lib/server/permissions';
 import { checkRateLimit } from '$lib/server/rate-limit';
+import { log } from '$lib/server/logger';
+import { metrics } from '$lib/server/metrics';
 
 // ── Initialize the IRC DM handler once on server startup ──
-// This runs when the module is first imported (server boot).
-// The dynamic import prevents build-time issues if bancho.js isn't available.
 if (!building) {
 	import('$lib/server/bancho/dm-handler')
 		.then(({ initDMHandler }) => initDMHandler())
-		.catch((err) => console.warn('[Hooks] DM handler init skipped:', err.message));
+		.catch((err) => log.dm.warn({ err: err.message }, 'DM handler init skipped'));
 
 	process.on('unhandledRejection', (reason) => {
-		console.error('[Unhandled Rejection]', reason);
+		log.http.error({ err: reason }, 'Unhandled rejection');
 	});
 
 	process.on('uncaughtException', (err) => {
-		console.error('[Uncaught Exception]', err);
+		log.http.fatal({ err }, 'Uncaught exception');
 	});
 }
 
+// ── Request logging middleware ──
+const handleRequestLogging: Handle = async ({ event, resolve }) => {
+	const requestId = crypto.randomUUID();
+	const start = performance.now();
+
+	event.locals.requestId = requestId;
+
+	const response = await resolve(event);
+
+	const duration = Math.round(performance.now() - start);
+	const userId = event.locals.user?.id;
+
+	log.http.info(
+		{
+			requestId,
+			method: event.request.method,
+			path: event.url.pathname,
+			status: response.status,
+			duration,
+			userId: userId ?? null,
+			ip: event.getClientAddress()
+		},
+		`${event.request.method} ${event.url.pathname} ${response.status} ${duration}ms`
+	);
+
+	metrics.requestCount++;
+	metrics.totalResponseTime += duration;
+
+	if (duration > 1000) {
+		log.http.warn({ requestId, path: event.url.pathname, duration }, 'Slow request');
+		metrics.slowRequests++;
+	}
+
+	response.headers.set('X-Request-Id', requestId);
+	return response;
+};
+
+// ── Auth + rate limiting ──
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
-	// ── Rate limiting for API routes ──
-	// 200 req/min per IP — high enough for legit use, stops bots/scrapers.
+	// Rate limiting for API routes: 600 req/min per IP
 	if (event.url.pathname.startsWith('/api/')) {
 		const ip = event.getClientAddress();
 		const { ok, retryAfter } = checkRateLimit(`api:${ip}`, 600, 60_000);
@@ -45,14 +84,12 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	if (session) {
 		event.locals.session = session.session;
 
-		// Load fresh role from DB (better-auth doesn't include custom columns)
 		const dbUser = await db.query.user.findFirst({
 			where: eq(userTable.id, session.user.id)
 		});
 
 		let role = dbUser?.role ?? 'player';
 
-		// Auto-promote root admin if env var is set and they're not admin yet
 		if (dbUser) {
 			role = await ensureRootAdminRole({
 				id: dbUser.id,
@@ -70,18 +107,23 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	return svelteKitHandler({ event, resolve, auth, building });
 };
 
-export const handle: Handle = handleBetterAuth;
+export const handle: Handle = sequence(
+	Sentry.sentryHandle(),
+	handleRequestLogging,
+	handleBetterAuth
+);
 
 // ── Global server error handler ──
-// Catches unhandled errors from load functions, API routes, etc.
-// Logs context for debugging; returns a safe message to the client.
-export const handleError: HandleServerError = ({ error, event }) => {
+export const handleError: HandleServerError = Sentry.handleErrorWithSentry(({ error, event }) => {
 	const err = error instanceof Error ? error : new Error(String(error));
-	console.error('[Server Error]', {
-		message: err.message,
-		path: event.url.pathname,
-		method: event.request.method,
-		stack: err.stack
-	});
+	log.http.error(
+		{
+			err,
+			requestId: event.locals.requestId,
+			path: event.url.pathname,
+			method: event.request.method
+		},
+		'Unhandled server error'
+	);
 	return { message: 'An unexpected error occurred.' };
-};
+});
