@@ -9,6 +9,8 @@
 	let createError = $state('');
 	let inviteError = $state('');
 	let inviteSuccess = $state(false);
+	let formDataLoading = $state(false);
+	let formData = $state<any>(null);
 
 	// Challenge form state
 	let selectedCreatorTeamId = $state('');
@@ -18,8 +20,25 @@
 	let useCustomBo = $state(false);
 	let opponentSearch = $state('');
 
-	const personalTeam = $derived((data as any).userTeams?.find((t: any) => t.isPersonal));
-	const nonPersonalUserTeams = $derived((data as any).userTeams?.filter((t: any) => !t.isPersonal) ?? []);
+	// Load form data when create/invite modals open
+	$effect(async () => {
+		if ((showCreate || showInvite) && !formData && !formDataLoading) {
+			formDataLoading = true;
+			const formData_elem = new FormData();
+			const response = await fetch('?/loadCreateFormData', {
+				method: 'POST',
+				body: formData_elem
+			});
+			const result = await response.json();
+			if (result.data) {
+				formData = result.data;
+			}
+			formDataLoading = false;
+		}
+	});
+
+	const personalTeam = $derived((formData ?? data).userTeams?.find((t: any) => t.isPersonal));
+	const nonPersonalUserTeams = $derived((formData ?? data).userTeams?.filter((t: any) => !t.isPersonal) ?? []);
 	const hasMultipleTeams = $derived(nonPersonalUserTeams.length > 0);
 
 	// Auto-select personal team by default
@@ -29,8 +48,8 @@
 		}
 	});
 
-	const selectedCreatorTeam = $derived(data.teams.find((t: any) => t.id === selectedCreatorTeamId));
-	const selectedInvitedTeam = $derived(data.teams.find((t: any) => t.id === selectedInvitedTeamId));
+	const selectedCreatorTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId));
+	const selectedInvitedTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId));
 	const creatorIsPersonal = $derived(selectedCreatorTeam?.isPersonal ?? true);
 
 	const creatorMaxSize = $derived(selectedCreatorTeam?.memberCount ?? 1);
@@ -40,7 +59,7 @@
 
 	// Filter opponent teams for search
 	const filteredOpponentTeams = $derived(
-		data.teams.filter((t: any) => {
+		(formData ?? data).teams.filter((t: any) => {
 			if (t.id === selectedCreatorTeamId) return false;
 			if (!opponentSearch) return true;
 			return t.name.toLowerCase().includes(opponentSearch.toLowerCase());
@@ -139,20 +158,22 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
-			{#if (data as any).userTeams?.length > 0}
+			{#if (formData ?? data).userTeams?.length > 0}
 				<button
 					onclick={() => { showInvite = !showInvite; if (showInvite) showCreate = false; }}
-					class="rounded-md border border-accent/30 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10"
+					disabled={formDataLoading && showInvite}
+					class="rounded-md border border-accent/30 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
 				>
-					{showInvite ? 'Cancel' : 'Challenge'}
+					{showInvite && formDataLoading ? 'Loading...' : showInvite ? 'Cancel' : 'Challenge'}
 				</button>
 			{/if}
 			{#if data.canCreateMatch}
 				<button
 					onclick={() => { showCreate = !showCreate; if (showCreate) showInvite = false; }}
-					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+					disabled={formDataLoading && showCreate}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 				>
-					{showCreate ? 'Cancel' : 'New Match'}
+					{showCreate && formDataLoading ? 'Loading...' : showCreate ? 'Cancel' : 'New Match'}
 				</button>
 			{/if}
 		</div>
