@@ -66,7 +66,7 @@ export async function createInvite(opts: {
 		await createNotification(member.userId, 'match_invite', title, notifMessage, invite.id);
 	}
 
-	// Send Bancho DMs (best-effort)    
+	// Send Bancho DMs (best-effort)
 	for (const member of invitedMembers) {
 		const u = await db.query.user.findFirst({
 			where: eq(user.id, member.userId)
