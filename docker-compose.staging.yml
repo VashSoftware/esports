@@ -44,7 +44,7 @@ services:
     ports:
       - "127.0.0.1:3002:3000"
     environment:
-      DATABASE_URL: postgresql://vash:84037ced4e0d08d0e6e6406efbf7bb77b504486d6cf67377@db:5432/vash_staging
+      DATABASE_URL: postgresql://vash_staging:${STAGING_DB_PASSWORD}@staging-db:5432/vash_staging
       ORIGIN: https://staging.esports.vash.software
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       OSU_CLIENT_ID: ${OSU_CLIENT_ID}
