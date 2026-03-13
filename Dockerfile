@@ -11,6 +11,7 @@ FROM base AS build
 COPY --from=deps /app/node_modules node_modules
 COPY . .
 ENV NODE_ENV=production
+ENV BETTER_AUTH_SECRET=build-placeholder
 RUN --mount=type=cache,target=/app/.svelte-kit bun run build
 
 # Runtime — prod deps only
