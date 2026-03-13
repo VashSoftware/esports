@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/app/.svelte-kit bun run build
 # Runtime — prod deps + drizzle-kit for migrations
 FROM base AS runtime
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production && bun add drizzle-kit drizzle-orm
+RUN bun install --frozen-lockfile --production --ignore-scripts && bun add drizzle-kit drizzle-orm --ignore-scripts
 COPY --from=build /app/build build
 COPY drizzle.config.ts ./
 COPY src/lib/server/db/schema.ts src/lib/server/db/auth.schema.ts src/lib/server/db/
