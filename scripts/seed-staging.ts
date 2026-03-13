@@ -709,7 +709,7 @@ async function seedMatches(
 			}
 			usedSlots.add(slotIdx);
 
-			const pickerSide = g % 2 === 0 ? (md.allMatches?.[i]?.p1First ? 1 : 2) : (md.allMatches?.[i]?.p1First ? 2 : 1);
+			const pickerSide = g % 2 === 0 ? 1 : 2;
 			const pickerParticipant = pickerSide === 1 ? p1 : p2;
 			const slotSr = md.pool.avgSr + randFloat(-0.5, 0.5);
 			const mods = g % 3 === 0 ? [] : [pick(['HD', 'HR', 'DT', 'FM'])];
