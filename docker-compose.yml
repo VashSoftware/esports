@@ -38,7 +38,13 @@ services:
     env_file:
       - .env
     healthcheck:
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -72,7 +78,11 @@ services:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET}
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/heartbeat || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://localhost:3000/api/heartbeat || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
