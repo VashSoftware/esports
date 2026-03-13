@@ -124,11 +124,7 @@ export async function getUserRole(userId: string): Promise<UserRole> {
 /**
  * Auto-promote root admin on login if they're still 'player'.
  */
-export async function ensureRootAdminRole(userRecord: {
-	id: string;
-	email: string;
-	role: string;
-}) {
+export async function ensureRootAdminRole(userRecord: { id: string; email: string; role: string }) {
 	if (isRootAdmin(userRecord.email) && userRecord.role !== 'admin') {
 		await db.update(user).set({ role: 'admin' }).where(eq(user.id, userRecord.id));
 		return 'admin';

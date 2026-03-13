@@ -33,10 +33,7 @@ export const load: PageServerLoad = async () => {
 				elo: r.elo,
 				wins: r.wins,
 				losses: r.losses,
-				winRate:
-					r.wins + r.losses > 0
-						? ((r.wins / (r.wins + r.losses)) * 100).toFixed(1)
-						: '—'
+				winRate: r.wins + r.losses > 0 ? ((r.wins / (r.wins + r.losses)) * 100).toFixed(1) : '—'
 			};
 		})
 	);
@@ -49,10 +46,7 @@ export const load: PageServerLoad = async () => {
 			wins: sql<number>`count(*)`.as('wins')
 		})
 		.from(match)
-		.where(and(
-			sql`${match.winnerId} IS NOT NULL`,
-			eq(match.state, 'FINISHED')
-		))
+		.where(and(sql`${match.winnerId} IS NOT NULL`, eq(match.state, 'FINISHED')))
 		.groupBy(match.winnerId)
 		.orderBy(sql`count(*) DESC`)
 		.limit(15);
@@ -92,10 +86,7 @@ export const load: PageServerLoad = async () => {
 	const recentHighScores = await db
 		.select()
 		.from(matchGameScore)
-		.orderBy(
-			sql`${matchGameScore.pp} DESC NULLS LAST`,
-			desc(matchGameScore.score)
-		)
+		.orderBy(sql`${matchGameScore.pp} DESC NULLS LAST`, desc(matchGameScore.score))
 		.limit(15)
 		.then((rows) =>
 			Promise.all(

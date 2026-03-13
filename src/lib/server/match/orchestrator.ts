@@ -29,9 +29,9 @@ function sleep(ms: number) {
 // Lobby join → cancel.  Rolling → auto-roll.  Picking → auto-pick.  Ready → force start.
 
 const TIMEOUT_LOBBY_JOIN = 5 * 60 * 1000; //  5 min to join
-const TIMEOUT_ROLLING    = 5 * 60 * 1000; //  5 min to complete all rolls
-const TIMEOUT_PICKING    = 2 * 60 * 1000; //  2 min to pick a map
-const TIMEOUT_READY      = 2 * 60 * 1000; //  2 min to ready up after map is set
+const TIMEOUT_ROLLING = 5 * 60 * 1000; //  5 min to complete all rolls
+const TIMEOUT_PICKING = 2 * 60 * 1000; //  2 min to pick a map
+const TIMEOUT_READY = 2 * 60 * 1000; //  2 min to ready up after map is set
 
 const matchTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -76,7 +76,9 @@ async function timeoutMatch(matchId: string, reason: string) {
 			await lobby.chat(`⏰ Match cancelled — ${reason}`);
 			await sleep(3000);
 			await lobby.close();
-		} catch { /* lobby may already be dead */ }
+		} catch {
+			/* lobby may already be dead */
+		}
 	}
 
 	removeLobby(matchId);
@@ -105,14 +107,8 @@ export function onMatchStateChange(matchId: string, newState: string) {
 				const joined = joinedPlayers.get(matchId) ?? new Set();
 				const expected = expectedPlayers.get(matchId) ?? new Set();
 				const missing = [...expected].filter((p) => !joined.has(p));
-				const detail =
-					missing.length > 0
-						? `Missing: ${missing.join(', ')}.`
-						: '';
-				await timeoutMatch(
-					matchId,
-					`Not all players joined within 5 minutes. ${detail}`
-				);
+				const detail = missing.length > 0 ? `Missing: ${missing.join(', ')}.` : '';
+				await timeoutMatch(matchId, `Not all players joined within 5 minutes. ${detail}`);
 			});
 			break;
 
@@ -140,7 +136,9 @@ export function onMatchStateChange(matchId: string, newState: string) {
 						for (const p of unrolled) {
 							const autoRoll = Math.floor(Math.random() * 100) + 1;
 							await submitRoll(matchId, p.id, autoRoll);
-							console.log(`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`);
+							console.log(
+								`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`
+							);
 							if (lobby?.isAlive) {
 								await lobby.chat(`${p.team.name} auto-rolled ${autoRoll}`);
 							}
@@ -171,12 +169,12 @@ export function onMatchStateChange(matchId: string, newState: string) {
 							if (isTBAutoRoll) {
 								await lobby.chat(
 									`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. ` +
-									`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
+										`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
 								);
 							} else {
 								await lobby.chat(
 									`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-									`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
+										`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
 								);
 							}
 						}
@@ -224,7 +222,9 @@ export function onMatchStateChange(matchId: string, newState: string) {
 					const slotLabel = `${randomSlot.category}${randomSlot.orderInCategory}`;
 
 					if (lobby?.isAlive) {
-						await lobby.chat(`⏰ Pick timed out — auto-picking ${slotLabel} for ${picker?.team.name}`);
+						await lobby.chat(
+							`⏰ Pick timed out — auto-picking ${slotLabel} for ${picker?.team.name}`
+						);
 					}
 					console.log(`[Timeout] Auto-picked ${slotLabel} for match ${matchId}`);
 
@@ -262,7 +262,7 @@ export async function initMatchLobby(matchId: string) {
 	if (activeCount >= MAX_LOBBIES) {
 		console.error(
 			`[Orchestrator] Cannot create lobby: ${activeCount}/${MAX_LOBBIES} lobbies active. ` +
-			`Close some matches first.`
+				`Close some matches first.`
 		);
 		throw new Error(
 			`Lobby limit reached (${activeCount}/${MAX_LOBBIES}). Close or finish existing matches first.`
@@ -287,10 +287,13 @@ export async function initMatchLobby(matchId: string) {
 
 	// Configure: HeadToHead, correct score mode, correct size
 	const scoreMode =
-		config.scoringType === 'score_v2' ? 3
-		: config.scoringType === 'accuracy' ? 1
-		: config.scoringType === 'combo' ? 2
-		: 0;
+		config.scoringType === 'score_v2'
+			? 3
+			: config.scoringType === 'accuracy'
+				? 1
+				: config.scoringType === 'combo'
+					? 2
+					: 0;
 	await lobby.setProperties(0, scoreMode, config.teamSize * 2);
 	await sleep(500);
 
@@ -330,7 +333,6 @@ export async function initMatchLobby(matchId: string) {
  * We also greet each player individually when they join, telling them the current state.
  */
 function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
-
 	// ── Welcome players when they JOIN the channel ──────────────────────
 	lobby.onPlayerJoined = async (username: string) => {
 		try {
@@ -374,7 +376,9 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 					await lobby.chat(`Welcome ${username}! Waiting for rolls to finish...`);
 				}
 			} else if (m.state === MATCH_STATES.PICKING) {
-				const sorted = [...m.participants].sort((a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99));
+				const sorted = [...m.participants].sort(
+					(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
+				);
 				const nextIdx = m.games.length % sorted.length;
 				const picker = sorted[nextIdx];
 				const scoreStr = `(${sorted[0]?.team.name}) ${sorted[0]?.score} - ${sorted[1]?.score} (${sorted[1]?.team.name})`;
@@ -390,9 +394,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 						`Welcome back ${username}! A game is in progress — ready up when it finishes.`
 					);
 				} else {
-					await lobby.chat(
-						`Welcome back ${username}! Please ready up so the game can start.`
-					);
+					await lobby.chat(`Welcome back ${username}! Please ready up so the game can start.`);
 				}
 			}
 		} catch (err: any) {
@@ -457,12 +459,12 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				if (isTBRoll) {
 					await lobby.chat(
 						`Rolls complete! ${sorted[0]?.team.name} picks the tiebreaker. ` +
-						`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
+							`Use !pick TB<n> (e.g. !pick TB1). You have 2 minutes.`
 					);
 				} else {
 					await lobby.chat(
 						`Rolls complete! ${sorted[0]?.team.name} picks first. ` +
-						`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
+							`Use !pick <slot> (e.g. !pick NM1). You have 2 minutes.`
 					);
 				}
 			} else if (isLastRoll && remaining.length === updated.participants.length) {
@@ -472,7 +474,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				// Tell the other player they still need to roll
 				await lobby.chat(
 					`${targetParticipant.team?.name ?? username} rolled ${value}. ` +
-					`Waiting for ${remaining.map((p) => p.team.name).join(', ')} to !roll.`
+						`Waiting for ${remaining.map((p) => p.team.name).join(', ')} to !roll.`
 				);
 			}
 		} catch (err: any) {
@@ -497,9 +499,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			const category = labelMatch[1];
 			const order = parseInt(labelMatch[2]);
 
-			const sorted = [...m.participants].sort(
-				(a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99)
-			);
+			const sorted = [...m.participants].sort((a, b) => (a.pickOrder ?? 99) - (b.pickOrder ?? 99));
 			const expectedIdx = m.games.length % sorted.length;
 			const expectedPicker = sorted[expectedIdx];
 
@@ -640,10 +640,10 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	} catch (err: any) {
 		console.warn('[Orchestrator] Ready timeout:', err.message);
 		try {
-			await lobby.chat(
-				'Timed out waiting for ready. Game will force start soon!'
-			);
-		} catch { /* lobby may be dead */ }
+			await lobby.chat('Timed out waiting for ready. Game will force start soon!');
+		} catch {
+			/* lobby may be dead */
+		}
 		// Still set up score collection — force start will trigger the game
 		collectScores(matchId, matchGameId, lobby).catch((err) =>
 			console.error('[Orchestrator] Score collection failed:', err)
@@ -757,7 +757,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 
 					console.log(
 						`[Orchestrator] osu! API returned ${osuGame.scores.length} scores for beatmap ${beatmapId}. ` +
-						`Player map has ${playerOsuIdMap.size} entries.`
+							`Player map has ${playerOsuIdMap.size} entries.`
 					);
 
 					for (const s of scores) {
@@ -781,7 +781,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						s.pp = osuScore.pp ?? null;
 						if (osuScore.mods?.length) {
 							s.mods = osuScore.mods.map((mod: any) =>
-								typeof mod === 'string' ? mod : mod.acronym ?? mod
+								typeof mod === 'string' ? mod : (mod.acronym ?? mod)
 							);
 						}
 					}
@@ -826,7 +826,9 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 			await lobby.chat(
 				`(${ps1?.team.name}) ${score1} - ${score2} (${ps2?.team.name}) — ${winner?.team.name ?? '?'} wins ${slotLabel}!`
 			);
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	const matchScoreStr = `(${ps1?.team.name}) ${ps1?.score} - ${ps2?.score} (${ps2?.team.name})`;
@@ -844,7 +846,9 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 			await lobby.chat(`This lobby will close in 3 minutes.`);
 			await sleep(3 * 60 * 1000);
 			await lobby.close();
-		} catch { /* lobby may already be closed */ }
+		} catch {
+			/* lobby may already be closed */
+		}
 		removeLobby(matchId);
 		expectedPlayers.delete(matchId);
 		joinedPlayers.delete(matchId);
@@ -864,10 +868,10 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 				const tbLabel = `TB${tbSlots[0].orderInCategory}`;
 				try {
 					await sleep(1000);
-					await lobby.chat(
-						`🔥 Tiebreaker! ${matchScoreStr} — auto-picking ${tbLabel}!`
-					);
-				} catch { /* ignore */ }
+					await lobby.chat(`🔥 Tiebreaker! ${matchScoreStr} — auto-picking ${tbLabel}!`);
+				} catch {
+					/* ignore */
+				}
 
 				const game = await pickMap(matchId, picker!.id, tbSlots[0].id);
 				playPickedMap(matchId, game.id).catch((err) =>
@@ -882,10 +886,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						.set({ rollValue: null, pickOrder: null })
 						.where(eq(matchParticipant.id, p.id));
 				}
-				await db
-					.update(match)
-					.set({ state: MATCH_STATES.ROLLING })
-					.where(eq(match.id, matchId));
+				await db.update(match).set({ state: MATCH_STATES.ROLLING }).where(eq(match.id, matchId));
 
 				onMatchStateChange(matchId, MATCH_STATES.ROLLING);
 
@@ -893,9 +894,11 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 					await sleep(1000);
 					await lobby.chat(
 						`🔥 Tiebreaker! ${matchScoreStr} — ${tbSlots.length} tiebreaker maps available. ` +
-						`Roll to decide who picks! Type !roll. You have 5 minutes.`
+							`Roll to decide who picks! Type !roll. You have 5 minutes.`
 					);
-				} catch { /* ignore */ }
+				} catch {
+					/* ignore */
+				}
 				return;
 			}
 			// Zero unplayed TBs at match point — fall through to normal picking
@@ -911,7 +914,9 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 			await lobby.chat(
 				`${matchScoreStr} — first to ${winsNeeded} — ${nextPicker?.team.name}'s turn to pick. Use !pick <slot> (2 min to pick)`
 			);
-		} catch { /* lobby may be dead */ }
+		} catch {
+			/* lobby may be dead */
+		}
 	}
 }
 

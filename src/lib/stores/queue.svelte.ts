@@ -67,11 +67,4 @@ function stopPolling() {
 	}
 }
 
-export {
-	queue,
-	fetchQueueStatus,
-	joinQueue,
-	leaveQueue,
-	startPolling,
-	stopPolling
-};
+export { queue, fetchQueueStatus, joinQueue, leaveQueue, startPolling, stopPolling };
