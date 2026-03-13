@@ -105,7 +105,7 @@ async function resolveUser(ircUsername: string) {
 async function handleHelp(ircUsername: string) {
 	await sendDM(
 		ircUsername,
-		'VASH Bot Commands: ' +
+		'Vash Esports Commands: ' +
 			'!queue — Join ranked queue | ' +
 			'!leave — Leave queue | ' +
 			'!elo — Check your rating | ' +
