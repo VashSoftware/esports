@@ -24,7 +24,8 @@ mock.module('drizzle-orm', () => ({
 	asc: mock(() => ({})),
 	lt: mock(() => ({})),
 	inArray: mock(() => ({})),
-	sql: mock(() => ({}))
+	sql: mock(() => ({})),
+	isNotNull: mock(() => ({}))
 }));
 
 mock.module('$lib/server/db/schema', () => ({
