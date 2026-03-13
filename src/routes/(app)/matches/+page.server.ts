@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import { match, teamMember } from '$lib/server/db/schema';
 import { redirect } from '@sveltejs/kit';
@@ -93,7 +94,7 @@ export const actions: Actions = {
 		const mappoolId = form.get('mappool')?.toString();
 		const bestOf = parseInt(form.get('bestOf')?.toString() ?? '7');
 
-		console.log('[Matches] CREATE:', { name, team1Id, team2Id, mappoolId, bestOf });
+		log.match.info({ name, team1Id, team2Id, mappoolId, bestOf }, 'creating match');
 
 		if (!team1Id || !team2Id || !mappoolId) {
 			return { error: 'All fields are required' };
@@ -108,15 +109,15 @@ export const actions: Actions = {
 				teams: [team1Id, team2Id],
 				createdBy: locals.user!.id
 			});
-			console.log('[Matches] Created:', result.id);
+			log.match.info({ matchId: result.id }, 'match created');
 		} catch (e: any) {
-			console.error('[Matches] Error:', e);
+			log.match.error({ err: e }, 'failed to create match');
 			return { error: e.message };
 		}
 
 		// Create IRC lobby in background
 		initMatchLobby(result.id).catch((err) => {
-			console.error('[Matches] IRC lobby failed:', err.message);
+			log.match.error({ err, matchId: result.id }, 'IRC lobby failed');
 		});
 
 		redirect(303, `/matches/${result.id}`);
@@ -168,7 +169,7 @@ export const actions: Actions = {
 			});
 			return { inviteSuccess: true };
 		} catch (e: any) {
-			console.error('[Matches] Invite error:', e);
+			log.match.error({ err: e }, 'invite creation failed');
 			return { error: e.message };
 		}
 	}

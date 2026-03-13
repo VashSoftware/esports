@@ -6,6 +6,7 @@ declare global {
 		interface Locals {
 			user?: User & { role: string };
 			session?: Session;
+			requestId?: string;
 		}
 
 		interface Error {

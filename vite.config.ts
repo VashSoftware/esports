@@ -3,9 +3,19 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { sentrySvelteKit } from '@sentry/sveltekit';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), devtoolsJson()],
+	plugins: [
+		tailwindcss(),
+		sentrySvelteKit({
+			org: 'vash-software-vr',
+			project: 'esports',
+			authToken: process.env.SENTRY_AUTH_TOKEN
+		}),
+		sveltekit(),
+		devtoolsJson()
+	],
 	ssr: {
 		external: ['bun']
 	},

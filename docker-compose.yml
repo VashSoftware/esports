@@ -34,7 +34,10 @@ services:
       OSU_CLIENT_SECRET: ${OSU_CLIENT_SECRET}
       OSU_IRC_USERNAME: ${OSU_IRC_USERNAME}
       OSU_IRC_PASSWORD: ${OSU_IRC_PASSWORD}
+      PUBLIC_SENTRY_DSN: ${PUBLIC_SENTRY_DSN}
       NODE_ENV: production
+    volumes:
+      - app-logs:/var/log/app
     env_file:
       - .env
     healthcheck:
@@ -87,3 +90,4 @@ services:
 volumes:
   pgdata:
   umamidata:
+  app-logs:

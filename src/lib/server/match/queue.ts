@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import {
 	match,
@@ -17,9 +18,7 @@ async function purgeExpiredQueueEntries() {
 	const deleted = await db.delete(matchQueue).where(lt(matchQueue.joinedAt, cutoff)).returning();
 
 	if (deleted.length > 0) {
-		console.log(
-			`[Queue] Purged ${deleted.length} expired queue entr${deleted.length === 1 ? 'y' : 'ies'}`
-		);
+		log.queue.info({ count: deleted.length }, 'purged expired queue entries');
 	}
 }
 
@@ -165,10 +164,10 @@ async function tryMatchFromQueue() {
 	try {
 		const { initMatchLobby } = await import('./orchestrator');
 		initMatchLobby(created.id).catch((err) => {
-			console.error('[Queue] IRC lobby creation failed:', err.message);
+			log.queue.error({ err, matchId: created.id }, 'IRC lobby creation failed');
 		});
 	} catch (err: any) {
-		console.error('[Queue] Failed to import orchestrator:', err.message);
+		log.queue.error({ err }, 'failed to import orchestrator');
 	}
 
 	return created;

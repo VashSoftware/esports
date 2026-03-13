@@ -9,6 +9,7 @@
  * Initialized once on server startup via hooks.server.ts.
  */
 
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import { user, playerRating, teamMember, team, matchInvite } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -30,7 +31,7 @@ export async function initDMHandler() {
 	try {
 		await getClient();
 	} catch (err: any) {
-		console.error('[DM] Failed to connect IRC for DM handler:', err.message);
+		log.dm.error({ err }, 'failed to connect IRC for DM handler');
 		return;
 	}
 
@@ -77,12 +78,12 @@ export async function initDMHandler() {
 					);
 			}
 		} catch (err: any) {
-			console.error(`[DM] Error handling "${text}" from ${ircUsername}:`, err.message);
+			log.dm.error({ err, ircUsername, text }, 'error handling command');
 			await sendDM(ircUsername, `Error: ${err.message}`).catch(() => {});
 		}
 	});
 
-	console.log('[DM] DM command handler initialized');
+	log.dm.info('DM command handler initialized');
 }
 
 // ── Resolve IRC username → DB user ──────────────────────────────────────

@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { log } from '$lib/server/logger';
 
 function sleep(ms: number) {
 	return new Promise<void>((r) => setTimeout(r, ms));
@@ -40,12 +41,12 @@ export async function getClient() {
 
 	// ── Lifecycle logging ──
 	client.on('disconnected', () => {
-		console.warn('[Bancho] Disconnected from IRC');
+		log.bancho.warn('Disconnected from IRC');
 		stopKeepalive();
 	});
 
 	client.on('error', (err: any) => {
-		console.error('[Bancho] IRC error:', err?.message ?? err);
+		log.bancho.error({ err }, 'IRC error');
 	});
 
 	// ── DM listener: route private messages to dmHandler ──
@@ -62,21 +63,21 @@ export async function getClient() {
 	client.on('connected', async () => {
 		if (initialConnect) {
 			initialConnect = false;
-			console.log('[Bancho] Connected as', env.OSU_IRC_USERNAME);
+			log.bancho.info({ username: env.OSU_IRC_USERNAME }, 'Connected to IRC');
 			startKeepalive();
 			return;
 		}
 
 		reconnecting = true;
-		console.log('[Bancho] Reconnected — re-joining', lobbies.size, 'active lobby channels');
+		log.bancho.info({ lobbyCount: lobbies.size }, 'Reconnected, re-joining lobby channels');
 		startKeepalive();
 
 		for (const [matchId, lobby] of lobbies.entries()) {
 			try {
 				await lobby._rejoinChannel(client);
-				console.log(`[Bancho] Re-joined channel for match ${matchId}`);
+				log.bancho.info({ matchId }, 'Re-joined lobby channel');
 			} catch (err: any) {
-				console.error(`[Bancho] Failed to re-join channel for match ${matchId}:`, err.message);
+				log.bancho.error({ err, matchId }, 'Failed to re-join lobby channel');
 				lobby._dead = true;
 			}
 		}
@@ -260,13 +261,16 @@ export class TournamentLobby {
 				score: parseInt(scoreMatch[2].replace(/,/g, '')),
 				passed: scoreMatch[3] === 'PASSED'
 			});
-			console.log(`[Bancho] Score: ${scoreMatch[1].trim()} = ${scoreMatch[2]}`);
+			log.bancho.info(
+				{ username: scoreMatch[1].trim(), score: scoreMatch[2] },
+				'Player score received'
+			);
 			return;
 		}
 
 		// Game finished
 		if (text.includes('The match has finished!')) {
-			console.log('[Bancho] Game finished. Scores:', this.collectedScores);
+			log.bancho.info({ scores: this.collectedScores }, 'Game finished');
 			this.gameInProgress = false;
 			this.readyPlayers.clear();
 			if (this.matchFinishedResolve) {
@@ -282,7 +286,7 @@ export class TournamentLobby {
 		if (rollMatch) {
 			const username = rollMatch[1].trim();
 			const value = parseInt(rollMatch[2]);
-			console.log(`[Bancho] Roll: ${username} = ${value}`);
+			log.bancho.info({ username, value }, 'Roll result');
 			if (this.onRollResult) {
 				this.onRollResult(username, value);
 			}
@@ -293,7 +297,7 @@ export class TournamentLobby {
 		const joinMatch = text.match(/^(.+?) joined in slot \d+/);
 		if (joinMatch) {
 			const username = joinMatch[1].trim();
-			console.log(`[Bancho] Player joined: ${username}`);
+			log.bancho.info({ username }, 'Player joined');
 			this.inLobby.add(username);
 			this.readyPlayers.delete(username);
 			if (this.onPlayerJoined) {
@@ -306,7 +310,7 @@ export class TournamentLobby {
 		const leftMatch = text.match(/^(.+?) left the game\./);
 		if (leftMatch) {
 			const username = leftMatch[1].trim();
-			console.log(`[Bancho] Player left: ${username}`);
+			log.bancho.info({ username }, 'Player left');
 			this.inLobby.delete(username);
 			this.readyPlayers.delete(username);
 			return;
@@ -328,7 +332,7 @@ export class TournamentLobby {
 
 		// All players ready
 		if (text.includes('All players are ready')) {
-			console.log('[Bancho] All players ready');
+			log.bancho.info('All players ready');
 			for (const u of this.inLobby) this.readyPlayers.add(u);
 			if (this.allReadyResolve) {
 				this.allReadyResolve();
@@ -346,7 +350,7 @@ export class TournamentLobby {
 
 		// Room closed
 		if (text.includes('Closed the match')) {
-			console.log(`[Bancho] Room ${this.channelName} was closed`);
+			log.bancho.info({ channel: this.channelName }, 'Room closed');
 			this._dead = true;
 			return;
 		}
@@ -359,7 +363,7 @@ export class TournamentLobby {
 			const category = pickMatch[1].toUpperCase();
 			const num = pickMatch[2] ? parseInt(pickMatch[2]) : 1;
 			const label = `${category}${num}`;
-			console.log(`[Bancho] Pick command from ${sender}: ${label}`);
+			log.bancho.info({ sender, label }, 'Pick command received');
 			if (this.onPickCommand) {
 				this.onPickCommand(sender, label);
 			}
@@ -382,7 +386,7 @@ export class TournamentLobby {
 		this.ensureAlive();
 
 		if (reconnecting) {
-			console.log(`[Bancho] Waiting for reconnect before sending to ${this.channelName}...`);
+			log.bancho.info({ channel: this.channelName }, 'Waiting for reconnect before sending');
 			const start = Date.now();
 			while (reconnecting && Date.now() - start < 10_000) {
 				await sleep(500);
@@ -392,7 +396,7 @@ export class TournamentLobby {
 			}
 		}
 
-		console.log(`[Bancho] ${this.channelName} > ${cmd}`);
+		log.bancho.debug({ channel: this.channelName, cmd }, 'Sending IRC command');
 		await this.channel.sendMessage(cmd);
 	}
 
@@ -426,12 +430,12 @@ export class TournamentLobby {
 	async close() {
 		try {
 			if (this._dead) {
-				console.log(`[Bancho] Lobby ${this.channelName} already dead, skipping close`);
+				log.bancho.info({ channel: this.channelName }, 'Lobby already dead, skipping close');
 				return;
 			}
 			await this.send('!mp close');
 		} catch (err: any) {
-			console.warn(`[Bancho] Failed to close ${this.channelName}:`, err.message);
+			log.bancho.warn({ err, channel: this.channelName }, 'Failed to close lobby');
 		}
 	}
 
@@ -480,7 +484,7 @@ const lobbies = new Map<string, TournamentLobby>();
 export function getLobby(matchId: string) {
 	const lobby = lobbies.get(matchId);
 	if (lobby?._dead) {
-		console.warn(`[Bancho] Lobby for match ${matchId} is dead, removing from registry`);
+		log.bancho.warn({ matchId }, 'Lobby is dead, removing from registry');
 		lobbies.delete(matchId);
 		return undefined;
 	}
@@ -522,12 +526,12 @@ export function getActiveLobbyCount(): number {
 }
 
 export async function closeAllLobbies() {
-	console.log(`[Bancho] Closing all ${lobbies.size} active lobbies...`);
+	log.bancho.info({ lobbyCount: lobbies.size }, 'Closing all active lobbies');
 	for (const [matchId, lobby] of lobbies.entries()) {
 		try {
 			await lobby.close();
 		} catch (err: any) {
-			console.warn(`[Bancho] Failed to close lobby ${matchId}:`, err.message);
+			log.bancho.warn({ err, matchId }, 'Failed to close lobby');
 		}
 		lobbies.delete(matchId);
 	}

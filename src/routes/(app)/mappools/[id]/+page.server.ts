@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { db } from '$lib/server/db';
 import { mappool, mappoolSlot } from '$lib/server/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
@@ -151,7 +152,7 @@ export const actions: Actions = {
 			coverUrl = await proxyImage(beatmap.beatmapset.covers['card@2x']);
 			listCoverUrl = await proxyImage(beatmap.beatmapset.covers['list@2x']);
 		} catch (err: any) {
-			console.warn('[Mappool] Failed to proxy covers to R2:', err.message);
+			log.osu.warn({ err, beatmapId }, 'failed to proxy covers to R2');
 		}
 
 		await db.insert(mappoolSlot).values({
@@ -346,7 +347,7 @@ export const actions: Actions = {
 				coverUrl = await proxyImage(beatmap.beatmapset.covers['card@2x']);
 				listCoverUrl = await proxyImage(beatmap.beatmapset.covers['list@2x']);
 			} catch (err: any) {
-				console.warn('[Mappool] Failed to proxy covers to R2:', err.message);
+				log.osu.warn({ err, beatmapId }, 'failed to proxy covers to R2');
 			}
 
 			await db.insert(mappoolSlot).values({
