@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MATCH_STATES } from './types';
 
 const mocks = {
 	db: {
@@ -8,6 +7,7 @@ const mocks = {
 			playerRating: { findFirst: vi.fn() },
 			matchQueue: { findFirst: vi.fn() }
 		},
+		select: vi.fn(),
 		delete: vi.fn()
 	}
 };
@@ -18,6 +18,7 @@ vi.mock('drizzle-orm', () => ({
 	eq: vi.fn(() => ({})),
 	and: vi.fn(() => ({})),
 	asc: vi.fn(() => ({})),
+	desc: vi.fn(() => ({})),
 	lt: vi.fn(() => ({})),
 	inArray: vi.fn(() => ({})),
 	sql: vi.fn(() => ({})),
@@ -26,6 +27,7 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('$lib/server/db/schema', () => ({
 	match: {},
+	matchParticipant: {},
 	matchQueue: {},
 	matchParticipantPlayer: {},
 	playerRating: {}
@@ -43,11 +45,23 @@ vi.mock('$lib/server/match/engine', () => ({
 
 const { joinQueue } = await import('./queue');
 
+function mockFindRecentActiveMatchRows(rows: Array<{ id: string }>) {
+	const limit = vi.fn().mockResolvedValue(rows);
+	const orderBy = vi.fn(() => ({ limit }));
+	const where = vi.fn(() => ({ orderBy }));
+	const innerJoinSecond = vi.fn(() => ({ where }));
+	const innerJoinFirst = vi.fn(() => ({ innerJoin: innerJoinSecond }));
+	const from = vi.fn(() => ({ innerJoin: innerJoinFirst }));
+
+	mocks.db.select.mockReturnValue({ from });
+}
+
 describe('joinQueue', () => {
 	beforeEach(() => {
 		mocks.db.query.matchParticipantPlayer.findMany.mockReset();
 		mocks.db.query.playerRating.findFirst.mockReset();
 		mocks.db.query.matchQueue.findFirst.mockReset();
+		mocks.db.select.mockReset();
 		mocks.db.delete.mockReset();
 	});
 
@@ -56,13 +70,7 @@ describe('joinQueue', () => {
 			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
-		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([
-			{
-				participant: {
-					match: { id: 'match-1', state: MATCH_STATES.PLAYING, createdAt: new Date().toISOString() }
-				}
-			}
-		]);
+		mockFindRecentActiveMatchRows([{ id: 'match-1' }]);
 
 		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow(
 			'You are already in an active match'
@@ -75,7 +83,7 @@ describe('joinQueue', () => {
 			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
-		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
+		mockFindRecentActiveMatchRows([]);
 		mocks.db.query.playerRating.findFirst.mockResolvedValue(null);
 
 		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow(
@@ -88,7 +96,7 @@ describe('joinQueue', () => {
 			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
-		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
+		mockFindRecentActiveMatchRows([]);
 		mocks.db.query.playerRating.findFirst.mockResolvedValue({ elo: 1500 });
 		mocks.db.query.matchQueue.findFirst.mockResolvedValue({ userId: 'user-1', teamId: 'team-1' });
 
