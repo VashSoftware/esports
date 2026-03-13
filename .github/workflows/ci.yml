@@ -29,5 +29,8 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
       - name: Tests
-        run: bun test
+        run: bun run test
