@@ -994,7 +994,7 @@ async function seedMatches(
 
 		// Determine match state
 		let matchState: string;
-		let winnerId: string | null = null;
+		const winnerId: string | null = null;
 		let finishedAt: Date | null = null;
 		let startedAt: Date | null = null;
 		let gamesToPlay = 0;

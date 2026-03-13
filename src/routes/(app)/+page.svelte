@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { queue, joinQueue, leaveQueue } from '$lib/stores/queue.svelte';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	const liveStates = ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'];
 

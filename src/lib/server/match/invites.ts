@@ -1,8 +1,8 @@
 import { dev } from '$app/environment';
 import { db } from '$lib/server/db';
-import { matchInvite, teamMember, notification } from '$lib/server/db/schema';
+import { matchInvite, teamMember } from '$lib/server/db/schema';
 import { user } from '$lib/server/db/auth.schema';
-import { eq, and, or, lt, inArray, desc } from 'drizzle-orm';
+import { eq, and, lt, inArray, desc } from 'drizzle-orm';
 import { createNotification, markActionedByReference } from '$lib/server/notifications';
 import { createMatch } from './engine';
 import type { MatchConfig } from './types';

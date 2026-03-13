@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { data } = $props();
+	const { data } = $props();
 	let creating = $state(false);
 </script>
 

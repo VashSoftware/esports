@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	const roleBadge: Record<string, { label: string; color: string }> = {
 		player: { label: 'Player', color: 'bg-surface-600 text-text-secondary' },

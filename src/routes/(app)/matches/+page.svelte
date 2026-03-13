@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	let showCreate = $state(false);
 	let showInvite = $state(false);
