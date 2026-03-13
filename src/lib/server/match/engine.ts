@@ -14,6 +14,8 @@ import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/cli
 import { updateElo } from './rating';
 import { getExpectedPicker, getMatchOrThrow, assertState, getMatchFull } from './helpers';
 
+export { getMatchFull, getMatchOrThrow };
+
 // ── Create Match ────────────────────────────────────────────────────────
 
 export async function createMatch(opts: {
