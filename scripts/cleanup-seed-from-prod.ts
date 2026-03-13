@@ -7,34 +7,27 @@
  *   DATABASE_URL="postgresql://..." bun scripts/cleanup-seed-from-prod.ts --dry-run
  */
 
+import { drizzle } from 'drizzle-orm/bun-sql';
+import { sql } from 'drizzle-orm';
+
+// ── DB setup ────────────────────────────────────────────────────────────
+
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error('DATABASE_URL not set');
-
-import { SQL as BunSQL } from 'bun:sql';
-
-const client = new BunSQL(DATABASE_URL);
+const db = drizzle(DATABASE_URL);
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
-async function query(sql: string, params: any[] = []) {
-	if (DRY_RUN) {
-		// For dry run, just count affected rows with a SELECT
-		return [];
-	}
-	return client.unsafe(sql, params);
+async function count(query: string): Promise<number> {
+	const rows = await db.execute(sql.raw(query));
+	return Number((rows as any)[0]?.count ?? 0);
 }
 
-async function count(sql: string, params: any[] = []): Promise<number> {
-	const rows = await client.unsafe(sql, params);
-	return Number(rows[0]?.count ?? 0);
-}
-
-async function exec(description: string, sql: string, params: any[] = []) {
+async function exec(description: string, deleteSql: string) {
 	// Count first
-	const countSql = sql
-		.replace(/^DELETE FROM/, 'SELECT COUNT(*) as count FROM')
-		.replace(/\s+RETURNING\b.*$/i, '');
-	const n = await count(countSql, params);
+	const countSql = deleteSql
+		.replace(/^DELETE FROM/, 'SELECT COUNT(*) as count FROM');
+	const n = await count(countSql);
 
 	if (n === 0) {
 		console.log(`  ⏭  ${description}: 0 rows (skipped)`);
@@ -46,7 +39,7 @@ async function exec(description: string, sql: string, params: any[] = []) {
 		return n;
 	}
 
-	await client.unsafe(sql, params);
+	await db.execute(sql.raw(deleteSql));
 	console.log(`  ✅ ${description}: ${n} rows deleted`);
 	return n;
 }
@@ -227,7 +220,7 @@ async function main() {
 		console.log('\n🔍 Dry run complete. Re-run without --dry-run to delete.');
 	}
 
-	await client.close();
+	process.exit(0);
 }
 
 main().catch((err) => {
