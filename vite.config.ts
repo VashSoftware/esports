@@ -12,7 +12,8 @@ export default defineConfig({
 	build: {
 		rollupOptions: {
 			external: ['bun']
-		}
+		},
+		reportCompressedSize: false
 	},
 	test: {
 		expect: { requireAssertions: true },
