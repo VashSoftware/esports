@@ -1,35 +1,40 @@
-import { beforeEach, describe, expect, test, mock } from 'bun:test';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MATCH_STATES } from './types';
-import { pickMap } from './engine';
 
 const mocks = {
 	db: {
 		query: {
-			match: { findFirst: mock() },
-			matchParticipant: { findMany: mock() },
-			matchGame: { findMany: mock() },
-			mappoolSlot: { findFirst: mock() }
+			match: { findFirst: vi.fn() },
+			matchParticipant: { findMany: vi.fn() },
+			matchGame: { findMany: vi.fn() },
+			mappoolSlot: { findFirst: vi.fn() }
 		},
-		insert: mock(),
-		update: mock(),
-		delete: mock(),
-		select: mock()
+		insert: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+		select: vi.fn()
+	},
+	helpers: {
+		getMatchOrThrow: vi.fn(),
+		getExpectedPicker: vi.fn(),
+		assertState: vi.fn(),
+		getMatchFull: vi.fn()
 	}
 };
 
-mock.module('$lib/server/db', () => ({ db: mocks.db }));
+vi.mock('$lib/server/db', () => ({ db: mocks.db }));
 
-mock.module('drizzle-orm', () => ({
-	eq: mock(() => ({})),
-	and: mock(() => ({})),
-	asc: mock(() => ({})),
-	lt: mock(() => ({})),
-	inArray: mock(() => ({})),
-	sql: mock(() => ({})),
-	isNotNull: mock(() => ({}))
+vi.mock('drizzle-orm', () => ({
+	eq: vi.fn(() => ({})),
+	and: vi.fn(() => ({})),
+	asc: vi.fn(() => ({})),
+	lt: vi.fn(() => ({})),
+	inArray: vi.fn(() => ({})),
+	sql: vi.fn(() => ({})),
+	isNotNull: vi.fn(() => ({}))
 }));
 
-mock.module('$lib/server/db/schema', () => ({
+vi.mock('$lib/server/db/schema', () => ({
 	match: {},
 	matchParticipant: {},
 	matchParticipantPlayer: {},
@@ -41,40 +46,54 @@ mock.module('$lib/server/db/schema', () => ({
 	teamMember: {}
 }));
 
-mock.module('$lib/server/db/auth.schema', () => ({ account: {} }));
+vi.mock('$lib/server/db/auth.schema', () => ({ account: {} }));
 
-mock.module('$lib/server/discord/client', () => ({
-	notifyMatchCreated: mock(),
-	notifyMatchFinished: mock()
+vi.mock('$lib/server/discord/client', () => ({
+	notifyMatchCreated: vi.fn(),
+	notifyMatchFinished: vi.fn()
 }));
 
-mock.module('$lib/server/osu/api', () => ({
-	getUser: mock()
+vi.mock('$lib/server/osu/api', () => ({
+	getUser: vi.fn()
 }));
+
+vi.mock('./helpers', () => ({
+	getExpectedPicker: (...args: unknown[]) => mocks.helpers.getExpectedPicker(...args),
+	getMatchOrThrow: (...args: unknown[]) => mocks.helpers.getMatchOrThrow(...args),
+	assertState: (...args: unknown[]) => mocks.helpers.assertState(...args),
+	getMatchFull: (...args: unknown[]) => mocks.helpers.getMatchFull(...args)
+}));
+
+vi.mock('./rating', () => ({
+	updateElo: vi.fn(),
+	calculateInitialElo: vi.fn(),
+	selectMappoolForRating: vi.fn()
+}));
+
+const { pickMap } = await import('./engine');
 
 describe('pickMap', () => {
 	beforeEach(() => {
-		mocks.db.query.match.findFirst.mockReset();
-		mocks.db.query.matchParticipant.findMany.mockReset();
-		mocks.db.query.matchGame.findMany.mockReset();
-		mocks.db.query.mappoolSlot.findFirst.mockReset();
-		mocks.db.insert.mockReset();
-		mocks.db.update.mockReset();
-		mocks.db.delete.mockReset();
-		mocks.db.select.mockReset();
+		vi.clearAllMocks();
 
-		mocks.db.query.match.findFirst.mockResolvedValue({
+		// getMatchOrThrow returns a match object
+		mocks.helpers.getMatchOrThrow.mockResolvedValue({
 			id: 'match-1',
 			state: MATCH_STATES.PICKING,
 			config: { bestOf: 5, teamSize: 1, scoringType: 'score_v2' }
 		});
 
+		// db.query.matchParticipant.findMany returns participants
 		mocks.db.query.matchParticipant.findMany.mockResolvedValue([
 			{ id: 'p1', pickOrder: 1, score: 1 },
 			{ id: 'p2', pickOrder: 2, score: 1 }
 		]);
 
+		// db.query.matchGame.findMany returns no games played yet
 		mocks.db.query.matchGame.findMany.mockResolvedValue([]);
+
+		// getExpectedPicker returns p1 (first picker)
+		mocks.helpers.getExpectedPicker.mockReturnValue({ id: 'p1', pickOrder: 1, score: 1 });
 	});
 
 	test('throws when a non-current picker tries to pick', async () => {

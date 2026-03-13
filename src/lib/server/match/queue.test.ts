@@ -1,44 +1,44 @@
-import { beforeEach, describe, expect, test, mock } from 'bun:test';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MATCH_STATES } from './types';
 
 const mocks = {
 	db: {
 		query: {
-			matchParticipantPlayer: { findMany: mock() },
-			playerRating: { findFirst: mock() },
-			matchQueue: { findFirst: mock() }
+			matchParticipantPlayer: { findMany: vi.fn() },
+			playerRating: { findFirst: vi.fn() },
+			matchQueue: { findFirst: vi.fn() }
 		},
-		delete: mock()
+		delete: vi.fn()
 	}
 };
 
-mock.module('$lib/server/db', () => ({ db: mocks.db }));
+vi.mock('$lib/server/db', () => ({ db: mocks.db }));
 
-mock.module('drizzle-orm', () => ({
-	eq: mock(() => ({})),
-	and: mock(() => ({})),
-	asc: mock(() => ({})),
-	lt: mock(() => ({})),
-	inArray: mock(() => ({})),
-	sql: mock(() => ({})),
-	isNotNull: mock(() => ({}))
+vi.mock('drizzle-orm', () => ({
+	eq: vi.fn(() => ({})),
+	and: vi.fn(() => ({})),
+	asc: vi.fn(() => ({})),
+	lt: vi.fn(() => ({})),
+	inArray: vi.fn(() => ({})),
+	sql: vi.fn(() => ({})),
+	isNotNull: vi.fn(() => ({}))
 }));
 
-mock.module('$lib/server/db/schema', () => ({
+vi.mock('$lib/server/db/schema', () => ({
 	match: {},
 	matchQueue: {},
 	matchParticipantPlayer: {},
 	playerRating: {}
 }));
 
-mock.module('$lib/server/db/auth.schema', () => ({ account: {} }));
+vi.mock('$lib/server/db/auth.schema', () => ({ account: {} }));
 
-mock.module('$lib/server/osu/api', () => ({
-	getUser: mock()
+vi.mock('$lib/server/osu/api', () => ({
+	getUser: vi.fn()
 }));
 
-mock.module('$lib/server/match/engine', () => ({
-	createMatch: mock()
+vi.mock('$lib/server/match/engine', () => ({
+	createMatch: vi.fn()
 }));
 
 const { joinQueue } = await import('./queue');
@@ -53,7 +53,7 @@ describe('joinQueue', () => {
 
 	test('throws when user is already in an active match', async () => {
 		mocks.db.delete.mockReturnValue({
-			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
 		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([
@@ -72,7 +72,7 @@ describe('joinQueue', () => {
 
 	test('throws when user has no rating', async () => {
 		mocks.db.delete.mockReturnValue({
-			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
 		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
@@ -85,7 +85,7 @@ describe('joinQueue', () => {
 
 	test('throws when user is already in queue', async () => {
 		mocks.db.delete.mockReturnValue({
-			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+			where: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([])) }))
 		});
 
 		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
