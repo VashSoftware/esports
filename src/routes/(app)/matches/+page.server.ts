@@ -99,7 +99,11 @@ export const actions: Actions = {
 		const bestOf = parseInt(form.get('bestOf')?.toString() ?? '5');
 		const teamSize1 = parseInt(form.get('teamSize1')?.toString() ?? '1');
 		const teamSize2 = parseInt(form.get('teamSize2')?.toString() ?? '1');
-		const scoringType = (form.get('scoringType')?.toString() ?? 'score_v2') as 'score' | 'score_v2' | 'accuracy' | 'combo';
+		const scoringType = (form.get('scoringType')?.toString() ?? 'score_v2') as
+			| 'score'
+			| 'score_v2'
+			| 'accuracy'
+			| 'combo';
 		const allowEloChange = form.get('allowEloChange') === 'on';
 		const message = form.get('message')?.toString()?.trim() || '';
 		const scheduledAtStr = form.get('scheduledAt')?.toString();

@@ -38,7 +38,9 @@ async function main() {
 	}
 
 	if (flag === '--full') {
-		await db.execute(sql`DELETE FROM team_member WHERE team_id IN (SELECT id FROM team WHERE is_personal = false)`);
+		await db.execute(
+			sql`DELETE FROM team_member WHERE team_id IN (SELECT id FROM team WHERE is_personal = false)`
+		);
 		await db.execute(sql`DELETE FROM team WHERE is_personal = false`);
 		console.log('  Cleared: non-personal teams');
 

@@ -9,9 +9,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432" # Only accessible from host
+      - '127.0.0.1:5432:5432' # Only accessible from host
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vash -d vash"]
+      test: ['CMD-SHELL', 'pg_isready -U vash -d vash']
       interval: 2s
       timeout: 3s
       retries: 10
@@ -25,7 +25,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000" # Only accessible from host (nginx proxies)
+      - '127.0.0.1:3000:3000' # Only accessible from host (nginx proxies)
     environment:
       DATABASE_URL: postgresql://vash:***REMOVED***@db:5432/vash
       ORIGIN: ${ORIGIN:-https://esports.vash.software}
@@ -40,10 +40,10 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "bun",
-          "-e",
-          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'bun',
+          '-e',
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -60,7 +60,7 @@ services:
     volumes:
       - umamidata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      test: ['CMD-SHELL', 'pg_isready -U umami -d umami']
       interval: 2s
       timeout: 3s
       retries: 10
@@ -73,16 +73,12 @@ services:
       umami-db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3001:3000" # Proxy via nginx at e.g. analytics.vash.software
+      - '127.0.0.1:3001:3000' # Proxy via nginx at e.g. analytics.vash.software
     environment:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
       APP_SECRET: ${UMAMI_APP_SECRET}
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q -O /dev/null http://localhost:3000/api/heartbeat || exit 1",
-        ]
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://localhost:3000/api/heartbeat || exit 1']
       interval: 15s
       timeout: 5s
       retries: 5

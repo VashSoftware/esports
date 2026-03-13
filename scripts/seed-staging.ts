@@ -258,8 +258,8 @@ function rankToElo(rank: number): number {
 function generateSyntheticRank(index: number, total: number): number {
 	const p = index / total;
 	if (p < 0.05) return randInt(1000, 10000);
-	if (p < 0.20) return randInt(10000, 50000);
-	if (p < 0.60) return randInt(50000, 300000);
+	if (p < 0.2) return randInt(10000, 50000);
+	if (p < 0.6) return randInt(50000, 300000);
 	if (p < 0.85) return randInt(300000, 1000000);
 	return randInt(1000000, 5000000);
 }
@@ -286,20 +286,108 @@ function timer() {
 
 // ── Name generators ─────────────────────────────────────────────────────
 
-const PREFIXES = [
-	'', '', '', 'xx', 'xX', 'ii', 'oO', 'Xx', '-', '_', 'Mr', 'Dr', 'DJ'
-];
+const PREFIXES = ['', '', '', 'xx', 'xX', 'ii', 'oO', 'Xx', '-', '_', 'Mr', 'Dr', 'DJ'];
 const WORDS = [
-	'Ace', 'Arrow', 'Blaze', 'Bolt', 'Cat', 'Cloud', 'Comet', 'Crow', 'Crystal', 'Cyber',
-	'Dark', 'Dawn', 'Demon', 'Diamond', 'Dragon', 'Dream', 'Eagle', 'Echo', 'Edge', 'Elite',
-	'Ember', 'Fang', 'Fire', 'Flash', 'Fox', 'Frost', 'Ghost', 'Gold', 'Hawk', 'Haze',
-	'Hero', 'Hunt', 'Ice', 'Iron', 'Jade', 'Jet', 'King', 'Knight', 'Leo', 'Light',
-	'Luna', 'Lynx', 'Mist', 'Moon', 'Neo', 'Night', 'Nova', 'Omega', 'Onyx', 'Phantom',
-	'Phoenix', 'Pixel', 'Prime', 'Pulse', 'Rage', 'Rain', 'Raven', 'Rex', 'Rise', 'River',
-	'Rock', 'Ruby', 'Rush', 'Sage', 'Shade', 'Shadow', 'Silver', 'Sky', 'Snap', 'Snow',
-	'Solar', 'Soul', 'Spark', 'Star', 'Steel', 'Storm', 'Strike', 'Sun', 'Swift', 'Sword',
-	'Thunder', 'Tiger', 'Titan', 'Turbo', 'Venom', 'Viper', 'Void', 'Wave', 'Wild', 'Wind',
-	'Wolf', 'Wrath', 'Zen', 'Zero', 'Zeta', 'Zoom', 'Apex', 'Atlas', 'Aura', 'Blade'
+	'Ace',
+	'Arrow',
+	'Blaze',
+	'Bolt',
+	'Cat',
+	'Cloud',
+	'Comet',
+	'Crow',
+	'Crystal',
+	'Cyber',
+	'Dark',
+	'Dawn',
+	'Demon',
+	'Diamond',
+	'Dragon',
+	'Dream',
+	'Eagle',
+	'Echo',
+	'Edge',
+	'Elite',
+	'Ember',
+	'Fang',
+	'Fire',
+	'Flash',
+	'Fox',
+	'Frost',
+	'Ghost',
+	'Gold',
+	'Hawk',
+	'Haze',
+	'Hero',
+	'Hunt',
+	'Ice',
+	'Iron',
+	'Jade',
+	'Jet',
+	'King',
+	'Knight',
+	'Leo',
+	'Light',
+	'Luna',
+	'Lynx',
+	'Mist',
+	'Moon',
+	'Neo',
+	'Night',
+	'Nova',
+	'Omega',
+	'Onyx',
+	'Phantom',
+	'Phoenix',
+	'Pixel',
+	'Prime',
+	'Pulse',
+	'Rage',
+	'Rain',
+	'Raven',
+	'Rex',
+	'Rise',
+	'River',
+	'Rock',
+	'Ruby',
+	'Rush',
+	'Sage',
+	'Shade',
+	'Shadow',
+	'Silver',
+	'Sky',
+	'Snap',
+	'Snow',
+	'Solar',
+	'Soul',
+	'Spark',
+	'Star',
+	'Steel',
+	'Storm',
+	'Strike',
+	'Sun',
+	'Swift',
+	'Sword',
+	'Thunder',
+	'Tiger',
+	'Titan',
+	'Turbo',
+	'Venom',
+	'Viper',
+	'Void',
+	'Wave',
+	'Wild',
+	'Wind',
+	'Wolf',
+	'Wrath',
+	'Zen',
+	'Zero',
+	'Zeta',
+	'Zoom',
+	'Apex',
+	'Atlas',
+	'Aura',
+	'Blade'
 ];
 const SUFFIXES = ['', '', '', '_', '-', 'HD', 'osu', 'pp', 'x', 'z', '69', '420', 'YT', 'TTV'];
 
@@ -313,54 +401,210 @@ function generateUsername(index: number): string {
 }
 
 const TEAM_NAMES = [
-	'Team Absolute', 'Velocity Gaming', 'Rising Phoenix', 'Dark Matter', 'Quantum Flux',
-	'Storm Chasers', 'Neon Knights', 'Solar Flare', 'Arctic Wolves', 'Thunder Strike',
-	'Crimson Tide', 'Iron Fortress', 'Shadow Realm', 'Crystal Edge', 'Blazing Stars',
-	'Night Owls', 'Golden Eagles', 'Frost Bite', 'Wild Cards', 'Steel Legion',
-	'Moon Riders', 'Star Dust', 'Fire Hawks', 'Ice Breakers', 'Wind Walkers',
-	'Dragon Scale', 'Raven Wing', 'Silver Bullet', 'Ghost Protocol', 'Prime Time',
-	'Echo Chamber', 'Volt Force', 'Sky Runners', 'Omega Squad', 'Alpha Pack',
-	'Zero Gravity', 'Dawn Patrol', 'Pixel Perfect', 'Cyber Monks', 'Neo Tokyo',
-	'Mist Walkers', 'Pulse Wave', 'Zenith', 'Apex Legends', 'Void Runners',
-	'Soul Reapers', 'Blade Dancers', 'Turbo Charged', 'Snap Dragons', 'Rush Hour',
-	'Phantom Force', 'Diamond Dogs', 'Cosmic Rays', 'Hyper Beam', 'Sonic Boom',
-	'Prism', 'Eclipse', 'Nebula', 'Supernova', 'Horizon',
-	'Catalyst', 'Entropy', 'Vanguard', 'Sentinel', 'Oracle',
-	'Maelstrom', 'Tempest', 'Cascade', 'Enigma', 'Paradox',
-	'Mirage', 'Nexus', 'Vertex', 'Cipher', 'Stratos',
-	'Helix', 'Spectrum', 'Polaris', 'Inferno', 'Tsunami',
-	'Rampage', 'Havoc', 'Fury', 'Blitz', 'Reign',
-	'Rapture', 'Genesis', 'Onslaught', 'Vendetta', 'Oblivion',
-	'Dominion', 'Ascension', 'Redemption', 'Revolution', 'Evolution',
-	'Dynasty', 'Empire', 'Republic', 'Alliance', 'Syndicate',
-	'Collective', 'Foundation', 'Initiative', 'Consortium', 'Federation'
+	'Team Absolute',
+	'Velocity Gaming',
+	'Rising Phoenix',
+	'Dark Matter',
+	'Quantum Flux',
+	'Storm Chasers',
+	'Neon Knights',
+	'Solar Flare',
+	'Arctic Wolves',
+	'Thunder Strike',
+	'Crimson Tide',
+	'Iron Fortress',
+	'Shadow Realm',
+	'Crystal Edge',
+	'Blazing Stars',
+	'Night Owls',
+	'Golden Eagles',
+	'Frost Bite',
+	'Wild Cards',
+	'Steel Legion',
+	'Moon Riders',
+	'Star Dust',
+	'Fire Hawks',
+	'Ice Breakers',
+	'Wind Walkers',
+	'Dragon Scale',
+	'Raven Wing',
+	'Silver Bullet',
+	'Ghost Protocol',
+	'Prime Time',
+	'Echo Chamber',
+	'Volt Force',
+	'Sky Runners',
+	'Omega Squad',
+	'Alpha Pack',
+	'Zero Gravity',
+	'Dawn Patrol',
+	'Pixel Perfect',
+	'Cyber Monks',
+	'Neo Tokyo',
+	'Mist Walkers',
+	'Pulse Wave',
+	'Zenith',
+	'Apex Legends',
+	'Void Runners',
+	'Soul Reapers',
+	'Blade Dancers',
+	'Turbo Charged',
+	'Snap Dragons',
+	'Rush Hour',
+	'Phantom Force',
+	'Diamond Dogs',
+	'Cosmic Rays',
+	'Hyper Beam',
+	'Sonic Boom',
+	'Prism',
+	'Eclipse',
+	'Nebula',
+	'Supernova',
+	'Horizon',
+	'Catalyst',
+	'Entropy',
+	'Vanguard',
+	'Sentinel',
+	'Oracle',
+	'Maelstrom',
+	'Tempest',
+	'Cascade',
+	'Enigma',
+	'Paradox',
+	'Mirage',
+	'Nexus',
+	'Vertex',
+	'Cipher',
+	'Stratos',
+	'Helix',
+	'Spectrum',
+	'Polaris',
+	'Inferno',
+	'Tsunami',
+	'Rampage',
+	'Havoc',
+	'Fury',
+	'Blitz',
+	'Reign',
+	'Rapture',
+	'Genesis',
+	'Onslaught',
+	'Vendetta',
+	'Oblivion',
+	'Dominion',
+	'Ascension',
+	'Redemption',
+	'Revolution',
+	'Evolution',
+	'Dynasty',
+	'Empire',
+	'Republic',
+	'Alliance',
+	'Syndicate',
+	'Collective',
+	'Foundation',
+	'Initiative',
+	'Consortium',
+	'Federation'
 ];
 
 // Beatmap metadata templates — used to generate pool slots with varied data
 const ARTISTS = [
-	'xi', 'DragonForce', 'UNDEAD CORPORATION', 'Imperial Circus Dead Decadence',
-	'Camellia', 'FELT', 'Halozy', 'Sound Horizon', 'Reol', 'DECO*27',
-	'ClariS', 'LiSA', 'Aimer', 'EGOIST', 'supercell', 'Linked Horizon',
-	'Foreground Eclipse', 'BABYMETAL', 'Hana', 'IOSYS',
-	'Mafumafu', 'Eve', 'Yorushika', 'YOASOBI', 'Kenshi Yonezu',
-	'Aqours', 'Roselia', 'Raise A Suilen', 'Pastel*Palettes', 'Poppin Party'
+	'xi',
+	'DragonForce',
+	'UNDEAD CORPORATION',
+	'Imperial Circus Dead Decadence',
+	'Camellia',
+	'FELT',
+	'Halozy',
+	'Sound Horizon',
+	'Reol',
+	'DECO*27',
+	'ClariS',
+	'LiSA',
+	'Aimer',
+	'EGOIST',
+	'supercell',
+	'Linked Horizon',
+	'Foreground Eclipse',
+	'BABYMETAL',
+	'Hana',
+	'IOSYS',
+	'Mafumafu',
+	'Eve',
+	'Yorushika',
+	'YOASOBI',
+	'Kenshi Yonezu',
+	'Aqours',
+	'Roselia',
+	'Raise A Suilen',
+	'Pastel*Palettes',
+	'Poppin Party'
 ];
 const TITLES = [
-	'FREEDOM DiVE', 'Blue Zenith', 'Uta', 'Image Material', 'Brain Power',
-	'The Big Black', 'Airman ga Taosenai', 'Kira Kira Days', 'Senbonzakura', 'Harumachi Clover',
-	'Storytellers', 'Highscore', 'Louder than Steel', 'Snow Drive', 'Night of Knights',
-	'Yuki no Hana', 'Rainbow Road', 'Galaxy Collapse', 'Last Goodbye', 'Shinbatsu',
-	'Crystallize', 'Overkill', 'Plasma Gun', 'Time Freeze', 'Diamond',
-	'United', 'Alchemy', 'Scarlet Rose', 'Infinite Dream', 'Lost Umbrella',
-	'Through the Fire and Flames', 'Cry Thunder', 'Soldiers of the Wasteland', 'Valley of the Damned', 'Black Fire',
-	'Akasha', 'Ethereal', 'Chrono Trigger', 'Solar System', 'Phantom Rider'
+	'FREEDOM DiVE',
+	'Blue Zenith',
+	'Uta',
+	'Image Material',
+	'Brain Power',
+	'The Big Black',
+	'Airman ga Taosenai',
+	'Kira Kira Days',
+	'Senbonzakura',
+	'Harumachi Clover',
+	'Storytellers',
+	'Highscore',
+	'Louder than Steel',
+	'Snow Drive',
+	'Night of Knights',
+	'Yuki no Hana',
+	'Rainbow Road',
+	'Galaxy Collapse',
+	'Last Goodbye',
+	'Shinbatsu',
+	'Crystallize',
+	'Overkill',
+	'Plasma Gun',
+	'Time Freeze',
+	'Diamond',
+	'United',
+	'Alchemy',
+	'Scarlet Rose',
+	'Infinite Dream',
+	'Lost Umbrella',
+	'Through the Fire and Flames',
+	'Cry Thunder',
+	'Soldiers of the Wasteland',
+	'Valley of the Damned',
+	'Black Fire',
+	'Akasha',
+	'Ethereal',
+	'Chrono Trigger',
+	'Solar System',
+	'Phantom Rider'
 ];
 const VERSIONS = [
-	'Normal', 'Hard', 'Insane', 'Expert', "Expert+", 'Lunatic',
-	"Someone's Extra", 'Another', 'Extreme', "Lasse's Insane",
-	'Reform', 'Deluge', 'Overdose', 'Rain', 'Platter',
-	"Monstrata's Expert", "Sotarks' Insane", "fieryrage's Extra", "Kroytz's Insane",
-	'Kalibe', 'Cataclysm'
+	'Normal',
+	'Hard',
+	'Insane',
+	'Expert',
+	'Expert+',
+	'Lunatic',
+	"Someone's Extra",
+	'Another',
+	'Extreme',
+	"Lasse's Insane",
+	'Reform',
+	'Deluge',
+	'Overdose',
+	'Rain',
+	'Platter',
+	"Monstrata's Expert",
+	"Sotarks' Insane",
+	"fieryrage's Extra",
+	"Kroytz's Insane",
+	'Kalibe',
+	'Cataclysm'
 ];
 
 // ── PHASE FUNCTIONS ─────────────────────────────────────────────────────
@@ -431,7 +675,13 @@ async function seedUsers(): Promise<UserData[]> {
 	await batchInsert(account, accounts);
 
 	console.log(`  Users + accounts: ${USER_COUNT} (${t()})`);
-	return users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt }));
+	return users.map((u) => ({
+		id: u.id,
+		name: u.name,
+		email: u.email,
+		role: u.role,
+		createdAt: u.createdAt
+	}));
 }
 
 async function seedPersonalTeams(users: UserData[]): Promise<TeamData[]> {
@@ -472,7 +722,9 @@ async function seedNonPersonalTeams(users: UserData[]): Promise<TeamData[]> {
 
 	for (let i = 0; i < TEAM_COUNT; i++) {
 		teams.push({
-			name: TEAM_NAMES[i % TEAM_NAMES.length] + (i >= TEAM_NAMES.length ? ` ${Math.floor(i / TEAM_NAMES.length) + 1}` : ''),
+			name:
+				TEAM_NAMES[i % TEAM_NAMES.length] +
+				(i >= TEAM_NAMES.length ? ` ${Math.floor(i / TEAM_NAMES.length) + 1}` : ''),
 			isPersonal: false,
 			ownerId: users[i].id
 		});
@@ -582,10 +834,15 @@ async function seedMappools(users: UserData[]): Promise<PoolData[]> {
 
 	// Generate slots for each pool
 	const SLOT_TEMPLATE = [
-		{ cat: 'NM', order: 1 }, { cat: 'NM', order: 2 }, { cat: 'NM', order: 3 },
-		{ cat: 'HD', order: 1 }, { cat: 'HD', order: 2 },
-		{ cat: 'HR', order: 1 }, { cat: 'HR', order: 2 },
-		{ cat: 'DT', order: 1 }, { cat: 'DT', order: 2 },
+		{ cat: 'NM', order: 1 },
+		{ cat: 'NM', order: 2 },
+		{ cat: 'NM', order: 3 },
+		{ cat: 'HD', order: 1 },
+		{ cat: 'HD', order: 2 },
+		{ cat: 'HR', order: 1 },
+		{ cat: 'HR', order: 2 },
+		{ cat: 'DT', order: 1 },
+		{ cat: 'DT', order: 2 },
 		{ cat: 'FM', order: 1 },
 		{ cat: 'TB', order: 1 }
 	];
@@ -737,7 +994,7 @@ async function seedMatches(
 
 		// Determine match state
 		let matchState: string;
-		let winnerId: string | null = null;
+		const winnerId: string | null = null;
 		let finishedAt: Date | null = null;
 		let startedAt: Date | null = null;
 		let gamesToPlay = 0;
@@ -833,7 +1090,9 @@ async function seedMatches(
 	}
 
 	// Strip temp fields for insert
-	const participantRows = allParticipants.map(({ _tempIdx, _matchDataIdx, _side, ...rest }) => rest);
+	const participantRows = allParticipants.map(
+		({ _tempIdx, _matchDataIdx, _side, ...rest }) => rest
+	);
 	const insertedParticipants = await batchInsert(matchParticipant, participantRows);
 
 	// Build players
@@ -851,7 +1110,9 @@ async function seedMatches(
 		});
 	}
 
-	const playerRows = allPlayers.map(({ _participantInsertIdx, _matchDataIdx, _side, ...rest }) => rest);
+	const playerRows = allPlayers.map(
+		({ _participantInsertIdx, _matchDataIdx, _side, ...rest }) => rest
+	);
 	const insertedPlayers = await batchInsert(matchParticipantPlayer, playerRows);
 
 	// Build a lookup: matchDataIdx + side -> participant ID and player ID
@@ -948,7 +1209,8 @@ async function seedMatches(
 				winnerParticipantId: gameWinner?.participantId || null,
 				state: gameState,
 				startedAt: gameStarted,
-				finishedAt: gameState === 'FINISHED' ? new Date(gameStarted.getTime() + randInt(2, 8) * 60000) : null,
+				finishedAt:
+					gameState === 'FINISHED' ? new Date(gameStarted.getTime() + randInt(2, 8) * 60000) : null,
 				_scores: [
 					{ playerId: p1.playerId, ...score1 },
 					{ playerId: p2.playerId, ...score2 }
@@ -988,8 +1250,7 @@ async function seedMatches(
 	// Update match winners and participant scores
 	for (const [idx, winner] of matchWinners) {
 		const mi = insertedMatches[idx];
-		await db
-			.execute(sql`UPDATE match SET winner_id = ${winner.winnerId} WHERE id = ${mi.id}`);
+		await db.execute(sql`UPDATE match SET winner_id = ${winner.winnerId} WHERE id = ${mi.id}`);
 
 		const p1 = participantLookup.get(`${idx}-1`)!;
 		const p2 = participantLookup.get(`${idx}-2`)!;
@@ -1023,7 +1284,13 @@ async function seedMatches(
 
 async function seedNotifications(users: UserData[]): Promise<void> {
 	const t = timer();
-	const types = ['match_created', 'match_finished', 'match_cancelled', 'team_invite', 'match_invite'];
+	const types = [
+		'match_created',
+		'match_finished',
+		'match_cancelled',
+		'team_invite',
+		'match_invite'
+	];
 	const rows: any[] = [];
 
 	for (const u of users) {

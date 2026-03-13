@@ -190,10 +190,7 @@ export const actions: Actions = {
 		requireAuth(locals);
 		if (locals.user!.role !== 'admin') error(403, 'Admins only');
 
-		await db
-			.update(mappool)
-			.set({ verifiedAt: new Date() })
-			.where(eq(mappool.id, params.id));
+		await db.update(mappool).set({ verifiedAt: new Date() }).where(eq(mappool.id, params.id));
 
 		return { success: true };
 	},
@@ -202,10 +199,7 @@ export const actions: Actions = {
 		requireAuth(locals);
 		if (locals.user!.role !== 'admin') error(403, 'Admins only');
 
-		await db
-			.update(mappool)
-			.set({ verifiedAt: null })
-			.where(eq(mappool.id, params.id));
+		await db.update(mappool).set({ verifiedAt: null }).where(eq(mappool.id, params.id));
 
 		return { success: true };
 	},
@@ -234,10 +228,7 @@ export const actions: Actions = {
 
 		// Fetch target category slots (excluding the moved slot)
 		const targetSlots = await db.query.mappoolSlot.findMany({
-			where: and(
-				eq(mappoolSlot.mappoolId, params.id),
-				eq(mappoolSlot.category, targetCategory)
-			),
+			where: and(eq(mappoolSlot.mappoolId, params.id), eq(mappoolSlot.category, targetCategory)),
 			orderBy: [asc(mappoolSlot.orderInCategory)]
 		});
 		const filteredTarget = targetSlots.filter((s) => s.id !== slotId);
@@ -267,10 +258,7 @@ export const actions: Actions = {
 		// If cross-category move, re-number the source category too
 		if (!isSameCategory) {
 			const sourceSlots = await db.query.mappoolSlot.findMany({
-				where: and(
-					eq(mappoolSlot.mappoolId, params.id),
-					eq(mappoolSlot.category, sourceCategory)
-				),
+				where: and(eq(mappoolSlot.mappoolId, params.id), eq(mappoolSlot.category, sourceCategory)),
 				orderBy: [asc(mappoolSlot.orderInCategory)]
 			});
 			for (let i = 0; i < sourceSlots.length; i++) {
@@ -292,7 +280,10 @@ export const actions: Actions = {
 		const raw = form.get('data')?.toString()?.trim();
 		if (!raw) return { error: 'No data provided' };
 
-		const lines = raw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+		const lines = raw
+			.split(/\n/)
+			.map((l) => l.trim())
+			.filter(Boolean);
 		const validMods = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 		const errors: string[] = [];
 		let successCount = 0;

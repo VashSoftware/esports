@@ -25,8 +25,7 @@ async function count(query: string): Promise<number> {
 
 async function exec(description: string, deleteSql: string) {
 	// Count first
-	const countSql = deleteSql
-		.replace(/^DELETE FROM/, 'SELECT COUNT(*) as count FROM');
+	const countSql = deleteSql.replace(/^DELETE FROM/, 'SELECT COUNT(*) as count FROM');
 	const n = await count(countSql);
 
 	if (n === 0) {
@@ -53,9 +52,7 @@ async function main() {
 	const realUsers = await count(
 		`SELECT COUNT(*) as count FROM "user" WHERE id NOT LIKE 'seed-user-%'`
 	);
-	const seedUsers = await count(
-		`SELECT COUNT(*) as count FROM "user" WHERE id LIKE 'seed-user-%'`
-	);
+	const seedUsers = await count(`SELECT COUNT(*) as count FROM "user" WHERE id LIKE 'seed-user-%'`);
 	console.log(`   Real users: ${realUsers}`);
 	console.log(`   Seed users: ${seedUsers}\n`);
 
@@ -168,37 +165,23 @@ async function main() {
 
 	// 13. Teams
 	console.log('Phase 13: Teams');
-	await exec(
-		'team (owned by seed users)',
-		`DELETE FROM team WHERE owner_id LIKE 'seed-user-%'`
-	);
+	await exec('team (owned by seed users)', `DELETE FROM team WHERE owner_id LIKE 'seed-user-%'`);
 
 	// 14. Sessions (cascade from user delete, but clean up explicitly)
 	console.log('Phase 14: Sessions');
-	await exec(
-		'session (from seed users)',
-		`DELETE FROM session WHERE user_id LIKE 'seed-user-%'`
-	);
+	await exec('session (from seed users)', `DELETE FROM session WHERE user_id LIKE 'seed-user-%'`);
 
 	// 15. Accounts
 	console.log('Phase 15: Accounts');
-	await exec(
-		'account (from seed users)',
-		`DELETE FROM account WHERE user_id LIKE 'seed-user-%'`
-	);
+	await exec('account (from seed users)', `DELETE FROM account WHERE user_id LIKE 'seed-user-%'`);
 
 	// 16. Users (the root)
 	console.log('Phase 16: Users');
-	await exec(
-		'user (seed users)',
-		`DELETE FROM "user" WHERE id LIKE 'seed-user-%'`
-	);
+	await exec('user (seed users)', `DELETE FROM "user" WHERE id LIKE 'seed-user-%'`);
 
 	// ── Verify ──
 	console.log('\n── Verification ──');
-	const remaining = await count(
-		`SELECT COUNT(*) as count FROM "user" WHERE id LIKE 'seed-user-%'`
-	);
+	const remaining = await count(`SELECT COUNT(*) as count FROM "user" WHERE id LIKE 'seed-user-%'`);
 	const remainingMatches = await count(
 		`SELECT COUNT(*) as count FROM match WHERE created_by LIKE 'seed-user-%'`
 	);

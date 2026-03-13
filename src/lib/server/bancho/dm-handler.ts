@@ -71,7 +71,10 @@ export async function initDMHandler() {
 					await handleDecline(ircUsername, args[0]);
 					break;
 				default:
-					await sendDM(ircUsername, `Unknown command: ${command}. Type !help for available commands.`);
+					await sendDM(
+						ircUsername,
+						`Unknown command: ${command}. Type !help for available commands.`
+					);
 			}
 		} catch (err: any) {
 			console.error(`[DM] Error handling "${text}" from ${ircUsername}:`, err.message);
@@ -123,7 +126,10 @@ async function handleQueue(ircUsername: string) {
 	// Check if already in queue
 	const status = await getQueueStatus(u.id);
 	if (status.inQueue) {
-		await sendDM(ircUsername, `You're already in queue (${status.queueSize} searching). Type !leave to exit.`);
+		await sendDM(
+			ircUsername,
+			`You're already in queue (${status.queueSize} searching). Type !leave to exit.`
+		);
 		return;
 	}
 
@@ -213,7 +219,10 @@ async function handleInvites(ircUsername: string) {
 		return `[${shortId}] ${i.creatorTeam.name} — BO${config.bestOf} ${config.scoringType}`;
 	});
 
-	await sendDM(ircUsername, `Pending invites (${pending.length}): ${lines.join(' | ')}. Reply !accept <id> or !decline <id>`);
+	await sendDM(
+		ircUsername,
+		`Pending invites (${pending.length}): ${lines.join(' | ')}. Reply !accept <id> or !decline <id>`
+	);
 }
 
 async function handleAccept(ircUsername: string, inviteIdPrefix?: string) {
@@ -232,7 +241,10 @@ async function handleAccept(ircUsername: string, inviteIdPrefix?: string) {
 	}
 
 	const match = await acceptInvite(invite.id, u.id);
-	await sendDM(ircUsername, `Accepted! Match created. Check osu! for the lobby invite or visit the web UI.`);
+	await sendDM(
+		ircUsername,
+		`Accepted! Match created. Check osu! for the lobby invite or visit the web UI.`
+	);
 }
 
 async function handleDecline(ircUsername: string, inviteIdPrefix?: string) {

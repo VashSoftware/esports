@@ -25,10 +25,19 @@ const OSU_CLIENT_ID = process.env.OSU_CLIENT_ID!;
 const OSU_CLIENT_SECRET = process.env.OSU_CLIENT_SECRET!;
 
 for (const [k, v] of Object.entries({
-	R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-	R2_BUCKET, R2_PUBLIC_URL, DATABASE_URL, OSU_CLIENT_ID, OSU_CLIENT_SECRET
+	R2_ACCOUNT_ID,
+	R2_ACCESS_KEY_ID,
+	R2_SECRET_ACCESS_KEY,
+	R2_BUCKET,
+	R2_PUBLIC_URL,
+	DATABASE_URL,
+	OSU_CLIENT_ID,
+	OSU_CLIENT_SECRET
 })) {
-	if (!v) { console.error(`Missing env var: ${k}`); process.exit(1); }
+	if (!v) {
+		console.error(`Missing env var: ${k}`);
+		process.exit(1);
+	}
 }
 
 // ── R2 ─────────────────────────────────────────────────────────────────
@@ -76,7 +85,9 @@ function isOsuUrl(url: string | null): boolean {
 	}
 }
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms: number) {
+	return new Promise((r) => setTimeout(r, ms));
+}
 
 // ── osu! API ───────────────────────────────────────────────────────────
 
@@ -96,7 +107,7 @@ async function getOsuToken(): Promise<string> {
 		})
 	});
 	if (!res.ok) throw new Error(`osu! token failed: ${res.status}`);
-	const data = await res.json() as { access_token: string; expires_in: number };
+	const data = (await res.json()) as { access_token: string; expires_in: number };
 	osuToken = data.access_token;
 	osuTokenExpiry = Date.now() + data.expires_in * 1000;
 	return osuToken;
@@ -121,7 +132,7 @@ async function getBeatmap(beatmapId: string): Promise<BeatmapData | null> {
 			headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
 		});
 		if (!res.ok) return null;
-		return await res.json() as BeatmapData;
+		return (await res.json()) as BeatmapData;
 	} catch {
 		return null;
 	}
@@ -137,14 +148,17 @@ const sql = new SQL(DATABASE_URL);
 
 console.log('═══ 1/3: Backfilling mappool slot metadata + covers ═══\n');
 
-const slots = await sql<{ id: string; beatmap_id: string; cover_url: string | null; title: string | null }[]>`
+const slots = await sql<
+	{ id: string; beatmap_id: string; cover_url: string | null; title: string | null }[]
+>`
 	SELECT id, beatmap_id, cover_url, title FROM mappool_slot
 	WHERE cover_url IS NULL OR title IS NULL
 `;
 
 console.log(`Found ${slots.length} slots missing metadata\n`);
 
-let slotOk = 0, slotFail = 0;
+let slotOk = 0,
+	slotFail = 0;
 for (const slot of slots) {
 	process.stdout.write(`  beatmap ${slot.beatmap_id} ... `);
 	const bm = await getBeatmap(slot.beatmap_id);
@@ -181,7 +195,9 @@ for (const slot of slots) {
 console.log(`\nSlots: ${slotOk} updated, ${slotFail} failed\n`);
 
 // Also update any slots that have osu! URLs instead of R2 URLs (partially migrated)
-const osuUrlSlots = await sql<{ id: string; cover_url: string | null; list_cover_url: string | null }[]>`
+const osuUrlSlots = await sql<
+	{ id: string; cover_url: string | null; list_cover_url: string | null }[]
+>`
 	SELECT id, cover_url, list_cover_url FROM mappool_slot
 	WHERE (cover_url LIKE '%ppy.sh%' OR list_cover_url LIKE '%ppy.sh%')
 `;
@@ -189,8 +205,12 @@ const osuUrlSlots = await sql<{ id: string; cover_url: string | null; list_cover
 if (osuUrlSlots.length > 0) {
 	console.log(`Found ${osuUrlSlots.length} slots with osu! URLs (need R2 proxy)\n`);
 	for (const slot of osuUrlSlots) {
-		const newCover = slot.cover_url && isOsuUrl(slot.cover_url) ? await proxyToR2(slot.cover_url) : slot.cover_url;
-		const newList = slot.list_cover_url && isOsuUrl(slot.list_cover_url) ? await proxyToR2(slot.list_cover_url) : slot.list_cover_url;
+		const newCover =
+			slot.cover_url && isOsuUrl(slot.cover_url) ? await proxyToR2(slot.cover_url) : slot.cover_url;
+		const newList =
+			slot.list_cover_url && isOsuUrl(slot.list_cover_url)
+				? await proxyToR2(slot.list_cover_url)
+				: slot.list_cover_url;
 		await sql`UPDATE mappool_slot SET cover_url = ${newCover}, list_cover_url = ${newList} WHERE id = ${slot.id}`;
 	}
 	console.log('Done re-proxying slot covers\n');
@@ -206,7 +226,8 @@ const users = await sql<{ id: string; image: string | null }[]>`
 	SELECT id, image FROM "user" WHERE image IS NOT NULL
 `;
 
-let avatarOk = 0, avatarSkip = 0;
+let avatarOk = 0,
+	avatarSkip = 0;
 for (const u of users) {
 	if (!isOsuUrl(u.image)) {
 		avatarSkip++;
@@ -235,7 +256,8 @@ const teams = await sql<{ id: string; avatar_url: string | null }[]>`
 	SELECT id, avatar_url FROM team WHERE avatar_url IS NOT NULL
 `;
 
-let teamOk = 0, teamSkip = 0;
+let teamOk = 0,
+	teamSkip = 0;
 for (const t of teams) {
 	if (!isOsuUrl(t.avatar_url)) {
 		teamSkip++;
