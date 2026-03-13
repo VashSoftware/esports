@@ -27,9 +27,9 @@ services:
     volumes:
       - pgdata-staging:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5433:5432"
+      - '127.0.0.1:5433:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vash_staging -d vash_staging"]
+      test: ['CMD-SHELL', 'pg_isready -U vash_staging -d vash_staging']
       interval: 2s
       timeout: 3s
       retries: 10
@@ -44,7 +44,7 @@ services:
       staging-db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3002:3000"
+      - '127.0.0.1:3002:3000'
     environment:
       DATABASE_URL: postgresql://vash_staging:${STAGING_DB_PASSWORD}@staging-db:5432/vash_staging
       ORIGIN: https://esports-staging.vash.software
@@ -67,10 +67,10 @@ services:
     healthcheck:
       test:
         [
-          "CMD",
-          "bun",
-          "-e",
-          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'bun',
+          '-e',
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
