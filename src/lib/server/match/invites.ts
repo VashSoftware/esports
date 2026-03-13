@@ -68,18 +68,14 @@ export async function createInvite(opts: {
 
 	// Send Bancho DMs (best-effort)
 	for (const member of invitedMembers) {
-		try {
-			const u = await db.query.user.findFirst({
-				where: eq(user.id, member.userId)
-			});
-			if (u?.name) {
-				await sendDM(
-					u.name,
-					`Match invite: ${title}. Accept/decline at https://esports.vash.software/matches or reply !accept ${invite.id.slice(0, 8)}`
-				);
-			}
-		} catch {
-			// DM sending is best-effort
+		const u = await db.query.user.findFirst({
+			where: eq(user.id, member.userId)
+		});
+		if (u?.name) {
+			sendDM(
+				u.name,
+				`Match invite: ${title}. Accept/decline at https://esports.vash.software/matches or reply !accept ${invite.id.slice(0, 8)}`
+			).catch(() => {}); // Silent best-effort
 		}
 	}
 
