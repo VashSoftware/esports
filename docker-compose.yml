@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: vash
       POSTGRES_USER: vash
-      POSTGRES_PASSWORD: 84037ced4e0d08d0e6e6406efbf7bb77b504486d6cf67377
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -27,7 +27,7 @@ services:
     ports:
       - '127.0.0.1:3000:3000' # Only accessible from host (nginx proxies)
     environment:
-      DATABASE_URL: postgresql://vash:84037ced4e0d08d0e6e6406efbf7bb77b504486d6cf67377@db:5432/vash
+      DATABASE_URL: postgresql://vash:${DB_PASSWORD}@db:5432/vash
       ORIGIN: ${ORIGIN:-https://esports.vash.software}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       OSU_CLIENT_ID: ${OSU_CLIENT_ID}
