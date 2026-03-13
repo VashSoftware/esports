@@ -58,10 +58,5 @@ export async function markActionedByReference(referenceId: string, userId: strin
 	await db
 		.update(notification)
 		.set({ read: true, actionedAt: new Date() })
-		.where(
-			and(
-				eq(notification.referenceId, referenceId),
-				eq(notification.userId, userId)
-			)
-		);
+		.where(and(eq(notification.referenceId, referenceId), eq(notification.userId, userId)));
 }

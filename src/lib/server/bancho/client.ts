@@ -31,9 +31,7 @@ export async function getClient() {
 
 	const banchoModule = await import('bancho.js');
 	const BanchoClient =
-		banchoModule.BanchoClient ??
-		banchoModule.default?.BanchoClient ??
-		banchoModule.default;
+		banchoModule.BanchoClient ?? banchoModule.default?.BanchoClient ?? banchoModule.default;
 
 	client = new BanchoClient({
 		username: env.OSU_IRC_USERNAME,
@@ -178,10 +176,7 @@ export class TournamentLobby {
 		const c = await getClient();
 
 		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(
-				() => reject(new Error('Lobby creation timed out')),
-				15000
-			);
+			const timeout = setTimeout(() => reject(new Error('Lobby creation timed out')), 15000);
 
 			const banchoBot = c.getUser('BanchoBot');
 
@@ -218,7 +213,9 @@ export class TournamentLobby {
 		if (this.channel && this.messageHandler) {
 			try {
 				this.channel.removeListener('message', this.messageHandler);
-			} catch { /* old channel may be dead */ }
+			} catch {
+				/* old channel may be dead */
+			}
 		}
 
 		this.channel = c.getChannel(this.channelName);
@@ -233,7 +230,9 @@ export class TournamentLobby {
 		if (this.messageHandler) {
 			try {
 				this.channel.removeListener('message', this.messageHandler);
-			} catch { /* ignore */ }
+			} catch {
+				/* ignore */
+			}
 		}
 
 		this.messageHandler = (msg: any) => {
@@ -254,9 +253,7 @@ export class TournamentLobby {
 
 	private parseBanchoMessage(text: string) {
 		// Player score: "<user> finished playing (Score: 1,234,567, ... PASSED)"
-		const scoreMatch = text.match(
-			/^(.+?) finished playing \(Score: ([\d,]+).*?(PASSED|FAILED)\)/i
-		);
+		const scoreMatch = text.match(/^(.+?) finished playing \(Score: ([\d,]+).*?(PASSED|FAILED)\)/i);
 		if (scoreMatch) {
 			this.collectedScores.push({
 				username: scoreMatch[1].trim(),

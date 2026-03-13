@@ -182,10 +182,7 @@ export const matchQueue = pgTable(
 		elo: integer('elo').default(1000).notNull(),
 		joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull()
 	},
-	(t) => [
-		uniqueIndex('idx_queue_user').on(t.userId),
-		index('idx_queue_elo').on(t.elo)
-	]
+	(t) => [uniqueIndex('idx_queue_user').on(t.userId), index('idx_queue_elo').on(t.elo)]
 );
 
 // ── Player ELO ──────────────────────────────────────────────────────────
@@ -201,42 +198,56 @@ export const playerRating = pgTable('player_rating', {
 });
 
 // ── Notifications ────────────────────────────────────────────────────
-export const notification = pgTable('notification', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: text('user_id').notNull(),
-	type: text('type').notNull(),
-	title: text('title').notNull(),
-	message: text('message'),
-	referenceId: text('reference_id'),
-	read: boolean('read').default(false).notNull(),
-	actionedAt: timestamp('actioned_at', { withTimezone: true }),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-}, (t) => [
-	index('idx_notification_user').on(t.userId),
-	index('idx_notification_user_read').on(t.userId, t.read)
-]);
+export const notification = pgTable(
+	'notification',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: text('user_id').notNull(),
+		type: text('type').notNull(),
+		title: text('title').notNull(),
+		message: text('message'),
+		referenceId: text('reference_id'),
+		read: boolean('read').default(false).notNull(),
+		actionedAt: timestamp('actioned_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_notification_user').on(t.userId),
+		index('idx_notification_user_read').on(t.userId, t.read)
+	]
+);
 
 // ── Match Invites ────────────────────────────────────────────────────
-export const matchInvite = pgTable('match_invite', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	createdBy: text('created_by').notNull(),
-	creatorTeamId: uuid('creator_team_id').notNull().references(() => team.id),
-	invitedTeamId: uuid('invited_team_id').notNull().references(() => team.id),
-	config: jsonb('config').notNull(),
-	mappoolId: uuid('mappool_id').notNull().references(() => mappool.id),
-	name: text('name'),
-	message: text('message'),
-	scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
-	expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-	status: text('status').default('pending').notNull(),
-	matchId: uuid('match_id').references(() => match.id),
-	respondedAt: timestamp('responded_at', { withTimezone: true }),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
-}, (t) => [
-	index('idx_invite_invited_team').on(t.invitedTeamId),
-	index('idx_invite_created_by').on(t.createdBy),
-	index('idx_invite_status').on(t.status)
-]);
+export const matchInvite = pgTable(
+	'match_invite',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		createdBy: text('created_by').notNull(),
+		creatorTeamId: uuid('creator_team_id')
+			.notNull()
+			.references(() => team.id),
+		invitedTeamId: uuid('invited_team_id')
+			.notNull()
+			.references(() => team.id),
+		config: jsonb('config').notNull(),
+		mappoolId: uuid('mappool_id')
+			.notNull()
+			.references(() => mappool.id),
+		name: text('name'),
+		message: text('message'),
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+		status: text('status').default('pending').notNull(),
+		matchId: uuid('match_id').references(() => match.id),
+		respondedAt: timestamp('responded_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_invite_invited_team').on(t.invitedTeamId),
+		index('idx_invite_created_by').on(t.createdBy),
+		index('idx_invite_status').on(t.status)
+	]
+);
 
 // ── Relations ───────────────────────────────────────────────────────────
 
@@ -293,11 +304,19 @@ export const matchQueueRelations = relations(matchQueue, ({ one }) => ({
 	team: one(team, { fields: [matchQueue.teamId], references: [team.id] })
 }));
 
-export const notificationRelations = relations(notification, ({ }) => ({}));
+export const notificationRelations = relations(notification, ({}) => ({}));
 
 export const matchInviteRelations = relations(matchInvite, ({ one }) => ({
-	creatorTeam: one(team, { fields: [matchInvite.creatorTeamId], references: [team.id], relationName: 'inviteCreatorTeam' }),
-	invitedTeam: one(team, { fields: [matchInvite.invitedTeamId], references: [team.id], relationName: 'inviteInvitedTeam' }),
+	creatorTeam: one(team, {
+		fields: [matchInvite.creatorTeamId],
+		references: [team.id],
+		relationName: 'inviteCreatorTeam'
+	}),
+	invitedTeam: one(team, {
+		fields: [matchInvite.invitedTeamId],
+		references: [team.id],
+		relationName: 'inviteInvitedTeam'
+	}),
 	mappool: one(mappool, { fields: [matchInvite.mappoolId], references: [mappool.id] }),
 	match: one(match, { fields: [matchInvite.matchId], references: [match.id] })
 }));

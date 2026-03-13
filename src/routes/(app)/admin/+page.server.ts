@@ -102,13 +102,19 @@ export const actions: Actions = {
 
 		await db.delete(matchQueue);
 
-		return { success: true, message: `Cancelled ${cancelled.length} match${cancelled.length !== 1 ? 'es' : ''} and cleared queue` };
+		return {
+			success: true,
+			message: `Cancelled ${cancelled.length} match${cancelled.length !== 1 ? 'es' : ''} and cleared queue`
+		};
 	},
 
 	clearQueue: async ({ locals }) => {
 		requireRole(locals, 'admin');
 		const deleted = await db.delete(matchQueue).returning({ id: matchQueue.id });
-		return { success: true, message: `Removed ${deleted.length} queue entr${deleted.length !== 1 ? 'ies' : 'y'}` };
+		return {
+			success: true,
+			message: `Removed ${deleted.length} queue entr${deleted.length !== 1 ? 'ies' : 'y'}`
+		};
 	},
 
 	expireInvites: async ({ locals }) => {
@@ -118,13 +124,19 @@ export const actions: Actions = {
 			.set({ status: 'expired' })
 			.where(eq(matchInvite.status, 'pending'))
 			.returning({ id: matchInvite.id });
-		return { success: true, message: `Expired ${expired.length} pending invite${expired.length !== 1 ? 's' : ''}` };
+		return {
+			success: true,
+			message: `Expired ${expired.length} pending invite${expired.length !== 1 ? 's' : ''}`
+		};
 	},
 
 	clearNotifications: async ({ locals }) => {
 		requireRole(locals, 'admin');
 		const deleted = await db.delete(notification).returning({ id: notification.id });
-		return { success: true, message: `Cleared ${deleted.length} notification${deleted.length !== 1 ? 's' : ''}` };
+		return {
+			success: true,
+			message: `Cleared ${deleted.length} notification${deleted.length !== 1 ? 's' : ''}`
+		};
 	},
 
 	resetRatings: async ({ locals }) => {
@@ -161,7 +173,14 @@ export const actions: Actions = {
 			if (existing) {
 				await db
 					.update(playerRating)
-					.set({ elo, initialElo: elo, osuRankAtSeed: rank, wins: 0, losses: 0, updatedAt: new Date() })
+					.set({
+						elo,
+						initialElo: elo,
+						osuRankAtSeed: rank,
+						wins: 0,
+						losses: 0,
+						updatedAt: new Date()
+					})
 					.where(eq(playerRating.userId, u.id));
 			} else {
 				await db.insert(playerRating).values({
@@ -178,7 +197,10 @@ export const actions: Actions = {
 			updated++;
 		}
 
-		return { success: true, message: `Re-seeded ${updated} rating${updated !== 1 ? 's' : ''} from osu! ranks` };
+		return {
+			success: true,
+			message: `Re-seeded ${updated} rating${updated !== 1 ? 's' : ''} from osu! ranks`
+		};
 	},
 
 	clearMatchHistory: async ({ locals }) => {

@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	let showCreate = $state(false);
 	let showInvite = $state(false);
@@ -21,24 +21,28 @@
 	let opponentSearch = $state('');
 
 	// Load form data when create/invite modals open
-	$effect(async () => {
+	$effect(() => {
 		if ((showCreate || showInvite) && !formData && !formDataLoading) {
 			formDataLoading = true;
-			const formData_elem = new FormData();
-			const response = await fetch('?/loadCreateFormData', {
-				method: 'POST',
-				body: formData_elem
-			});
-			const result = await response.json();
-			if (result.data) {
-				formData = result.data;
-			}
-			formDataLoading = false;
+			(async () => {
+				const formData_elem = new FormData();
+				const response = await fetch('?/loadCreateFormData', {
+					method: 'POST',
+					body: formData_elem
+				});
+				const result = await response.json();
+				if (result.data) {
+					formData = result.data;
+				}
+				formDataLoading = false;
+			})();
 		}
 	});
 
 	const personalTeam = $derived((formData ?? data).userTeams?.find((t: any) => t.isPersonal));
-	const nonPersonalUserTeams = $derived((formData ?? data).userTeams?.filter((t: any) => !t.isPersonal) ?? []);
+	const nonPersonalUserTeams = $derived(
+		(formData ?? data).userTeams?.filter((t: any) => !t.isPersonal) ?? []
+	);
 	const hasMultipleTeams = $derived(nonPersonalUserTeams.length > 0);
 
 	// Auto-select personal team by default
@@ -48,8 +52,12 @@
 		}
 	});
 
-	const selectedCreatorTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId));
-	const selectedInvitedTeam = $derived((formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId));
+	const selectedCreatorTeam = $derived(
+		(formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId)
+	);
+	const selectedInvitedTeam = $derived(
+		(formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId)
+	);
 	const creatorIsPersonal = $derived(selectedCreatorTeam?.isPersonal ?? true);
 
 	const creatorMaxSize = $derived(selectedCreatorTeam?.memberCount ?? 1);
@@ -149,7 +157,7 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-700 tracking-tight">Matches</h1>
+			<h1 class="font-700 text-2xl tracking-tight">Matches</h1>
 			<p class="mt-1 text-sm text-text-secondary">
 				{data.matches.length} match{data.matches.length !== 1 ? 'es' : ''}
 				{#if liveMatches.length > 0}
@@ -160,18 +168,24 @@
 		<div class="flex gap-2">
 			{#if (formData ?? data).userTeams?.length > 0}
 				<button
-					onclick={() => { showInvite = !showInvite; if (showInvite) showCreate = false; }}
+					onclick={() => {
+						showInvite = !showInvite;
+						if (showInvite) showCreate = false;
+					}}
 					disabled={formDataLoading && showInvite}
-					class="rounded-md border border-accent/30 px-4 py-2 text-sm font-600 text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
+					class="font-600 rounded-md border border-accent/30 px-4 py-2 text-sm text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
 				>
 					{showInvite && formDataLoading ? 'Loading...' : showInvite ? 'Cancel' : 'Challenge'}
 				</button>
 			{/if}
 			{#if data.canCreateMatch}
 				<button
-					onclick={() => { showCreate = !showCreate; if (showCreate) showInvite = false; }}
+					onclick={() => {
+						showCreate = !showCreate;
+						if (showCreate) showInvite = false;
+					}}
 					disabled={formDataLoading && showCreate}
-					class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
+					class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 				>
 					{showCreate && formDataLoading ? 'Loading...' : showCreate ? 'Cancel' : 'New Match'}
 				</button>
@@ -199,7 +213,7 @@
 			}}
 			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
 		>
-			<h2 class="text-sm font-600">Create Match</h2>
+			<h2 class="font-600 text-sm">Create Match</h2>
 
 			{#if createError}
 				<p class="mt-2 text-sm text-red-400">{createError}</p>
@@ -207,7 +221,7 @@
 
 			<div class="mt-4 grid grid-cols-2 gap-4">
 				<div>
-					<label for="name" class="text-xs font-500 text-text-secondary">Match Name</label>
+					<label for="name" class="font-500 text-xs text-text-secondary">Match Name</label>
 					<input
 						type="text"
 						id="name"
@@ -218,7 +232,7 @@
 				</div>
 
 				<div>
-					<label for="bestOf" class="text-xs font-500 text-text-secondary">Best Of</label>
+					<label for="bestOf" class="font-500 text-xs text-text-secondary">Best Of</label>
 					<select
 						id="bestOf"
 						name="bestOf"
@@ -231,7 +245,7 @@
 				</div>
 
 				<div>
-					<label for="team1" class="text-xs font-500 text-text-secondary">Team 1</label>
+					<label for="team1" class="font-500 text-xs text-text-secondary">Team 1</label>
 					<select
 						id="team1"
 						name="team1"
@@ -239,14 +253,14 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each data.teams as t}
+						{#each formData?.teams as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
 				</div>
 
 				<div>
-					<label for="team2" class="text-xs font-500 text-text-secondary">Team 2</label>
+					<label for="team2" class="font-500 text-xs text-text-secondary">Team 2</label>
 					<select
 						id="team2"
 						name="team2"
@@ -254,14 +268,14 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each data.teams as t}
+						{#each formData?.teams as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
 				</div>
 
 				<div class="col-span-2">
-					<label for="mappool" class="text-xs font-500 text-text-secondary">Mappool</label>
+					<label for="mappool" class="font-500 text-xs text-text-secondary">Mappool</label>
 					<select
 						id="mappool"
 						name="mappool"
@@ -269,7 +283,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select mappool...</option>
-						{#each data.mappools as p}
+						{#each formData?.mappools as p}
 							<option value={p.id}>{p.name} ({p.slots.length} maps)</option>
 						{/each}
 					</select>
@@ -279,7 +293,7 @@
 			<div class="mt-4 flex justify-end">
 				<button
 					type="submit"
-					class="rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+					class="font-600 rounded-md bg-accent px-5 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover"
 				>
 					Create &amp; Start
 				</button>
@@ -296,12 +310,18 @@
 				inviteError = '';
 				inviteSuccess = false;
 				return async ({ result, update }) => {
-					if (result.type === 'failure' || (result.type === 'success' && (result.data as any)?.error)) {
+					if (
+						result.type === 'failure' ||
+						(result.type === 'success' && (result.data as any)?.error)
+					) {
 						inviteError = (result.data as any)?.error ?? 'Failed to send invite';
 					} else if (result.type === 'success' && (result.data as any)?.inviteSuccess) {
 						inviteSuccess = true;
 						await invalidateAll();
-						setTimeout(() => { showInvite = false; inviteSuccess = false; }, 2000);
+						setTimeout(() => {
+							showInvite = false;
+							inviteSuccess = false;
+						}, 2000);
 					} else {
 						await update();
 					}
@@ -309,7 +329,7 @@
 			}}
 			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
 		>
-			<h2 class="text-sm font-600">Challenge</h2>
+			<h2 class="font-600 text-sm">Challenge</h2>
 
 			{#if inviteError}
 				<p class="mt-2 text-sm text-red-400">{inviteError}</p>
@@ -326,8 +346,12 @@
 				<!-- Your Team (only shown if you have non-personal teams) -->
 				{#if hasMultipleTeams}
 					<div>
-						<label for="inv-myTeam" class="text-xs font-500 text-text-secondary">Your Team</label>
-						<select id="inv-myTeam" bind:value={selectedCreatorTeamId} class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+						<label for="inv-myTeam" class="font-500 text-xs text-text-secondary">Your Team</label>
+						<select
+							id="inv-myTeam"
+							bind:value={selectedCreatorTeamId}
+							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+						>
 							{#if personalTeam}
 								<option value={personalTeam.id}>{teamDisplayName(personalTeam)}</option>
 							{/if}
@@ -340,7 +364,9 @@
 
 				<!-- Opponent (searchable) -->
 				<div>
-					<label for="inv-opponent-search" class="text-xs font-500 text-text-secondary">Opponent</label>
+					<label for="inv-opponent-search" class="font-500 text-xs text-text-secondary"
+						>Opponent</label
+					>
 					<input
 						type="text"
 						id="inv-opponent-search"
@@ -350,17 +376,35 @@
 						autocomplete="off"
 					/>
 					{#if selectedInvitedTeam}
-						<div class="mt-1.5 flex items-center gap-2 rounded-md bg-accent/10 px-3 py-1.5 text-xs text-accent">
+						<div
+							class="mt-1.5 flex items-center gap-2 rounded-md bg-accent/10 px-3 py-1.5 text-xs text-accent"
+						>
 							<span class="font-600">{teamDisplayName(selectedInvitedTeam)}</span>
-							<span class="text-text-secondary">({selectedInvitedTeam.memberCount} player{selectedInvitedTeam.memberCount !== 1 ? 's' : ''})</span>
-							<button type="button" onclick={() => { selectedInvitedTeamId = ''; opponentSearch = ''; }} class="ml-auto text-text-secondary hover:text-red-400">&times;</button>
+							<span class="text-text-secondary"
+								>({selectedInvitedTeam.memberCount} player{selectedInvitedTeam.memberCount !== 1
+									? 's'
+									: ''})</span
+							>
+							<button
+								type="button"
+								onclick={() => {
+									selectedInvitedTeamId = '';
+									opponentSearch = '';
+								}}
+								class="ml-auto text-text-secondary hover:text-red-400">&times;</button
+							>
 						</div>
 					{:else if opponentSearch}
-						<div class="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-surface-700">
+						<div
+							class="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-surface-700"
+						>
 							{#each filteredOpponentTeams.slice(0, 20) as t}
 								<button
 									type="button"
-									onclick={() => { selectedInvitedTeamId = t.id; opponentSearch = ''; }}
+									onclick={() => {
+										selectedInvitedTeamId = t.id;
+										opponentSearch = '';
+									}}
 									class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-surface-600"
 								>
 									{#if t.avatarUrl}
@@ -380,14 +424,22 @@
 
 				<!-- Best Of -->
 				<div>
-					<span class="text-xs font-500 text-text-secondary">Best Of</span>
+					<span class="font-500 text-xs text-text-secondary">Best Of</span>
 					<div class="mt-1.5 flex flex-wrap gap-1.5">
 						{#each [3, 5, 7, 9, 11, 13] as n}
 							<button
 								type="button"
-								onclick={() => { bestOf = n; useCustomBo = false; customBestOf = ''; }}
-								class="rounded-md px-3 py-1.5 text-xs font-600 transition-colors {!useCustomBo && bestOf === n ? 'bg-accent text-surface-900' : 'border border-border bg-surface-700 text-text-secondary hover:border-accent/40 hover:text-text-primary'}"
-							>BO{n}</button>
+								onclick={() => {
+									bestOf = n;
+									useCustomBo = false;
+									customBestOf = '';
+								}}
+								class="font-600 rounded-md px-3 py-1.5 text-xs transition-colors {!useCustomBo &&
+								bestOf === n
+									? 'bg-accent text-surface-900'
+									: 'border border-border bg-surface-700 text-text-secondary hover:border-accent/40 hover:text-text-primary'}"
+								>BO{n}</button
+							>
 						{/each}
 						<input
 							type="number"
@@ -397,7 +449,9 @@
 							bind:value={customBestOf}
 							onfocus={() => (useCustomBo = true)}
 							oninput={() => (useCustomBo = true)}
-							class="w-20 rounded-md border {useCustomBo ? 'border-accent' : 'border-border'} bg-surface-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
+							class="w-20 rounded-md border {useCustomBo
+								? 'border-accent'
+								: 'border-border'} bg-surface-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
 						/>
 					</div>
 				</div>
@@ -406,8 +460,14 @@
 					<!-- Team sizes (only if creator is not personal team) -->
 					{#if !creatorIsPersonal && creatorMaxSize > 1}
 						<div>
-							<label for="inv-ts1" class="text-xs font-500 text-text-secondary">Your Team Size</label>
-							<select id="inv-ts1" name="teamSize1" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+							<label for="inv-ts1" class="font-500 text-xs text-text-secondary"
+								>Your Team Size</label
+							>
+							<select
+								id="inv-ts1"
+								name="teamSize1"
+								class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+							>
 								{#each Array.from({ length: creatorMaxSize }, (_, i) => i + 1) as n}
 									<option value={n} selected={n === creatorMaxSize}>{n}v</option>
 								{/each}
@@ -419,8 +479,14 @@
 
 					{#if selectedInvitedTeam && !selectedInvitedTeam.isPersonal && invitedMaxSize > 1}
 						<div>
-							<label for="inv-ts2" class="text-xs font-500 text-text-secondary">Opponent Team Size</label>
-							<select id="inv-ts2" name="teamSize2" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+							<label for="inv-ts2" class="font-500 text-xs text-text-secondary"
+								>Opponent Team Size</label
+							>
+							<select
+								id="inv-ts2"
+								name="teamSize2"
+								class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+							>
 								{#each Array.from({ length: invitedMaxSize }, (_, i) => i + 1) as n}
 									<option value={n} selected={n === invitedMaxSize}>v{n}</option>
 								{/each}
@@ -432,8 +498,12 @@
 
 					<!-- Scoring -->
 					<div>
-						<label for="inv-scoring" class="text-xs font-500 text-text-secondary">Scoring</label>
-						<select id="inv-scoring" name="scoringType" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+						<label for="inv-scoring" class="font-500 text-xs text-text-secondary">Scoring</label>
+						<select
+							id="inv-scoring"
+							name="scoringType"
+							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+						>
 							<option value="score_v2" selected>ScoreV2</option>
 							<option value="score">Score</option>
 							<option value="accuracy">Accuracy</option>
@@ -443,10 +513,15 @@
 
 					<!-- Mappool -->
 					<div>
-						<label for="inv-mappool" class="text-xs font-500 text-text-secondary">Mappool</label>
-						<select id="inv-mappool" name="mappool" required class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none">
+						<label for="inv-mappool" class="font-500 text-xs text-text-secondary">Mappool</label>
+						<select
+							id="inv-mappool"
+							name="mappool"
+							required
+							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+						>
 							<option value="">Select mappool...</option>
-							{#each data.mappools as p}
+							{#each formData?.mappools as p}
 								<option value={p.id}>{p.name} — {mappoolSummary(p)}</option>
 							{/each}
 						</select>
@@ -456,7 +531,12 @@
 				<!-- ELO toggle (default on) -->
 				<div class="flex items-center gap-3">
 					<label class="flex items-center gap-2 text-xs text-text-secondary">
-						<input type="checkbox" name="allowEloChange" checked class="rounded border-border bg-surface-700 text-accent focus:ring-accent" />
+						<input
+							type="checkbox"
+							name="allowEloChange"
+							checked
+							class="rounded border-border bg-surface-700 text-accent focus:ring-accent"
+						/>
 						Affects ELO
 					</label>
 				</div>
@@ -464,18 +544,37 @@
 				<!-- Message + Schedule -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label for="inv-message" class="text-xs font-500 text-text-secondary">Message (optional)</label>
-						<input type="text" id="inv-message" name="message" placeholder="e.g. ggs only" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none" />
+						<label for="inv-message" class="font-500 text-xs text-text-secondary"
+							>Message (optional)</label
+						>
+						<input
+							type="text"
+							id="inv-message"
+							name="message"
+							placeholder="e.g. ggs only"
+							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-none"
+						/>
 					</div>
 					<div>
-						<label for="inv-schedule" class="text-xs font-500 text-text-secondary">Schedule (optional)</label>
-						<input type="datetime-local" id="inv-schedule" name="scheduledAt" class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none" />
+						<label for="inv-schedule" class="font-500 text-xs text-text-secondary"
+							>Schedule (optional)</label
+						>
+						<input
+							type="datetime-local"
+							id="inv-schedule"
+							name="scheduledAt"
+							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
+						/>
 					</div>
 				</div>
 			</div>
 
 			<div class="mt-4 flex justify-end">
-				<button type="submit" disabled={!selectedInvitedTeamId} class="rounded-md bg-accent px-5 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-40">
+				<button
+					type="submit"
+					disabled={!selectedInvitedTeamId}
+					class="font-600 rounded-md bg-accent px-5 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-40"
+				>
 					Send Challenge
 				</button>
 			</div>
@@ -485,7 +584,7 @@
 	<!-- Live Matches -->
 	{#if liveMatches.length > 0}
 		<div class="mt-6">
-			<h2 class="flex items-center gap-2 text-sm font-600">
+			<h2 class="font-600 flex items-center gap-2 text-sm">
 				<div class="relative h-2 w-2">
 					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 					<div class="relative h-2 w-2 rounded-full bg-green-400"></div>
@@ -504,24 +603,24 @@
 							{#if p1?.team.avatarUrl}
 								<img src={p1.team.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
 							{/if}
-							<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
+							<span class="font-600 text-sm">{p1?.team.name ?? '?'}</span>
 						</div>
 
 						<div class="flex items-center gap-3">
-							<span class="text-xl font-800 tabular-nums">{p1?.score ?? 0}</span>
-							<span class="text-xs font-600 text-text-secondary">vs</span>
-							<span class="text-xl font-800 tabular-nums">{p2?.score ?? 0}</span>
+							<span class="font-800 text-xl tabular-nums">{p1?.score ?? 0}</span>
+							<span class="font-600 text-xs text-text-secondary">vs</span>
+							<span class="font-800 text-xl tabular-nums">{p2?.score ?? 0}</span>
 						</div>
 
 						<div class="flex flex-1 items-center justify-end gap-3">
-							<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
+							<span class="font-600 text-sm">{p2?.team.name ?? '?'}</span>
 							{#if p2?.team.avatarUrl}
 								<img src={p2.team.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
 							{/if}
 						</div>
 
 						<span
-							class="flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-500 {sc?.color ??
+							class="font-500 flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs {sc?.color ??
 								'border-border'}"
 						>
 							{#if sc?.dot}
@@ -538,7 +637,7 @@
 	<!-- All Matches -->
 	<div class="mt-6">
 		{#if liveMatches.length > 0}
-			<h2 class="text-sm font-600 text-text-secondary">Past Matches</h2>
+			<h2 class="font-600 text-sm text-text-secondary">Past Matches</h2>
 		{/if}
 		<div class="mt-3 flex flex-col gap-2">
 			{#each recentMatches as m}
@@ -552,40 +651,45 @@
 					<!-- Match info -->
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center gap-2">
-							<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
+							<span class="font-600 text-sm">{p1?.team.name ?? '?'}</span>
 							{#if m.state === 'FINISHED'}
 								<span
-									class="text-xs font-700 tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0)
+									class="font-700 text-xs tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0)
 										? 'text-green-400'
 										: 'text-text-secondary'}">{p1?.score ?? 0}</span
 								>
 								<span class="text-xs text-text-secondary">-</span>
 								<span
-									class="text-xs font-700 tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0)
+									class="font-700 text-xs tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0)
 										? 'text-green-400'
 										: 'text-text-secondary'}">{p2?.score ?? 0}</span
 								>
 							{:else}
 								<span class="text-xs text-text-secondary">vs</span>
 							{/if}
-							<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
+							<span class="font-600 text-sm">{p2?.team.name ?? '?'}</span>
 						</div>
-						<p class="mt-0.5 text-xs text-text-secondary">{m.name ? `${m.name} · ` : ''}BO{config.bestOf}{#if m.finishedAt} &middot; {timeAgo(m.finishedAt)}{:else if m.createdAt} &middot; {timeAgo(m.createdAt)}{/if}</p>
+						<p class="mt-0.5 text-xs text-text-secondary">
+							{m.name ? `${m.name} · ` : ''}BO{config.bestOf}{#if m.finishedAt}
+								&middot; {timeAgo(m.finishedAt)}{:else if m.createdAt}
+								&middot; {timeAgo(m.createdAt)}{/if}
+						</p>
 						{#if m.mappool}
-							<p class="text-xs text-text-secondary">{m.mappool.name}{#if avgSR(m.mappool)} ({avgSR(m.mappool)}★){/if}</p>
+							<p class="text-xs text-text-secondary">
+								{m.mappool.name}{#if avgSR(m.mappool)}
+									({avgSR(m.mappool)}★){/if}
+							</p>
 						{/if}
 					</div>
 
 					<!-- Winner indicator -->
 					{#if m.state === 'FINISHED' && m.winnerId}
 						{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
-						<span class="text-xs font-500 text-green-400">🏆 {winner?.team.name}</span>
+						<span class="font-500 text-xs text-green-400">🏆 {winner?.team.name}</span>
 					{/if}
 
 					<!-- State -->
-					<span
-						class="rounded border px-2 py-0.5 text-xs font-500 {sc?.color ?? 'border-border'}"
-					>
+					<span class="font-500 rounded border px-2 py-0.5 text-xs {sc?.color ?? 'border-border'}">
 						{sc?.label ?? m.state}
 					</span>
 				</a>

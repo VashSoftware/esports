@@ -42,9 +42,30 @@ const mappoolSlot = pgTable('mappool_slot', {
 // Sample beatmap IDs (real osu! maps)
 const SAMPLE_MAPS = [
 	{ id: '75', category: 'NM', title: 'Disco Prince', artist: 'Kenji Ninuma', sr: 2.5, bpm: 120 },
-	{ id: '163', category: 'NM', title: 'Crazy Noisy Bizarre Town', artist: 'The DU', sr: 3.2, bpm: 140 },
-	{ id: '250', category: 'HD', title: 'Sakura Kagetsu', artist: 'Mutsuhiko Izumi', sr: 4.1, bpm: 165 },
-	{ id: '306', category: 'HR', title: 'Airman ga Taosenai', artist: 'Team Nekokan', sr: 5.0, bpm: 200 },
+	{
+		id: '163',
+		category: 'NM',
+		title: 'Crazy Noisy Bizarre Town',
+		artist: 'The DU',
+		sr: 3.2,
+		bpm: 140
+	},
+	{
+		id: '250',
+		category: 'HD',
+		title: 'Sakura Kagetsu',
+		artist: 'Mutsuhiko Izumi',
+		sr: 4.1,
+		bpm: 165
+	},
+	{
+		id: '306',
+		category: 'HR',
+		title: 'Airman ga Taosenai',
+		artist: 'Team Nekokan',
+		sr: 5.0,
+		bpm: 200
+	},
 	{ id: '390', category: 'DT', title: 'Kira Kira Days', artist: 'MOSAIC.WAV', sr: 4.5, bpm: 175 },
 	{ id: '455', category: 'FM', title: 'FREEDOM DiVE', artist: 'xi', sr: 6.0, bpm: 222 },
 	{ id: '500', category: 'TB', title: 'Blue Zenith', artist: 'xi', sr: 6.5, bpm: 200 }
@@ -61,10 +82,13 @@ async function main() {
 	}
 
 	// Create a sample mappool
-	const [pool] = await db.insert(mappool).values({
-		name: 'Dev Test Pool',
-		verifiedAt: new Date()
-	}).returning();
+	const [pool] = await db
+		.insert(mappool)
+		.values({
+			name: 'Dev Test Pool',
+			verifiedAt: new Date()
+		})
+		.returning();
 
 	console.log(`Created mappool: ${pool.name} (${pool.id})`);
 
@@ -86,7 +110,9 @@ async function main() {
 		});
 	}
 
-	console.log(`  Added ${SAMPLE_MAPS.length} maps (${[...new Set(SAMPLE_MAPS.map((m) => m.category))].join(', ')})`);
+	console.log(
+		`  Added ${SAMPLE_MAPS.length} maps (${[...new Set(SAMPLE_MAPS.map((m) => m.category))].join(', ')})`
+	);
 	console.log('Done. Sign in via osu! OAuth to create a user and personal team.');
 	process.exit(0);
 }

@@ -2,7 +2,11 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { sql } from 'drizzle-orm';
-import { isBanchoConnected, isBanchoReconnecting, getActiveLobbyCount } from '$lib/server/bancho/client';
+import {
+	isBanchoConnected,
+	isBanchoReconnecting,
+	getActiveLobbyCount
+} from '$lib/server/bancho/client';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async () => {
