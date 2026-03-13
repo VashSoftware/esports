@@ -2,7 +2,8 @@ import { db } from '$lib/server/db';
 import { match, matchGame, matchParticipant, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
-import { getMatchFull, submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
+import { submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
+import { getMatchFull } from './helpers';
 import { env } from '$env/dynamic/private';
 
 // matchId → lowercase usernames of all expected players

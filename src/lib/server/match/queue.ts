@@ -3,6 +3,7 @@ import { match, matchQueue, matchParticipantPlayer, playerRating } from '$lib/se
 import { eq, asc, sql, inArray, lt } from 'drizzle-orm';
 import { MATCH_STATES } from './types';
 import { createMatch } from './engine';
+import { selectMappoolForRating } from './rating';
 
 const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -168,34 +169,4 @@ async function tryMatchFromQueue() {
 	}
 
 	return created;
-}
-
-async function selectMappoolForRating(avgElo: number) {
-	// Only use verified mappools
-	const pools = await db.query.mappool.findMany({
-		where: (m, { isNotNull }) => isNotNull(m.verifiedAt),
-		with: { slots: true }
-	});
-
-	if (pools.length === 0) return null;
-
-	// Map ELO range (0-3500) to star rating range (2-8)
-	const targetStars = 2 + avgElo / 700;
-	const clampedTarget = Math.max(2, Math.min(8, targetStars));
-
-	// Score each pool by distance from target
-	const scored = pools
-		.filter((p) => p.slots.length > 0)
-		.map((p) => {
-			const avgStars = p.slots.reduce((sum, s) => sum + (s.starRating ?? 0), 0) / p.slots.length;
-			return { pool: p, diff: Math.abs(avgStars - clampedTarget) };
-		})
-		.sort((a, b) => a.diff - b.diff);
-
-	if (scored.length === 0) return null;
-
-	// Allow any pool within 1 star of the closest match, then pick randomly
-	const threshold = scored[0].diff + 1.0;
-	const candidates = scored.filter((s) => s.diff <= threshold);
-	return candidates[Math.floor(Math.random() * candidates.length)].pool;
 }
