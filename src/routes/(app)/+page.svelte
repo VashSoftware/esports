@@ -366,10 +366,13 @@
 								</p>
 								{#if m.mappool}
 									<p class="text-xs text-text-secondary">
-										<a
-											href="/mappools/{m.mappool.id}"
-											onclick={(e) => e.stopPropagation()}
-											class="hover:text-accent hover:underline">{m.mappool.name}</a
+										<button
+											onclick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												window.location.href = `/mappools/${m.mappool!.id}`;
+											}}
+											class="hover:text-accent hover:underline">{m.mappool.name}</button
 										>{#if avgSR(m.mappool)}
 											({avgSR(m.mappool)}★){/if}
 									</p>
