@@ -14,10 +14,10 @@ ENV NODE_ENV=production
 ENV BETTER_AUTH_SECRET=build-placeholder
 RUN --mount=type=cache,target=/app/.svelte-kit bun run build
 
-# Runtime — prod deps only
+# Runtime — prod deps + drizzle-kit for migrations
 FROM base AS runtime
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production && bun add drizzle-kit drizzle-orm
 COPY --from=build /app/build build
 COPY drizzle.config.ts ./
 COPY src/lib/server/db/schema.ts src/lib/server/db/auth.schema.ts src/lib/server/db/
