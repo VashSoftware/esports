@@ -22,6 +22,8 @@ services:
       POSTGRES_DB: vash_staging
       POSTGRES_USER: vash_staging
       POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD}
+    env_file:
+      - .env.staging
     volumes:
       - pgdata-staging:/var/lib/postgresql/data
     ports:
