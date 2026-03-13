@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { startPolling, stopPolling } from '$lib/stores/queue.svelte';
 
-	let { children } = $props();
+	const { children } = $props();
 
 	const user = $derived(page.data?.user);
 	const activeMatch = $derived(page.data?.activeMatch);

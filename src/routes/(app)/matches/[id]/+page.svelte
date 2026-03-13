@@ -3,13 +3,13 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 
-	let { data } = $props();
+	const { data } = $props();
 
-	let m = $derived(data.match);
-	let lobbyStatus = $derived(data.lobbyStatus);
-	let playerNames = $derived(data.playerNames);
-	let p1 = $derived(m.participants[0]);
-	let p2 = $derived(m.participants[1]);
+	const m = $derived(data.match);
+	const lobbyStatus = $derived(data.lobbyStatus);
+	const playerNames = $derived(data.playerNames);
+	const p1 = $derived(m.participants[0]);
+	const p2 = $derived(m.participants[1]);
 
 	const config = $derived(m.config as { bestOf: number; teamSize: number; scoringType: string });
 	const winsNeeded = $derived(Math.ceil(config.bestOf / 2));

@@ -3,7 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 
-	let { data } = $props();
+	const { data } = $props();
 
 	const categories = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 
@@ -13,9 +13,9 @@
 	let searching = $state(false);
 
 	// Inline per-category add state
-	let inlineInputs = $state<Record<string, string>>({});
-	let inlineSearching = $state<Record<string, boolean>>({});
-	let inlineErrors = $state<Record<string, string>>({});
+	const inlineInputs = $state<Record<string, string>>({});
+	const inlineSearching = $state<Record<string, boolean>>({});
+	const inlineErrors = $state<Record<string, string>>({});
 
 	// Drag-and-drop state
 	let draggedSlot = $state<{ id: string; category: string; index: number } | null>(null);
@@ -30,7 +30,7 @@
 
 	// Rename state
 	let editing = $state(false);
-	let editName = $derived(data.pool.name);
+	const editName = $derived(data.pool.name);
 
 	// Check if pool has any maps at all
 	const hasAnySlots = $derived(data.pool.slots.length > 0);
