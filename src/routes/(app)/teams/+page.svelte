@@ -16,9 +16,15 @@
 		data.teams.filter((t: any) => t.members.some((m: any) => m.userId === data.userId))
 	);
 	const otherTeams = $derived(
-		data.teams.filter((t: any) => !t.isPersonal && !t.members.some((m: any) => m.userId === data.userId))
+		data.teams.filter(
+			(t: any) => !t.isPersonal && !t.members.some((m: any) => m.userId === data.userId)
+		)
 	);
-	const teamCount = $derived(data.teams.filter((t: any) => !t.isPersonal || t.members.some((m: any) => m.userId === data.userId)).length);
+	const teamCount = $derived(
+		data.teams.filter(
+			(t: any) => !t.isPersonal || t.members.some((m: any) => m.userId === data.userId)
+		).length
+	);
 
 	function isOwner(t: any) {
 		return t.ownerId === data.userId;
@@ -38,14 +44,14 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-700 tracking-tight">Teams</h1>
+			<h1 class="font-700 text-2xl tracking-tight">Teams</h1>
 			<p class="mt-1 text-sm text-text-secondary">
 				{teamCount} team{teamCount !== 1 ? 's' : ''}
 			</p>
 		</div>
 		<button
 			onclick={() => (creating = !creating)}
-			class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+			class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover"
 		>
 			{creating ? 'Cancel' : 'New Team'}
 		</button>
@@ -75,7 +81,7 @@
 			/>
 			<button
 				type="submit"
-				class="rounded-md bg-accent px-4 py-2 text-sm font-600 text-surface-900 transition-colors hover:bg-accent-hover"
+				class="font-600 rounded-md bg-accent px-4 py-2 text-sm text-surface-900 transition-colors hover:bg-accent-hover"
 			>
 				Create
 			</button>
@@ -89,7 +95,7 @@
 	<!-- My Teams -->
 	{#if myTeams.length > 0}
 		<div class="mt-6">
-			<h2 class="text-sm font-600 text-text-secondary">My Teams</h2>
+			<h2 class="font-600 text-sm text-text-secondary">My Teams</h2>
 			<div class="mt-3 flex flex-col gap-3">
 				{#each myTeams as t}
 					<div class="rounded-lg border border-border bg-surface-800 transition-colors">
@@ -102,17 +108,21 @@
 								<img src={t.avatarUrl} alt="" class="h-10 w-10 rounded-full" />
 							{:else}
 								<div
-									class="flex h-10 w-10 items-center justify-center rounded-full bg-surface-600 text-sm font-700 text-text-secondary"
+									class="font-700 flex h-10 w-10 items-center justify-center rounded-full bg-surface-600 text-sm text-text-secondary"
 								>
 									{t.name.charAt(0).toUpperCase()}
 								</div>
 							{/if}
 							<div class="flex-1">
 								<div class="flex items-center gap-2">
-									<a href="/teams/{t.id}" onclick={(e: MouseEvent) => e.stopPropagation()} class="text-sm font-600 hover:text-accent hover:underline">{t.name}</a>
+									<a
+										href="/teams/{t.id}"
+										onclick={(e: MouseEvent) => e.stopPropagation()}
+										class="font-600 text-sm hover:text-accent hover:underline">{t.name}</a
+									>
 									{#if t.isPersonal}
 										<span
-											class="rounded bg-surface-600 px-1.5 py-0.5 text-[10px] font-500 text-text-secondary"
+											class="font-500 rounded bg-surface-600 px-1.5 py-0.5 text-[10px] text-text-secondary"
 											>solo</span
 										>
 									{/if}
@@ -130,7 +140,7 @@
 
 						<!-- Expanded: members -->
 						{#if expandedTeam === t.id}
-							<div class="border-t border-border px-4 pb-4 pt-3">
+							<div class="border-t border-border px-4 pt-3 pb-4">
 								<!-- Rename team -->
 								{#if isOwner(t) && !t.isPersonal}
 									{#if renamingTeam === t.id}
@@ -143,10 +153,7 @@
 													if (result.type === 'success' && (result.data as any)?.success) {
 														renamingTeam = null;
 														await update();
-													} else if (
-														result.type === 'success' &&
-														(result.data as any)?.error
-													) {
+													} else if (result.type === 'success' && (result.data as any)?.error) {
 														actionError = (result.data as any).error;
 													}
 												};
@@ -163,7 +170,7 @@
 											/>
 											<button
 												type="submit"
-												class="rounded-md bg-accent px-3 py-1.5 text-xs font-600 text-surface-900 hover:bg-accent-hover"
+												class="font-600 rounded-md bg-accent px-3 py-1.5 text-xs text-surface-900 hover:bg-accent-hover"
 												>Save</button
 											>
 											<button
@@ -232,10 +239,7 @@
 														memberUsername = '';
 														addingMemberTo = null;
 														await update();
-													} else if (
-														result.type === 'success' &&
-														(result.data as any)?.error
-													) {
+													} else if (result.type === 'success' && (result.data as any)?.error) {
 														actionError = (result.data as any).error;
 													}
 												};
@@ -253,7 +257,7 @@
 											/>
 											<button
 												type="submit"
-												class="rounded-md bg-accent px-3 py-1.5 text-xs font-600 text-surface-900 hover:bg-accent-hover"
+												class="font-600 rounded-md bg-accent px-3 py-1.5 text-xs text-surface-900 hover:bg-accent-hover"
 												>Add</button
 											>
 											<button
@@ -299,21 +303,24 @@
 	<!-- Other Teams -->
 	{#if otherTeams.length > 0}
 		<div class="mt-6">
-			<h2 class="text-sm font-600 text-text-secondary">Other Teams</h2>
+			<h2 class="font-600 text-sm text-text-secondary">Other Teams</h2>
 			<div class="mt-3 flex flex-col gap-2">
 				{#each otherTeams as t}
-					<a href="/teams/{t.id}" class="flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/30 hover:bg-surface-700">
+					<a
+						href="/teams/{t.id}"
+						class="flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/30 hover:bg-surface-700"
+					>
 						{#if t.avatarUrl}
 							<img src={t.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
 						{:else}
 							<div
-								class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs font-700 text-text-secondary"
+								class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
 							>
 								{t.name.charAt(0).toUpperCase()}
 							</div>
 						{/if}
 						<div class="flex-1">
-							<span class="text-sm font-600">{t.name}</span>
+							<span class="font-600 text-sm">{t.name}</span>
 							<p class="text-xs text-text-secondary">
 								{t.members.length} member{t.members.length !== 1 ? 's' : ''}
 							</p>

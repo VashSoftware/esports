@@ -6,7 +6,9 @@ import { getUser } from '$lib/server/osu/api';
 
 // ── Initial Rating ──────────────────────────────────────────────────────
 
-export async function calculateInitialElo(userId: string): Promise<{ elo: number; osuRank: number | null }> {
+export async function calculateInitialElo(
+	userId: string
+): Promise<{ elo: number; osuRank: number | null }> {
 	const osuAccount = await db.query.account.findFirst({
 		where: and(eq(account.userId, userId), eq(account.providerId, 'osu'))
 	});

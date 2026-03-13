@@ -20,7 +20,8 @@ export async function createInvite(opts: {
 	message?: string;
 	scheduledAt?: Date | null;
 }) {
-	const { createdBy, creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } = opts;
+	const { createdBy, creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } =
+		opts;
 
 	if (creatorTeamId === invitedTeamId && !dev) {
 		throw new Error('Cannot invite your own team');

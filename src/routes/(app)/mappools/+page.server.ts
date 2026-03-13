@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const mappools = await db.query.mappool.findMany({ with: { slots: true } });
 
-	const avgSR = (m: typeof mappools[0]) =>
+	const avgSR = (m: (typeof mappools)[0]) =>
 		m.slots.length ? m.slots.reduce((s, sl) => s + (sl.starRating ?? 0), 0) / m.slots.length : 0;
 
 	mappools.sort((a, b) => avgSR(b) - avgSR(a));

@@ -87,10 +87,7 @@ export async function moveToRolling(matchId: string) {
 	const m = await getMatchOrThrow(matchId);
 	assertState(m.state, MATCH_STATES.LOBBY);
 
-	await db
-		.update(match)
-		.set({ state: MATCH_STATES.ROLLING })
-		.where(eq(match.id, matchId));
+	await db.update(match).set({ state: MATCH_STATES.ROLLING }).where(eq(match.id, matchId));
 
 	return getMatchFull(matchId);
 }
@@ -110,8 +107,8 @@ export async function submitRoll(matchId: string, participantId: string, value: 
 		where: eq(matchParticipant.matchId, matchId)
 	});
 
-	const allRolled = participants.every(
-		(p) => (p.id === participantId ? true : p.rollValue !== null)
+	const allRolled = participants.every((p) =>
+		p.id === participantId ? true : p.rollValue !== null
 	);
 
 	if (allRolled) {
@@ -142,10 +139,7 @@ export async function submitRoll(matchId: string, participantId: string, value: 
 					.where(eq(matchParticipant.id, sorted[i].id));
 			}
 
-			await db
-				.update(match)
-				.set({ state: MATCH_STATES.PICKING })
-				.where(eq(match.id, matchId));
+			await db.update(match).set({ state: MATCH_STATES.PICKING }).where(eq(match.id, matchId));
 		}
 	}
 
@@ -206,10 +200,7 @@ export async function pickMap(matchId: string, participantId: string, mappoolSlo
 		})
 		.returning();
 
-	await db
-		.update(match)
-		.set({ state: MATCH_STATES.PLAYING })
-		.where(eq(match.id, matchId));
+	await db.update(match).set({ state: MATCH_STATES.PLAYING }).where(eq(match.id, matchId));
 
 	return game;
 }
@@ -324,10 +315,7 @@ export async function submitGameScores(
 		const finishedMatch = await getMatchFull(game.matchId);
 		notifyMatchFinished(finishedMatch).catch(() => {});
 	} else {
-		await db
-			.update(match)
-			.set({ state: MATCH_STATES.PICKING })
-			.where(eq(match.id, game.matchId));
+		await db.update(match).set({ state: MATCH_STATES.PICKING }).where(eq(match.id, game.matchId));
 	}
 
 	return getMatchFull(game.matchId);

@@ -26,15 +26,20 @@
 		{#if t.avatarUrl}
 			<img src={t.avatarUrl} alt="" class="h-14 w-14 rounded-full" />
 		{:else}
-			<div class="flex h-14 w-14 items-center justify-center rounded-full bg-surface-600 text-lg font-700 text-text-secondary">
+			<div
+				class="font-700 flex h-14 w-14 items-center justify-center rounded-full bg-surface-600 text-lg text-text-secondary"
+			>
 				{t.name.charAt(0).toUpperCase()}
 			</div>
 		{/if}
 		<div>
 			<div class="flex items-center gap-2">
-				<h1 class="text-2xl font-700 tracking-tight">{t.name}</h1>
+				<h1 class="font-700 text-2xl tracking-tight">{t.name}</h1>
 				{#if t.isPersonal}
-					<span class="rounded bg-surface-600 px-1.5 py-0.5 text-[10px] font-500 text-text-secondary">solo</span>
+					<span
+						class="font-500 rounded bg-surface-600 px-1.5 py-0.5 text-[10px] text-text-secondary"
+						>solo</span
+					>
 				{/if}
 			</div>
 			<p class="mt-0.5 text-sm text-text-secondary">
@@ -46,16 +51,18 @@
 
 	<!-- Players -->
 	<div class="mt-6">
-		<h2 class="text-sm font-600 text-text-secondary">Players</h2>
+		<h2 class="font-600 text-sm text-text-secondary">Players</h2>
 		<div class="mt-3 flex flex-col gap-2">
 			{#each t.members as member}
-				<div class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 px-4 py-3">
+				<div
+					class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 px-4 py-3"
+				>
 					{#if member.user?.image}
 						<img src={member.user.image} alt="" class="h-8 w-8 rounded-full" />
 					{:else}
 						<div class="h-8 w-8 rounded-full bg-surface-600"></div>
 					{/if}
-					<span class="flex-1 text-sm font-600">{member.user?.name ?? 'Unknown'}</span>
+					<span class="font-600 flex-1 text-sm">{member.user?.name ?? 'Unknown'}</span>
 					<span class="text-xs text-text-secondary">{member.role}</span>
 				</div>
 			{/each}
@@ -65,7 +72,7 @@
 	<!-- Recent Matches -->
 	{#if data.recentMatches.length > 0}
 		<div class="mt-6">
-			<h2 class="text-sm font-600 text-text-secondary">Recent Matches</h2>
+			<h2 class="font-600 text-sm text-text-secondary">Recent Matches</h2>
 			<div class="mt-3 flex flex-col gap-2">
 				{#each data.recentMatches as m}
 					{@const p1 = m.participants[0]}
@@ -75,16 +82,26 @@
 						href="/matches/{m.id}"
 						class="flex items-center gap-3 rounded-lg border border-border bg-surface-800 px-4 py-3 transition-colors hover:border-accent/30 hover:bg-surface-700"
 					>
-						<span class="text-sm font-600">{p1?.team.name ?? '?'}</span>
+						<span class="font-600 text-sm">{p1?.team.name ?? '?'}</span>
 						{#if m.state === 'FINISHED'}
-							<span class="text-xs font-700 tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p1?.score ?? 0}</span>
+							<span
+								class="font-700 text-xs tabular-nums {(p1?.score ?? 0) > (p2?.score ?? 0)
+									? 'text-green-400'
+									: 'text-text-secondary'}">{p1?.score ?? 0}</span
+							>
 							<span class="text-xs text-text-secondary">-</span>
-							<span class="text-xs font-700 tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0) ? 'text-green-400' : 'text-text-secondary'}">{p2?.score ?? 0}</span>
+							<span
+								class="font-700 text-xs tabular-nums {(p2?.score ?? 0) > (p1?.score ?? 0)
+									? 'text-green-400'
+									: 'text-text-secondary'}">{p2?.score ?? 0}</span
+							>
 						{:else}
 							<span class="text-xs text-text-secondary">vs</span>
 						{/if}
-						<span class="text-sm font-600">{p2?.team.name ?? '?'}</span>
-						<span class="ml-auto text-xs {won ? 'font-600 text-green-400' : 'text-red-400'}">{won ? 'W' : 'L'}</span>
+						<span class="font-600 text-sm">{p2?.team.name ?? '?'}</span>
+						<span class="ml-auto text-xs {won ? 'font-600 text-green-400' : 'text-red-400'}"
+							>{won ? 'W' : 'L'}</span
+						>
 						<span class="text-xs text-text-secondary/50">{timeAgo(m.createdAt)}</span>
 					</a>
 				{/each}

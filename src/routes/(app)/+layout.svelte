@@ -49,11 +49,7 @@
 						stroke="currentColor"
 						stroke-width="2"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M4 6h16M4 12h16M4 18h16"
-						/>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
 					</svg>
 				</button>
 				<div class="lg:flex-1"></div>
@@ -79,7 +75,7 @@
 					</div>
 					<a
 						href="/matches/{activeMatch.id}"
-						class="rounded-md border border-yellow-500/40 px-3 py-1 text-xs font-600 text-yellow-300 transition-colors hover:bg-yellow-500/20"
+						class="font-600 rounded-md border border-yellow-500/40 px-3 py-1 text-xs text-yellow-300 transition-colors hover:bg-yellow-500/20"
 					>
 						Go to match &rarr;
 					</a>

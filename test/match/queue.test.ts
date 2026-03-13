@@ -6,7 +6,7 @@ const mocks = {
 		query: {
 			matchParticipantPlayer: { findMany: mock() },
 			playerRating: { findFirst: mock() },
-            matchQueue: { findFirst: mock() }
+			matchQueue: { findFirst: mock() }
 		},
 		delete: mock()
 	}
@@ -64,7 +64,9 @@ describe('joinQueue', () => {
 			}
 		]);
 
-		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow('You are already in an active match');
+		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow(
+			'You are already in an active match'
+		);
 		expect(mocks.db.query.playerRating.findFirst).not.toHaveBeenCalled();
 	});
 
@@ -81,15 +83,15 @@ describe('joinQueue', () => {
 		);
 	});
 
-    test('throws when user is already in queue', async() => {
-        mocks.db.delete.mockReturnValue({
-            where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
-        });
+	test('throws when user is already in queue', async () => {
+		mocks.db.delete.mockReturnValue({
+			where: mock(() => ({ returning: mock(() => Promise.resolve([])) }))
+		});
 
-        mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
-        mocks.db.query.playerRating.findFirst.mockResolvedValue({ elo: 1500 });
-        mocks.db.query.matchQueue.findFirst.mockResolvedValue({ userId: 'user-1', teamId: 'team-1' });
+		mocks.db.query.matchParticipantPlayer.findMany.mockResolvedValue([]);
+		mocks.db.query.playerRating.findFirst.mockResolvedValue({ elo: 1500 });
+		mocks.db.query.matchQueue.findFirst.mockResolvedValue({ userId: 'user-1', teamId: 'team-1' });
 
-        await expect(joinQueue('user-1', 'team-1')).rejects.toThrow('Already in queue');
-    });
+		await expect(joinQueue('user-1', 'team-1')).rejects.toThrow('Already in queue');
+	});
 });
