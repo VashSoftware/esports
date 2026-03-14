@@ -29,7 +29,7 @@ jobs:
               git reset --hard origin/prod
 
               docker compose build
-              docker compose up -d
+              docker compose up -d --wait
               docker compose exec app bunx drizzle-kit push --force
             else
               cd /opt/esports-staging
@@ -38,6 +38,6 @@ jobs:
               git reset --hard origin/staging
 
               docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging build
-              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging up -d
+              docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging up -d --wait
               docker compose -f docker-compose.staging.yml --env-file .env.staging -p esports-staging exec staging-app bunx drizzle-kit push --force
             fi

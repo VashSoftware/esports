@@ -17,11 +17,11 @@ export default defineConfig({
 		devtoolsJson()
 	],
 	ssr: {
-		external: ['bun', 'pino', 'pino-pretty']
+		external: ['bun', 'pino', 'pino-pretty', '@sentry/sveltekit', '@sentry/node']
 	},
 	build: {
 		rollupOptions: {
-			external: ['bun', 'pino', 'pino-pretty']
+			external: ['bun', 'pino', 'pino-pretty', '@sentry/sveltekit', '@sentry/node']
 		},
 		reportCompressedSize: false
 	},
