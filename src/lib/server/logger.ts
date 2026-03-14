@@ -4,32 +4,14 @@ import { building } from '$app/environment';
 
 const isProduction = !building && process.env.NODE_ENV === 'production';
 
-const transport = building
-	? undefined
-	: isProduction
-		? pino.transport({
-				targets: [
-					{ target: 'pino/file', options: { destination: 1 } },
-					{
-						target: 'pino/file',
-						options: { destination: '/var/log/app/app.log', mkdir: true }
-					}
-				]
-			})
-		: pino.transport({
-				target: 'pino-pretty',
-				options: { colorize: true, translateTime: 'HH:MM:ss' }
-			});
-
-export const logger = pino(
-	{
-		level: isProduction ? 'info' : 'debug',
-		base: { service: 'vash-esports' },
-		serializers: pino.stdSerializers,
-		redact: ['req.headers.authorization', 'req.headers.cookie']
-	},
-	transport
-);
+// Production: JSON to stdout (Docker captures logs via log driver)
+// Dev: pipe through pino-pretty (`bun run dev | bunx pino-pretty`)
+export const logger = pino({
+	level: isProduction ? 'info' : 'debug',
+	base: { service: 'vash-esports' },
+	serializers: pino.stdSerializers,
+	redact: ['req.headers.authorization', 'req.headers.cookie']
+});
 
 // Child loggers per subsystem — maps to existing [Tag] prefixes
 export const log = {

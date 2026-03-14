@@ -37,11 +37,11 @@ export default defineConfig({
 		devtoolsJson()
 	],
 	ssr: {
-		external: ['bun', 'pino', 'pino-pretty']
+		external: ['bun']
 	},
 	build: {
 		rollupOptions: {
-			external: ['bun', 'pino', 'pino-pretty']
+			external: ['bun']
 		},
 		reportCompressedSize: false
 	},
