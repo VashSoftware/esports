@@ -3,6 +3,16 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
 import * as Sentry from '@sentry/sveltekit';
+
+if (!building) {
+	Sentry.init({
+		dsn: process.env.PUBLIC_SENTRY_DSN,
+		tracesSampleRate: 0.2,
+		environment: process.env.NODE_ENV ?? 'development',
+		sendDefaultPii: true
+	});
+}
+
 import { auth } from '$lib/server/auth';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { db } from '$lib/server/db';
