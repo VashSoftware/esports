@@ -6,6 +6,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
 import { proxyImage } from '$lib/server/storage/r2';
 import { requireAuth } from '$lib/server/permissions';
+import { categoryToMods, isValidCategory, MOD_REGEX } from '$lib/mods';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -163,7 +164,7 @@ export const actions: Actions = {
 			starRating: beatmap.difficulty_rating,
 			bpm: beatmap.bpm,
 			totalLength: beatmap.total_length,
-			mods: category === 'NM' || category === 'TB' ? [] : [category],
+			mods: categoryToMods(category),
 			// Cached metadata — all R2 URLs
 			title: beatmap.beatmapset.title,
 			artist: beatmap.beatmapset.artist,
@@ -242,7 +243,7 @@ export const actions: Actions = {
 		newTargetOrder.splice(clampedIndex, 0, slot);
 
 		// Update the moved slot's category and mods
-		const newMods = targetCategory === 'NM' || targetCategory === 'TB' ? [] : [targetCategory];
+		const newMods = categoryToMods(targetCategory);
 		await db
 			.update(mappoolSlot)
 			.set({ category: targetCategory, mods: newMods })
@@ -285,7 +286,6 @@ export const actions: Actions = {
 			.split(/\n/)
 			.map((l) => l.trim())
 			.filter(Boolean);
-		const validMods = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
 		const errors: string[] = [];
 		let successCount = 0;
 
@@ -298,14 +298,13 @@ export const actions: Actions = {
 			}
 
 			// Detect column order: mod+id or id+mod
-			const modRegex = /^(NM|HD|HR|DT|FM|TB)\d*$/i;
 			let modCode: string;
 			let beatmapRaw: string;
 
-			if (modRegex.test(parts[0])) {
+			if (MOD_REGEX.test(parts[0])) {
 				modCode = parts[0];
 				beatmapRaw = parts[1];
-			} else if (modRegex.test(parts[parts.length - 1])) {
+			} else if (MOD_REGEX.test(parts[parts.length - 1])) {
 				modCode = parts[parts.length - 1];
 				beatmapRaw = parts[0];
 			} else {
@@ -313,7 +312,7 @@ export const actions: Actions = {
 				continue;
 			}
 
-			const modMatch = modCode.match(modRegex)!;
+			const modMatch = modCode.match(MOD_REGEX)!;
 			const category = modMatch[1].toUpperCase();
 
 			let beatmapId = beatmapRaw;
@@ -358,7 +357,7 @@ export const actions: Actions = {
 				starRating: beatmap.difficulty_rating,
 				bpm: beatmap.bpm,
 				totalLength: beatmap.total_length,
-				mods: category === 'NM' || category === 'TB' ? [] : [category],
+				mods: categoryToMods(category),
 				title: beatmap.beatmapset.title,
 				artist: beatmap.beatmapset.artist,
 				version: beatmap.version,

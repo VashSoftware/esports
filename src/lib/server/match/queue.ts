@@ -10,6 +10,7 @@ import {
 import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { MATCH_STATES } from './types';
 import { createMatch } from './engine';
+import { findClosestPair, getAverageMappoolSR as getAvgSR } from './queue-math';
 
 const QUEUE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -128,17 +129,7 @@ async function tryMatchFromQueue() {
 	if (queue.length < 2) return null;
 
 	// Find closest ELO pair
-	let bestPair: [(typeof queue)[0], (typeof queue)[0]] | null = null;
-	let smallestGap = Infinity;
-
-	for (let i = 0; i < queue.length - 1; i++) {
-		const gap = Math.abs(queue[i].elo - queue[i + 1].elo);
-		if (gap < smallestGap) {
-			smallestGap = gap;
-			bestPair = [queue[i], queue[i + 1]];
-		}
-	}
-
+	const bestPair = findClosestPair(queue);
 	if (!bestPair) return null;
 
 	// Pick mappool based on average player rating
@@ -187,21 +178,12 @@ async function selectMappoolForRating(avgElo: number) {
 
 	let bestPool = pools[0];
 	for (const pool of pools) {
-		const avgSR = getAverageMappoolSR(pool);
+		const avgSR = getAvgSR(pool.slots);
 		const diff = Math.abs(avgSR - targetStars);
-		if (diff < Math.abs(getAverageMappoolSR(bestPool) - targetStars)) {
+		if (diff < Math.abs(getAvgSR(bestPool.slots) - targetStars)) {
 			bestPool = pool;
 		}
 	}
 
 	return bestPool;
-}
-
-function getAverageMappoolSR(pool: { slots: { starRating: number | null }[] }): number {
-	return (
-		pool.slots.reduce(
-			(acc: number, slot: { starRating: number | null }) => acc + (slot.starRating ?? 0),
-			0
-		) / pool.slots.length
-	);
 }

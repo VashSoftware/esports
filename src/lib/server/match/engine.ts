@@ -13,6 +13,14 @@ import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { notifyMatchCreated, notifyMatchFinished } from '$lib/server/discord/client';
 import { updateElo } from './rating';
 import { getExpectedPicker, getMatchOrThrow, assertState, getMatchFull } from './helpers';
+import {
+	validateTiebreakerPick,
+	determineGameWinner,
+	hasRollTie,
+	assignPickOrder,
+	winsNeeded as calcWinsNeeded
+} from './engine-logic';
+import { getScoreMultiplier } from '$lib/mods';
 
 export { getMatchFull, getMatchOrThrow };
 
@@ -118,9 +126,8 @@ export async function submitRoll(matchId: string, participantId: string, value: 
 		}));
 
 		const rollValues = finalRolls.map((p) => p.rollValue);
-		const hasTie = new Set(rollValues).size < rollValues.length;
 
-		if (hasTie) {
+		if (hasRollTie(rollValues)) {
 			// Reset all rolls so everyone must roll again
 			for (const p of participants) {
 				await db
@@ -130,13 +137,13 @@ export async function submitRoll(matchId: string, participantId: string, value: 
 			}
 			// Stay in ROLLING state
 		} else {
-			const sorted = [...finalRolls].sort((a, b) => b.rollValue - a.rollValue);
+			const order = assignPickOrder(finalRolls);
 
-			for (let i = 0; i < sorted.length; i++) {
+			for (const { participantId, pickOrder } of order) {
 				await db
 					.update(matchParticipant)
-					.set({ pickOrder: i + 1 })
-					.where(eq(matchParticipant.id, sorted[i].id));
+					.set({ pickOrder })
+					.where(eq(matchParticipant.id, participantId));
 			}
 
 			await db.update(match).set({ state: MATCH_STATES.PICKING }).where(eq(match.id, matchId));
@@ -172,20 +179,16 @@ export async function pickMap(matchId: string, participantId: string, mappoolSlo
 
 	// ── Tiebreaker restrictions ──
 	const config = m.config as MatchConfig;
-	const winsNeeded = Math.ceil(config.bestOf / 2);
-	const allAtMatchPoint = participants.every((p) => p.score === winsNeeded - 1);
+	const needed = calcWinsNeeded(config.bestOf);
+	const allAtMatchPoint = participants.every((p) => p.score === needed - 1);
 
 	const slot = await db.query.mappoolSlot.findFirst({
 		where: eq(mappoolSlot.id, mappoolSlotId)
 	});
 
 	if (slot) {
-		if (slot.category === 'TB' && !allAtMatchPoint) {
-			throw new Error('Tiebreaker can only be picked at match point');
-		}
-		if (allAtMatchPoint && slot.category !== 'TB') {
-			throw new Error('Only tiebreaker maps can be picked at match point');
-		}
+		const tbError = validateTiebreakerPick(slot.category, allAtMatchPoint);
+		if (tbError) throw new Error(tbError);
 	}
 
 	const [game] = await db
@@ -224,17 +227,22 @@ export async function submitGameScores(
 	}[]
 ) {
 	const game = await db.query.matchGame.findFirst({
-		where: eq(matchGame.id, matchGameId)
+		where: eq(matchGame.id, matchGameId),
+		with: { slot: true }
 	});
 
 	if (!game) throw new Error('Game not found');
 	if (game.state !== GAME_STATES.PLAYING) throw new Error(`Game is ${game.state}, not PLAYING`);
 
+	// Apply score multiplier based on slot mods (e.g. EZ → 2x)
+	const slotMods = game.slot?.mods ?? [];
+	const multiplier = getScoreMultiplier(slotMods);
+
 	for (const s of scores) {
 		await db.insert(matchGameScore).values({
 			matchGameId,
 			playerId: s.playerId,
-			score: s.score,
+			score: multiplier !== 1 ? Math.round(s.score * multiplier) : s.score,
 			accuracy: s.accuracy ?? 0,
 			maxCombo: s.maxCombo ?? 0,
 			count300: s.count300 ?? 0,
@@ -258,14 +266,7 @@ export async function submitGameScores(
 		participantScores.set(pid, (participantScores.get(pid) ?? 0) + s.score);
 	}
 
-	let winnerId: string | null = null;
-	let highScore = -1;
-	for (const [pid, total] of participantScores) {
-		if (total > highScore) {
-			highScore = total;
-			winnerId = pid;
-		}
-	}
+	const winnerId = determineGameWinner(participantScores);
 
 	await db
 		.update(matchGame)
@@ -290,13 +291,13 @@ export async function submitGameScores(
 
 	const m = await getMatchOrThrow(game.matchId);
 	const config = m.config as MatchConfig;
-	const winsNeeded = Math.ceil(config.bestOf / 2);
+	const needed = calcWinsNeeded(config.bestOf);
 
 	const participants = await db.query.matchParticipant.findMany({
 		where: eq(matchParticipant.matchId, game.matchId)
 	});
 
-	const matchWinner = participants.find((p) => p.score >= winsNeeded);
+	const matchWinner = participants.find((p) => p.score >= needed);
 
 	if (matchWinner) {
 		await db

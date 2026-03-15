@@ -103,7 +103,10 @@ async function main() {
 			starRating: m.sr,
 			bpm: m.bpm,
 			totalLength: 120,
-			mods: m.category === 'NM' || m.category === 'TB' ? [] : [m.category],
+			mods:
+				m.category === 'NM' || m.category === 'TB'
+					? []
+					: (m.category.match(/.{2}/g)?.filter((c) => c !== 'NM' && c !== 'TB') ?? [m.category]),
 			title: m.title,
 			artist: m.artist,
 			version: 'Normal'
