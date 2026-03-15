@@ -85,6 +85,18 @@ services:
       retries: 5
       start_period: 30s
 
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080' # Proxy via nginx at e.g. logs.vash.software
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_AUTH_PROVIDER: simple
+      DOZZLE_USERNAME: ${DOZZLE_USERNAME:-admin}
+      DOZZLE_PASSWORD: ${DOZZLE_PASSWORD}
+
 volumes:
   pgdata:
   umamidata:
