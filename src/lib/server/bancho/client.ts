@@ -358,7 +358,7 @@ export class TournamentLobby {
 
 	private parsePlayerMessage(sender: string, text: string) {
 		// !pick NM1, !pick HD2, etc.
-		const pickMatch = text.match(/^!pick\s+([A-Z]{2})(\d*)/i);
+		const pickMatch = text.match(/^!pick\s+([A-Z]{2,})(\d*)/i);
 		if (pickMatch) {
 			const category = pickMatch[1].toUpperCase();
 			const num = pickMatch[2] ? parseInt(pickMatch[2]) : 1;

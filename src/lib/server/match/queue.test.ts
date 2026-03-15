@@ -43,6 +43,11 @@ vi.mock('$lib/server/match/engine', () => ({
 	createMatch: vi.fn()
 }));
 
+vi.mock('./queue-math', async () => {
+	const actual = await vi.importActual<typeof import('./queue-math')>('./queue-math');
+	return { ...actual };
+});
+
 const { joinQueue } = await import('./queue');
 
 function mockFindRecentActiveMatchRows(rows: Array<{ id: string }>) {

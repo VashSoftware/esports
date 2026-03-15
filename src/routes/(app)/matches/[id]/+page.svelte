@@ -43,16 +43,9 @@
 	// Can picks actually be made right now?
 	const pickingPhase = $derived(m.state === 'PICKING');
 
-	const catColors: Record<string, string> = {
-		NM: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		HD: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-		HR: 'bg-red-500/20 text-red-400 border-red-500/30',
-		DT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-		FM: 'bg-green-500/20 text-green-400 border-green-500/30',
-		TB: 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-	};
+	import { CATEGORY_COLORS, categorySort } from '$lib/mods';
 
-	const MOD_ORDER = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
+	const catColors = CATEGORY_COLORS;
 
 	// Group mappool slots by category
 	type MappoolSlot = {
@@ -72,10 +65,9 @@
 		for (const cat of Object.keys(groups)) {
 			groups[cat].sort((a, b) => a.orderInCategory - b.orderInCategory);
 		}
-		// Return entries sorted by canonical mod order
-		return Object.fromEntries(
-			MOD_ORDER.filter((cat) => groups[cat]).map((cat) => [cat, groups[cat]])
-		);
+		// Return entries sorted by canonical mod order (supports compound categories)
+		const sortedKeys = Object.keys(groups).sort((a, b) => categorySort(a) - categorySort(b));
+		return Object.fromEntries(sortedKeys.map((cat) => [cat, groups[cat]]));
 	});
 
 	// Match duration

@@ -487,9 +487,9 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				return;
 			}
 
-			const labelMatch = slotLabel.match(/^([A-Z]{2})(\d+)$/);
+			const labelMatch = slotLabel.match(/^([A-Z]{2,})(\d+)$/);
 			if (!labelMatch) {
-				await lobby.chat(`${username}: Invalid slot. Use format like NM1, HD2, DT1.`);
+				await lobby.chat(`${username}: Invalid slot. Use format like NM1, HD2, HDHR1, RX1.`);
 				return;
 			}
 			const category = labelMatch[1];
@@ -596,8 +596,9 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 	await lobby.setMap(slot.beatmapId);
 	await sleep(1000);
 
-	// Set mods — FM category always uses Freemod regardless of stored mods array
-	await lobby.setMods(slot.category === 'FM' ? ['FM'] : slot.mods);
+	// Set mods — if FM is in the slot mods, enable Freemod
+	const slotMods = slot.mods ?? [];
+	await lobby.setMods(slotMods.includes('FM') ? ['FM'] : slotMods);
 	await sleep(500);
 
 	// Announce with context: what map, current score, what to do

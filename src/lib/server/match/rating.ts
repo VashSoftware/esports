@@ -4,6 +4,7 @@ import { playerRating, matchParticipantPlayer } from '$lib/server/db/schema';
 import { account } from '$lib/server/db/auth.schema';
 import { eq, and, isNotNull } from 'drizzle-orm';
 import { getUser } from '$lib/server/osu/api';
+import { rankToElo, computeNewElo } from './rating-math';
 
 // ── Initial Rating ──────────────────────────────────────────────────────
 
@@ -26,12 +27,7 @@ export async function calculateInitialElo(
 			return { elo: 1000, osuRank: null };
 		}
 
-		// elo = 3500 - log10(rank) * 500
-		// rank 1 → 3500, rank 1000 → 2000, rank 100k → 1000, rank 1M → 500
-		const rawElo = 3500 - Math.log10(rank) * 500;
-		const elo = Math.round(Math.max(0, Math.min(3500, rawElo)));
-
-		return { elo, osuRank: rank };
+		return { elo: rankToElo(rank), osuRank: rank };
 	} catch (err) {
 		log.rating.warn({ err, userId }, 'failed to fetch osu! rank, defaulting to 1000');
 		return { elo: 1000, osuRank: null };
@@ -79,11 +75,7 @@ export async function updateElo(participants: { id: string; teamId: string }[], 
 
 		for (const { userId, rating } of sides.get(p.id)!) {
 			const gamesPlayed = rating.wins + rating.losses;
-			const K = gamesPlayed < 10 ? 40 : gamesPlayed < 30 ? 32 : 24;
-
-			const expected = 1 / (1 + Math.pow(10, (opponentAvg - rating.elo) / 400));
-			const actual = isWinner ? 1 : 0;
-			const newElo = Math.max(0, Math.round(rating.elo + K * (actual - expected)));
+			const newElo = computeNewElo(rating.elo, opponentAvg, isWinner, gamesPlayed);
 
 			await db
 				.update(playerRating)
