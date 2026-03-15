@@ -7,7 +7,7 @@ import * as Sentry from '@sentry/sveltekit';
 if (!building) {
 	Sentry.init({
 		dsn: process.env.PUBLIC_SENTRY_DSN,
-		tracesSampleRate: 0.2,
+		tracesSampleRate: 1.0, // TODO: lower to 0.2–0.3 once past alpha
 		environment: process.env.NODE_ENV ?? 'development',
 		sendDefaultPii: true
 	});
