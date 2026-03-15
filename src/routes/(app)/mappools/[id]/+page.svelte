@@ -3,9 +3,16 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 
+	import { ADD_CATEGORIES, CATEGORY_COLORS, categorySort } from '$lib/mods';
+
 	const { data } = $props();
 
-	const categories = ['NM', 'HD', 'HR', 'DT', 'FM', 'TB'];
+	// Merge predefined categories with any custom categories found in the pool
+	const categories = $derived(() => {
+		const existing = new Set(data.pool.slots.map((s: any) => s.category));
+		const merged = new Set([...ADD_CATEGORIES, ...existing]);
+		return [...merged].sort((a, b) => categorySort(a) - categorySort(b));
+	});
 
 	let addingCategory = $state('NM');
 	let beatmapInput = $state('');
@@ -142,14 +149,7 @@
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
 
-	const categoryColors: Record<string, string> = {
-		NM: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		HD: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-		HR: 'bg-red-500/20 text-red-400 border-red-500/30',
-		DT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-		FM: 'bg-green-500/20 text-green-400 border-green-500/30',
-		TB: 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-	};
+	const categoryColors = CATEGORY_COLORS;
 </script>
 
 <svelte:head>
@@ -305,7 +305,7 @@
 					bind:value={addingCategory}
 					class="rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 				>
-					{#each categories as cat}
+					{#each categories() as cat}
 						<option value={cat}>{cat}</option>
 					{/each}
 				</select>
@@ -378,7 +378,7 @@
 					<textarea
 						name="data"
 						bind:value={bulkData}
-						placeholder={'NM1\t181589\nNM2\t2603758\nHR1\t948389\nTB\t457061'}
+						placeholder={'NM1\t181589\nNM2\t2603758\nHDHR1\t948389\nRXHR1\t123456\nTB\t457061'}
 						rows="6"
 						class="w-full rounded-md border border-border bg-surface-700 px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
 					></textarea>
@@ -419,7 +419,7 @@
 	<!-- Map List -->
 	<div class="mt-6 flex flex-col gap-6">
 		{#if hasAnySlots || isDragging}
-			{#each categories as category (category)}
+			{#each categories() as category (category)}
 				{@const slots = data.pool.slots.filter((s) => s.category === category)}
 				{#if slots.length > 0 || isDragging}
 					<div>
@@ -473,10 +473,10 @@
 											{draggedSlot?.id === slot.id
 											? 'border-accent/50 opacity-40'
 											: 'border-border hover:border-accent/30'}"
-										style={dropTarget?.category === category && dropTarget.index === i
+										style={dropTarget?.category === category && dropTarget?.index === i
 											? `box-shadow: 0 -3px 0 0 var(--color-accent, #8b5cf6); margin-top: 4px;`
 											: dropTarget?.category === category &&
-												  dropTarget.index === slots.length &&
+												  dropTarget?.index === slots.length &&
 												  i === slots.length - 1
 												? `box-shadow: 0 3px 0 0 var(--color-accent, #8b5cf6); margin-bottom: 4px;`
 												: ''}

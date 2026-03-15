@@ -70,6 +70,11 @@ vi.mock('./rating', () => ({
 	selectMappoolForRating: vi.fn()
 }));
 
+vi.mock('./engine-logic', async () => {
+	const actual = await vi.importActual<typeof import('./engine-logic')>('./engine-logic');
+	return { ...actual };
+});
+
 const { pickMap } = await import('./engine');
 
 describe('pickMap', () => {
@@ -111,5 +116,57 @@ describe('pickMap', () => {
 			'Tiebreaker can only be picked at match point'
 		);
 		expect(mocks.db.insert).not.toHaveBeenCalled();
+	});
+
+	test('rejects already-played maps', async () => {
+		mocks.db.query.matchGame.findMany.mockResolvedValue([{ mappoolSlotId: 'slot-1' }]);
+
+		await expect(pickMap('match-1', 'p1', 'slot-1')).rejects.toThrow(
+			'This map has already been played'
+		);
+		expect(mocks.db.insert).not.toHaveBeenCalled();
+	});
+
+	test('rejects non-TB maps at match point', async () => {
+		// Set both participants to match point (score = winsNeeded - 1 = 2)
+		mocks.db.query.matchParticipant.findMany.mockResolvedValue([
+			{ id: 'p1', pickOrder: 1, score: 2 },
+			{ id: 'p2', pickOrder: 2, score: 2 }
+		]);
+		mocks.helpers.getExpectedPicker.mockReturnValue({ id: 'p1', pickOrder: 1, score: 2 });
+
+		mocks.db.query.mappoolSlot.findFirst.mockResolvedValue({
+			id: 'slot-nm',
+			category: 'NM'
+		});
+
+		await expect(pickMap('match-1', 'p1', 'slot-nm')).rejects.toThrow(
+			'Only tiebreaker maps can be picked at match point'
+		);
+	});
+
+	test('allows TB pick at match point', async () => {
+		mocks.db.query.matchParticipant.findMany.mockResolvedValue([
+			{ id: 'p1', pickOrder: 1, score: 2 },
+			{ id: 'p2', pickOrder: 2, score: 2 }
+		]);
+		mocks.helpers.getExpectedPicker.mockReturnValue({ id: 'p1', pickOrder: 1, score: 2 });
+
+		mocks.db.query.mappoolSlot.findFirst.mockResolvedValue({
+			id: 'slot-tb',
+			category: 'TB'
+		});
+
+		const mockGame = { id: 'game-1' };
+		mocks.db.insert.mockReturnValue({
+			values: vi.fn(() => ({ returning: vi.fn(() => Promise.resolve([mockGame])) }))
+		});
+		mocks.db.update.mockReturnValue({
+			set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) }))
+		});
+		mocks.helpers.getMatchFull.mockResolvedValue({});
+
+		const result = await pickMap('match-1', 'p1', 'slot-tb');
+		expect(result).toEqual(mockGame);
 	});
 });
