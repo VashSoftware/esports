@@ -39,6 +39,9 @@ if (!building) {
 }
 
 // ── Request logging middleware ──
+// Paths that are too noisy to log every time (healthchecks, polling)
+const SILENT_PATHS = new Set(['/api/health', '/api/queue']);
+
 const handleRequestLogging: Handle = async ({ event, resolve }) => {
 	const requestId = crypto.randomUUID();
 	const start = performance.now();
@@ -48,26 +51,33 @@ const handleRequestLogging: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 
 	const duration = Math.round(performance.now() - start);
-	const userId = event.locals.user?.id;
+	const path = event.url.pathname;
+	const status = response.status;
 
-	log.http.info(
-		{
-			requestId,
-			method: event.request.method,
-			path: event.url.pathname,
-			status: response.status,
-			duration,
-			userId: userId ?? null,
-			ip: event.getClientAddress()
-		},
-		`${event.request.method} ${event.url.pathname} ${response.status} ${duration}ms`
-	);
-
+	// Always count metrics, but only log interesting requests
 	metrics.requestCount++;
 	metrics.totalResponseTime += duration;
 
+	const isSilent = SILENT_PATHS.has(path) && status < 400;
+
+	if (!isSilent) {
+		const userId = event.locals.user?.id;
+		log.http.info(
+			{
+				requestId,
+				method: event.request.method,
+				path,
+				status,
+				duration,
+				userId: userId ?? null,
+				ip: event.getClientAddress()
+			},
+			`${event.request.method} ${path} ${status} ${duration}ms`
+		);
+	}
+
 	if (duration > 1000) {
-		log.http.warn({ requestId, path: event.url.pathname, duration }, 'Slow request');
+		log.http.warn({ requestId, path, duration }, 'Slow request');
 		metrics.slowRequests++;
 	}
 
