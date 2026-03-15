@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { env } from '$env/dynamic/private';
 import { Client, GatewayIntentBits, EmbedBuilder, type TextChannel } from 'discord.js';
 
@@ -58,7 +59,7 @@ export async function notifyMatchCreated(match: {
 
 		await channel.send({ embeds: [embed] });
 	} catch (err: any) {
-		console.error('[Discord] Failed to send match created notification:', err.message);
+		log.discord.error({ err }, 'failed to send match created notification');
 	}
 }
 
@@ -87,6 +88,6 @@ export async function notifyMatchFinished(match: {
 
 		await channel.send({ embeds: [embed] });
 	} catch (err: any) {
-		console.error('[Discord] Failed to send match finished notification:', err.message);
+		log.discord.error({ err }, 'failed to send match finished notification');
 	}
 }

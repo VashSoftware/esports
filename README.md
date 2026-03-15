@@ -1,8 +1,12 @@
 # Vash Esports
 
+<div align="center">
+  
 [![CI](https://github.com/VashSoftware/esports/actions/workflows/ci.yml/badge.svg)](https://github.com/VashSoftware/esports/actions/workflows/ci.yml)
 [![Deploy](https://github.com/VashSoftware/esports/actions/workflows/deploy.yml/badge.svg)](https://github.com/VashSoftware/esports/actions/workflows/deploy.yml)
 [![Discord](https://img.shields.io/discord/639921094974898176?color=5865F2&logo=discord&logoColor=white&label=discord)](https://discord.gg/n3mZgWk)
+
+</div>
 
 An automated osu! matchmaking platform. Players queue up, get matched by ELO, and play fully automated multiplayer matches — lobby creation, map picking, score tracking, and rating updates all happen without referees.
 

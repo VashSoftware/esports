@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { user } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { mappoolSlot } from '$lib/server/db/schema';
@@ -258,7 +259,7 @@ export const actions: Actions = {
 
 			// Set map + mods in IRC lobby and start game (background)
 			playPickedMap(params.id, game.id).catch((err) =>
-				console.error('[Match] IRC play failed:', err.message)
+				log.match.error({ err, matchId: params.id, gameId: game.id }, 'IRC play failed')
 			);
 
 			return { picked: true, gameId: game.id };

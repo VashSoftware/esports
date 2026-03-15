@@ -1,3 +1,4 @@
+import { log } from '$lib/server/logger';
 import { dev } from '$app/environment';
 import { db } from '$lib/server/db';
 import { matchInvite, teamMember } from '$lib/server/db/schema';
@@ -145,10 +146,10 @@ export async function acceptInvite(inviteId: string, userId: string) {
 		try {
 			const { initMatchLobby } = await import('./orchestrator');
 			initMatchLobby(created.id).catch((err) => {
-				console.error('[Invites] IRC lobby creation failed:', err.message);
+				log.invites.error({ err, matchId: created.id }, 'IRC lobby creation failed');
 			});
 		} catch (err: any) {
-			console.error('[Invites] Failed to import orchestrator:', err.message);
+			log.invites.error({ err }, 'failed to import orchestrator');
 		}
 	}
 

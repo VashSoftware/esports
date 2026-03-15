@@ -1,4 +1,5 @@
 // src/lib/server/osu/api.ts
+import { log } from '$lib/server/logger';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { and, eq } from 'drizzle-orm';
@@ -113,7 +114,7 @@ export async function getBeatmap(beatmapId: string | number) {
 		// If fetch fails, try returning stale (expired) cached data
 		const stale = getStale(cacheKey);
 		if (stale) {
-			console.warn(`[osu! API] Failed to fetch beatmap ${beatmapId}, returning stale cache`);
+			log.osu.warn({ beatmapId }, 'fetch failed, returning stale cache');
 			return stale;
 		}
 		throw err; // No stale data either — propagate the error

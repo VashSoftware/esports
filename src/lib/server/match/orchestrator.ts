@@ -5,6 +5,7 @@ import { MATCH_STATES, GAME_STATES, type MatchConfig } from './types';
 import { submitRoll, pickMap, submitGameScores, cancelMatch } from './engine';
 import { getMatchFull } from './helpers';
 import { env } from '$env/dynamic/private';
+import { log } from '$lib/server/logger';
 
 // matchId → lowercase usernames of all expected players
 const expectedPlayers = new Map<string, Set<string>>();
@@ -40,7 +41,7 @@ function setMatchTimeout(matchId: string, phase: string, ms: number, fn: () => v
 	clearMatchTimeout(matchId, phase);
 	matchTimeouts.set(key, setTimeout(fn, ms));
 	const secs = Math.round(ms / 1000);
-	console.log(`[Timeout] Set ${phase} timeout for match ${matchId} (${secs}s)`);
+	log.timeout.info({ matchId, phase, secs }, 'Timeout armed');
 }
 
 function clearMatchTimeout(matchId: string, phase: string) {
@@ -49,7 +50,7 @@ function clearMatchTimeout(matchId: string, phase: string) {
 	if (t) {
 		clearTimeout(t);
 		matchTimeouts.delete(key);
-		console.log(`[Timeout] Cleared ${phase} timeout for match ${matchId}`);
+		log.timeout.info({ matchId, phase }, 'Timeout cleared');
 	}
 }
 
@@ -67,7 +68,7 @@ function clearAllMatchTimeouts(matchId: string) {
  * marks the match CANCELLED in the database.
  */
 async function timeoutMatch(matchId: string, reason: string) {
-	console.warn(`[Orchestrator] Match ${matchId} timed out: ${reason}`);
+	log.orchestrator.warn({ matchId, reason }, 'Match timed out');
 	clearAllMatchTimeouts(matchId);
 
 	const lobby = getLobby(matchId);
@@ -88,7 +89,7 @@ async function timeoutMatch(matchId: string, reason: string) {
 	try {
 		await cancelMatch(matchId);
 	} catch (err: any) {
-		console.error(`[Orchestrator] Failed to cancel timed-out match ${matchId}:`, err.message);
+		log.orchestrator.error({ err, matchId }, 'Failed to cancel timed-out match');
 	}
 }
 
@@ -136,9 +137,7 @@ export function onMatchStateChange(matchId: string, newState: string) {
 						for (const p of unrolled) {
 							const autoRoll = Math.floor(Math.random() * 100) + 1;
 							await submitRoll(matchId, p.id, autoRoll);
-							console.log(
-								`[Timeout] Auto-rolled ${autoRoll} for ${p.team.name} in match ${matchId}`
-							);
+							log.timeout.info({ matchId, team: p.team.name, roll: autoRoll }, 'Auto-rolled');
 							if (lobby?.isAlive) {
 								await lobby.chat(`${p.team.name} auto-rolled ${autoRoll}`);
 							}
@@ -180,7 +179,7 @@ export function onMatchStateChange(matchId: string, newState: string) {
 						}
 					}
 				} catch (err: any) {
-					console.error(`[Timeout] Auto-roll failed for match ${matchId}:`, err.message);
+					log.timeout.error({ err, matchId }, 'Auto-roll failed');
 					await timeoutMatch(matchId, 'Auto-roll failed — match cancelled.');
 				}
 			});
@@ -226,14 +225,14 @@ export function onMatchStateChange(matchId: string, newState: string) {
 							`⏰ Pick timed out — auto-picking ${slotLabel} for ${picker?.team.name}`
 						);
 					}
-					console.log(`[Timeout] Auto-picked ${slotLabel} for match ${matchId}`);
+					log.timeout.info({ matchId, slotLabel }, 'Auto-picked map');
 
 					const game = await pickMap(matchId, picker!.id, randomSlot.id);
 					playPickedMap(matchId, game.id).catch((err) =>
-						console.error('[Timeout] Auto-pick play failed:', err.message)
+						log.timeout.error({ err, matchId }, 'Auto-pick play failed')
 					);
 				} catch (err: any) {
-					console.error(`[Timeout] Auto-pick failed for match ${matchId}:`, err.message);
+					log.timeout.error({ err, matchId }, 'Auto-pick failed');
 					await timeoutMatch(matchId, 'Auto-pick failed — match cancelled.');
 				}
 			});
@@ -260,10 +259,7 @@ export async function initMatchLobby(matchId: string) {
 	// Check lobby limit
 	const activeCount = getActiveLobbyCount();
 	if (activeCount >= MAX_LOBBIES) {
-		console.error(
-			`[Orchestrator] Cannot create lobby: ${activeCount}/${MAX_LOBBIES} lobbies active. ` +
-				`Close some matches first.`
-		);
+		log.orchestrator.error({ activeCount, maxLobbies: MAX_LOBBIES }, 'Lobby limit reached');
 		throw new Error(
 			`Lobby limit reached (${activeCount}/${MAX_LOBBIES}). Close or finish existing matches first.`
 		);
@@ -272,10 +268,10 @@ export async function initMatchLobby(matchId: string) {
 	const lobby = new TournamentLobby();
 
 	const lobbyName = `VASH: (${m.participants[0]?.team.name}) vs (${m.participants[1]?.team.name})`;
-	console.log(`[Orchestrator] Creating lobby: ${lobbyName}`);
+	log.orchestrator.info({ matchId, lobbyName }, 'Creating lobby');
 
 	const { matchId: osuId, channel } = await lobby.create(lobbyName);
-	console.log(`[Orchestrator] Created ${channel} (osu mp/${osuId})`);
+	log.orchestrator.info({ matchId, channel, osuMatchId: osuId }, 'Lobby created');
 
 	setLobby(matchId, lobby);
 
@@ -305,7 +301,7 @@ export async function initMatchLobby(matchId: string) {
 			if (u?.name && !invited.has(u.name.toLowerCase())) {
 				await lobby.invite(u.name);
 				invited.add(u.name.toLowerCase());
-				console.log(`[Orchestrator] Invited ${u.name}`);
+				log.orchestrator.info({ matchId, player: u.name }, 'Invited player');
 				await sleep(300);
 			}
 		}
@@ -398,7 +394,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				}
 			}
 		} catch (err: any) {
-			console.error('[Orchestrator] Player join handler error:', err.message);
+			log.orchestrator.error({ err, matchId }, 'Player join handler error');
 		}
 	};
 
@@ -437,7 +433,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			const isLastRoll = m.participants.filter((p) => p.rollValue === null).length === 1;
 
 			await submitRoll(matchId, targetParticipant.id, value);
-			console.log(`[Orchestrator] IRC roll: ${username} = ${value}`);
+			log.orchestrator.info({ matchId, username, roll: value }, 'IRC roll received');
 
 			// Check if all rolled → announce pick order or tie
 			const updated = await getMatchFull(matchId);
@@ -478,7 +474,7 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 				);
 			}
 		} catch (err: any) {
-			console.error('[Orchestrator] IRC roll error:', err.message);
+			log.orchestrator.error({ err, matchId }, 'IRC roll error');
 		}
 	};
 
@@ -553,14 +549,14 @@ function setupChatHandlers(matchId: string, lobby: TournamentLobby) {
 			}
 
 			const game = await pickMap(matchId, expectedPicker!.id, slot.id);
-			console.log(`[Orchestrator] IRC pick: ${username} picked ${slotLabel}`);
+			log.orchestrator.info({ matchId, username, slotLabel }, 'IRC pick received');
 
 			// Picking timeout is cleared inside playPickedMap
 			playPickedMap(matchId, game.id).catch((err) =>
-				console.error('[Orchestrator] IRC play failed:', err.message)
+				log.orchestrator.error({ err, matchId }, 'IRC play failed')
 			);
 		} catch (err: any) {
-			console.error('[Orchestrator] IRC pick error:', err.message);
+			log.orchestrator.error({ err, matchId }, 'IRC pick error');
 			await lobby.chat(`Error: ${err.message}`).catch(() => {});
 		}
 	};
@@ -576,12 +572,12 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 
 	const lobby = getLobby(matchId);
 	if (!lobby) {
-		console.warn('[Orchestrator] No IRC lobby for', matchId, '— skipping IRC');
+		log.orchestrator.warn({ matchId }, 'No IRC lobby — skipping IRC');
 		return;
 	}
 
 	if (!lobby.isAlive) {
-		console.warn('[Orchestrator] Lobby for', matchId, 'is dead — removing');
+		log.orchestrator.warn({ matchId }, 'Lobby is dead — removing');
 		removeLobby(matchId);
 		return;
 	}
@@ -616,16 +612,16 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		const currentLobby = getLobby(matchId);
 		if (currentLobby?.gameInProgress) {
 			// Game is running — scores will come in eventually
-			console.log(`[Timeout] Ready timeout fired but game is in progress for ${matchId}, ignoring`);
+			log.timeout.info({ matchId }, 'Ready timeout fired but game in progress, ignoring');
 			return;
 		}
-		console.log(`[Timeout] Ready timed out for match ${matchId} — force starting`);
+		log.timeout.info({ matchId }, 'Ready timed out — force starting');
 		if (currentLobby?.isAlive) {
 			try {
 				await currentLobby.chat('⏰ Ready timed out — force starting in 10s!');
 				await currentLobby.startGame(10);
 			} catch (err: any) {
-				console.error(`[Timeout] Force start failed for match ${matchId}:`, err.message);
+				log.timeout.error({ err, matchId }, 'Force start failed');
 			}
 		}
 	});
@@ -638,7 +634,7 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		await lobby.chat('All ready — starting in 5s!');
 		await lobby.startGame(5);
 	} catch (err: any) {
-		console.warn('[Orchestrator] Ready timeout:', err.message);
+		log.orchestrator.warn({ err, matchId }, 'Ready timeout');
 		try {
 			await lobby.chat('Timed out waiting for ready. Game will force start soon!');
 		} catch {
@@ -646,14 +642,14 @@ export async function playPickedMap(matchId: string, matchGameId: string) {
 		}
 		// Still set up score collection — force start will trigger the game
 		collectScores(matchId, matchGameId, lobby).catch((err) =>
-			console.error('[Orchestrator] Score collection failed:', err)
+			log.orchestrator.error({ err, matchId }, 'Score collection failed')
 		);
 		return;
 	}
 
 	// Non-blocking: wait for scores then process
 	collectScores(matchId, matchGameId, lobby).catch((err) =>
-		console.error('[Orchestrator] Score collection failed:', err)
+		log.orchestrator.error({ err, matchId }, 'Score collection failed')
 	);
 }
 
@@ -681,7 +677,10 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	// Game finished → disarm the ready timeout if it's still ticking
 	clearMatchTimeout(matchId, 'ready');
 
-	console.log(`[Orchestrator] Scores for game ${matchGameId}:`, ircScores);
+	log.orchestrator.info(
+		{ matchId, matchGameId, scoreCount: ircScores.length },
+		'Scores received from IRC'
+	);
 
 	// Map IRC usernames → matchParticipantPlayer IDs
 	const m = await getMatchFull(matchId);
@@ -727,7 +726,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 	}
 
 	if (scores.length === 0) {
-		console.warn('[Orchestrator] No scores matched any IRC usernames');
+		log.orchestrator.warn({ matchId, matchGameId }, 'No scores matched any IRC usernames');
 		return;
 	}
 
@@ -755,20 +754,25 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 						osuScoreMap.set(os.user_id, os);
 					}
 
-					console.log(
-						`[Orchestrator] osu! API returned ${osuGame.scores.length} scores for beatmap ${beatmapId}. ` +
-							`Player map has ${playerOsuIdMap.size} entries.`
+					log.orchestrator.info(
+						{
+							matchGameId,
+							beatmapId,
+							apiScores: osuGame.scores.length,
+							mappedPlayers: playerOsuIdMap.size
+						},
+						'osu! API scores retrieved'
 					);
 
 					for (const s of scores) {
 						const playerOsuId = playerOsuIdMap.get(s.playerId);
 						if (playerOsuId === undefined) {
-							console.warn(`[Orchestrator] No osu account ID for player ${s.playerId}`);
+							log.orchestrator.warn({ playerId: s.playerId }, 'No osu account ID for player');
 							continue;
 						}
 						const osuScore = osuScoreMap.get(playerOsuId);
 						if (!osuScore) {
-							console.warn(`[Orchestrator] No osu! API score for osu user ${playerOsuId}`);
+							log.orchestrator.warn({ osuUserId: playerOsuId }, 'No osu! API score for user');
 							continue;
 						}
 
@@ -785,13 +789,13 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 							);
 						}
 					}
-					console.log(`[Orchestrator] Enriched scores from osu! API for game ${matchGameId}`);
+					log.orchestrator.info({ matchGameId }, 'Enriched scores from osu! API');
 				} else {
-					console.warn(`[Orchestrator] No scores in osu! API game event for beatmap ${beatmapId}`);
+					log.orchestrator.warn({ beatmapId }, 'No scores in osu! API game event');
 				}
 			}
 		} catch (err: any) {
-			console.warn('[Orchestrator] Failed to enrich scores from osu! API:', err.message);
+			log.orchestrator.warn({ err, matchId }, 'Failed to enrich scores from osu! API');
 		}
 	}
 
@@ -875,7 +879,7 @@ async function collectScores(matchId: string, matchGameId: string, lobby: Tourna
 
 				const game = await pickMap(matchId, picker!.id, tbSlots[0].id);
 				playPickedMap(matchId, game.id).catch((err) =>
-					console.error('[Orchestrator] TB auto-pick play failed:', err.message)
+					log.orchestrator.error({ err, matchId }, 'TB auto-pick play failed')
 				);
 				return;
 			} else if (tbSlots.length > 1) {

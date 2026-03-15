@@ -1,4 +1,5 @@
 // src/lib/server/auth.ts
+import { log } from '$lib/server/logger';
 import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
@@ -54,7 +55,7 @@ export const auth = betterAuth({
 						initialElo: elo,
 						osuRankAtSeed: osuRank
 					});
-					console.log(`[Auth] Seeded ${user.name} with ${elo} ELO (rank #${osuRank ?? 'unknown'})`);
+					log.auth.info({ name: user.name, elo, osuRank }, 'seeded new user rating');
 				}
 			}
 		}
@@ -91,7 +92,7 @@ export const auth = betterAuth({
 						});
 						const data = await res.json();
 						if (!res.ok) {
-							console.error('osu! token exchange failed:', data);
+							log.auth.error({ data }, 'osu! token exchange failed');
 							throw new Error('Token exchange failed');
 						}
 						return {

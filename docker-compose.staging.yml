@@ -61,6 +61,7 @@ services:
       R2_BUCKET: ${R2_BUCKET:-vash-esports-images}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-https://cdn.esports.vash.software}
       ROOT_ADMIN_EMAIL: ${ROOT_ADMIN_EMAIL}
+      PUBLIC_SENTRY_DSN: ${PUBLIC_SENTRY_DSN}
       NODE_ENV: production
     env_file:
       - .env.staging
