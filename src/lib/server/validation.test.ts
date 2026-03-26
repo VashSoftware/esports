@@ -184,7 +184,7 @@ describe('submitScoreSchema', () => {
 	test('accepts valid score submission', () => {
 		const valid = {
 			matchGameId: uuid1,
-			scores: [{ participantId: uuid2, score: 1000000 }]
+			scores: [{ playerId: uuid2, score: 1000000 }]
 		};
 		expect(submitScoreSchema.parse(valid)).toBeTruthy();
 	});
@@ -193,7 +193,7 @@ describe('submitScoreSchema', () => {
 		expect(() =>
 			submitScoreSchema.parse({
 				matchGameId: uuid1,
-				scores: [{ participantId: uuid2, score: -1 }]
+				scores: [{ playerId: uuid2, score: -1 }]
 			})
 		).toThrow();
 	});
@@ -204,7 +204,7 @@ describe('submitScoreSchema', () => {
 
 	test('rejects scores array over 16 entries', () => {
 		const scores = Array.from({ length: 17 }, (_, i) => ({
-			participantId: `550e8400-e29b-41d4-a716-4466554400${String(i).padStart(2, '0')}`,
+			playerId: `550e8400-e29b-41d4-a716-4466554400${String(i).padStart(2, '0')}`,
 			score: 100
 		}));
 		expect(() => submitScoreSchema.parse({ matchGameId: uuid1, scores })).toThrow();
@@ -214,7 +214,7 @@ describe('submitScoreSchema', () => {
 		expect(() =>
 			submitScoreSchema.parse({
 				matchGameId: 'bad',
-				scores: [{ participantId: uuid2, score: 100 }]
+				scores: [{ playerId: uuid2, score: 100 }]
 			})
 		).toThrow();
 	});

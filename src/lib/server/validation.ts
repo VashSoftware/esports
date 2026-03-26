@@ -40,8 +40,17 @@ export const createInviteSchema = z.object({
 
 // ── Score submission ──
 const scoreEntrySchema = z.object({
-	participantId: z.string().uuid(),
-	score: z.number().int().min(0)
+	playerId: z.string().uuid(),
+	score: z.number().int().min(0),
+	accuracy: z.number().min(0).max(100).optional(),
+	maxCombo: z.number().int().min(0).optional(),
+	count300: z.number().int().min(0).optional(),
+	count100: z.number().int().min(0).optional(),
+	count50: z.number().int().min(0).optional(),
+	countMiss: z.number().int().min(0).optional(),
+	mods: z.array(z.string()).optional(),
+	passed: z.boolean().optional(),
+	pp: z.number().min(0).nullable().optional()
 });
 
 export const submitScoreSchema = z.object({
