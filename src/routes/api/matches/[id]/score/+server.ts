@@ -1,10 +1,11 @@
 // src/routes/api/matches/[id]/score/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { submitGameScores } from '$lib/server/match/engine';
+import { requireRole } from '$lib/server/permissions';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requireRole(locals, 'referee', 'Only referees or admins can submit scores');
 
 	const { matchGameId, scores } = await request.json();
 	if (!matchGameId || !scores?.length) {
