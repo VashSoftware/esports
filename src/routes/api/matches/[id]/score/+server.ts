@@ -2,15 +2,14 @@
 import { json, error } from '@sveltejs/kit';
 import { submitGameScores } from '$lib/server/match/engine';
 import { requireRole } from '$lib/server/permissions';
+import { submitScoreSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	requireRole(locals, 'referee', 'Only referees or admins can submit scores');
 
-	const { matchGameId, scores } = await request.json();
-	if (!matchGameId || !scores?.length) {
-		error(400, 'matchGameId and scores required');
-	}
+	const body = await request.json();
+	const { matchGameId, scores } = parseBody(submitScoreSchema, body);
 
 	try {
 		const m = await submitGameScores(matchGameId, scores);

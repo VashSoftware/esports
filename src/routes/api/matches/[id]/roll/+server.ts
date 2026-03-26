@@ -3,15 +3,14 @@ import { json, error } from '@sveltejs/kit';
 import { submitRoll } from '$lib/server/match/engine';
 import { requireAuth, hasRole } from '$lib/server/permissions';
 import { getMatchFull } from '$lib/server/match/helpers';
+import { submitRollSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const user = requireAuth(locals);
 
-	const { value } = await request.json();
-	if (value == null) {
-		error(400, 'value required');
-	}
+	const body = await request.json();
+	const { value } = parseBody(submitRollSchema, body);
 
 	const match = await getMatchFull(params.id);
 

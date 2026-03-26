@@ -3,15 +3,14 @@ import { json, error } from '@sveltejs/kit';
 import { pickMap } from '$lib/server/match/engine';
 import { requireAuth, hasRole } from '$lib/server/permissions';
 import { getMatchFull } from '$lib/server/match/helpers';
+import { pickMapSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const user = requireAuth(locals);
 
-	const { mappoolSlotId } = await request.json();
-	if (!mappoolSlotId) {
-		error(400, 'mappoolSlotId required');
-	}
+	const body = await request.json();
+	const { mappoolSlotId } = parseBody(pickMapSchema, body);
 
 	const match = await getMatchFull(params.id);
 
