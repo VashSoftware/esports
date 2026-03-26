@@ -21,6 +21,7 @@ import {
 	winsNeeded as calcWinsNeeded
 } from './engine-logic';
 import { getScoreMultiplier } from '$lib/mods';
+import { tryAdvanceTournament } from '$lib/server/tournament/progression';
 
 export { getMatchFull, getMatchOrThrow };
 
@@ -315,6 +316,9 @@ export async function submitGameScores(
 
 		const finishedMatch = await getMatchFull(game.matchId);
 		notifyMatchFinished(finishedMatch).catch(() => {});
+
+		// advance tournament bracket if this is a tournament match
+		tryAdvanceTournament(game.matchId).catch(() => {});
 	} else {
 		await db.update(match).set({ state: MATCH_STATES.PICKING }).where(eq(match.id, game.matchId));
 	}

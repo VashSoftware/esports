@@ -29,5 +29,6 @@ export const log = {
 	rating: logger.child({ subsystem: 'rating' }),
 	admin: logger.child({ subsystem: 'admin' }),
 	timeout: logger.child({ subsystem: 'timeout' }),
-	http: logger.child({ subsystem: 'http' })
+	http: logger.child({ subsystem: 'http' }),
+	tournament: logger.child({ subsystem: 'tournament' })
 };

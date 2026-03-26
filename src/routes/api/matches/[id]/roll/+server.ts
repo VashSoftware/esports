@@ -1,14 +1,29 @@
 // src/routes/api/matches/[id]/roll/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { submitRoll } from '$lib/server/match/engine';
+import { requireAuth, hasRole } from '$lib/server/permissions';
+import { getMatchFull } from '$lib/server/match/helpers';
+import { submitRollSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	const user = requireAuth(locals);
 
-	const { participantId, value } = await request.json();
-	if (!participantId || value == null) {
-		error(400, 'participantId and value required');
+	const body = await request.json();
+	const { value } = parseBody(submitRollSchema, body);
+
+	const match = await getMatchFull(params.id);
+
+	// Find the participant linked to the authenticated user
+	const participant = match.participants.find((p) => p.players.some((pl) => pl.userId === user.id));
+
+	if (!participant && !hasRole(user.role, 'referee')) {
+		error(403, 'You are not a participant in this match');
+	}
+
+	const participantId = participant?.id;
+	if (!participantId) {
+		error(400, 'Could not resolve participant');
 	}
 
 	try {

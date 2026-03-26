@@ -254,6 +254,183 @@ export const matchInvite = pgTable(
 	]
 );
 
+// ── Tournaments ────────────────────────────────────────────────────────
+export const tournament = pgTable(
+	'tournament',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		name: text('name').notNull(),
+		description: text('description'),
+		format: text('format').notNull(), // single_elim | double_elim | groups_bracket
+		state: text('state').default('DRAFT').notNull(),
+		config: jsonb('config').notNull(),
+		maxSlots: integer('max_slots').notNull(),
+		bannerUrl: text('banner_url'),
+		createdBy: text('created_by').notNull(),
+		registrationOpenAt: timestamp('registration_open_at', { withTimezone: true }),
+		registrationCloseAt: timestamp('registration_close_at', { withTimezone: true }),
+		startAt: timestamp('start_at', { withTimezone: true }),
+		finishedAt: timestamp('finished_at', { withTimezone: true }),
+		winnerId: uuid('winner_id').references(() => team.id),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_tournament_state').on(t.state),
+		index('idx_tournament_created_at').on(t.createdAt)
+	]
+);
+
+// ── Tournament Staff ───────────────────────────────────────────────────
+export const tournamentStaff = pgTable(
+	'tournament_staff',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		userId: text('user_id').notNull(),
+		role: text('role').notNull() // organizer | admin | referee | pooler | streamer
+	},
+	(t) => [
+		uniqueIndex('idx_tstaff_tournament_user').on(t.tournamentId, t.userId),
+		index('idx_tstaff_tournament').on(t.tournamentId)
+	]
+);
+
+// ── Tournament Rounds ──────────────────────────────────────────────────
+export const tournamentRound = pgTable(
+	'tournament_round',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		abbreviation: text('abbreviation'),
+		roundOrder: integer('round_order').notNull(),
+		bestOf: integer('best_of').notNull(),
+		mappoolId: uuid('mappool_id').references(() => mappool.id),
+		bracketType: text('bracket_type'), // winners | losers | grand_final | group | null
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true })
+	},
+	(t) => [index('idx_tround_tournament').on(t.tournamentId)]
+);
+
+// ── Tournament Registrations ───────────────────────────────────────────
+export const tournamentRegistration = pgTable(
+	'tournament_registration',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		teamId: uuid('team_id')
+			.notNull()
+			.references(() => team.id),
+		userId: text('user_id').notNull(),
+		seed: integer('seed'),
+		qualifierScore: real('qualifier_score'),
+		status: text('status').default('registered').notNull(),
+		registeredAt: timestamp('registered_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		uniqueIndex('idx_treg_tournament_team').on(t.tournamentId, t.teamId),
+		index('idx_treg_tournament').on(t.tournamentId)
+	]
+);
+
+// ── Tournament Matches (bracket structure) ─────────────────────────────
+export const tournamentMatch = pgTable(
+	'tournament_match',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		roundId: uuid('round_id')
+			.notNull()
+			.references(() => tournamentRound.id, { onDelete: 'cascade' }),
+		matchId: uuid('match_id').references(() => match.id),
+		bracketPosition: integer('bracket_position').notNull(),
+		winnerGoesToId: uuid('winner_goes_to_id'),
+		loserGoesToId: uuid('loser_goes_to_id'),
+		winnerSlot: integer('winner_slot'),
+		loserSlot: integer('loser_slot'),
+		team1Id: uuid('team1_id').references(() => team.id),
+		team2Id: uuid('team2_id').references(() => team.id),
+		winnerId: uuid('winner_id').references(() => team.id),
+		scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+		state: text('state').default('PENDING').notNull()
+	},
+	(t) => [
+		index('idx_tmatch_tournament').on(t.tournamentId),
+		index('idx_tmatch_round').on(t.roundId),
+		index('idx_tmatch_match').on(t.matchId),
+		index('idx_tmatch_state').on(t.state)
+	]
+);
+
+// ── Tournament Groups ──────────────────────────────────────────────────
+export const tournamentGroup = pgTable(
+	'tournament_group',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		groupOrder: integer('group_order').notNull()
+	},
+	(t) => [index('idx_tgroup_tournament').on(t.tournamentId)]
+);
+
+// ── Tournament Group Entries ───────────────────────────────────────────
+export const tournamentGroupEntry = pgTable(
+	'tournament_group_entry',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		groupId: uuid('group_id')
+			.notNull()
+			.references(() => tournamentGroup.id, { onDelete: 'cascade' }),
+		teamId: uuid('team_id')
+			.notNull()
+			.references(() => team.id),
+		wins: integer('wins').default(0).notNull(),
+		losses: integer('losses').default(0).notNull(),
+		mapWins: integer('map_wins').default(0).notNull(),
+		mapLosses: integer('map_losses').default(0).notNull(),
+		seed: integer('seed')
+	},
+	(t) => [
+		uniqueIndex('idx_tge_group_team').on(t.groupId, t.teamId),
+		index('idx_tge_group').on(t.groupId)
+	]
+);
+
+// ── Tournament Qualifier Scores ────────────────────────────────────────
+export const tournamentQualifierScore = pgTable(
+	'tournament_qualifier_score',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		tournamentId: uuid('tournament_id')
+			.notNull()
+			.references(() => tournament.id, { onDelete: 'cascade' }),
+		teamId: uuid('team_id')
+			.notNull()
+			.references(() => team.id),
+		mappoolSlotId: uuid('mappool_slot_id')
+			.notNull()
+			.references(() => mappoolSlot.id),
+		totalScore: integer('total_score').notNull(),
+		accuracy: real('accuracy'),
+		playedAt: timestamp('played_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_tqs_tournament_team').on(t.tournamentId, t.teamId),
+		index('idx_tqs_tournament').on(t.tournamentId)
+	]
+);
+
 // ── Relations ───────────────────────────────────────────────────────────
 
 export const teamRelations = relations(team, ({ many }) => ({
@@ -324,4 +501,94 @@ export const matchInviteRelations = relations(matchInvite, ({ one }) => ({
 	}),
 	mappool: one(mappool, { fields: [matchInvite.mappoolId], references: [mappool.id] }),
 	match: one(match, { fields: [matchInvite.matchId], references: [match.id] })
+}));
+
+// ── Tournament Relations ────────────────────────────────────────────────
+
+export const tournamentRelations = relations(tournament, ({ many }) => ({
+	rounds: many(tournamentRound),
+	registrations: many(tournamentRegistration),
+	matches: many(tournamentMatch),
+	groups: many(tournamentGroup),
+	staff: many(tournamentStaff),
+	qualifierScores: many(tournamentQualifierScore)
+}));
+
+export const tournamentStaffRelations = relations(tournamentStaff, ({ one }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentStaff.tournamentId],
+		references: [tournament.id]
+	})
+}));
+
+export const tournamentRoundRelations = relations(tournamentRound, ({ one, many }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentRound.tournamentId],
+		references: [tournament.id]
+	}),
+	mappool: one(mappool, { fields: [tournamentRound.mappoolId], references: [mappool.id] }),
+	matches: many(tournamentMatch)
+}));
+
+export const tournamentRegistrationRelations = relations(tournamentRegistration, ({ one }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentRegistration.tournamentId],
+		references: [tournament.id]
+	}),
+	team: one(team, { fields: [tournamentRegistration.teamId], references: [team.id] })
+}));
+
+export const tournamentMatchRelations = relations(tournamentMatch, ({ one }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentMatch.tournamentId],
+		references: [tournament.id]
+	}),
+	round: one(tournamentRound, {
+		fields: [tournamentMatch.roundId],
+		references: [tournamentRound.id]
+	}),
+	match: one(match, { fields: [tournamentMatch.matchId], references: [match.id] }),
+	team1: one(team, {
+		fields: [tournamentMatch.team1Id],
+		references: [team.id],
+		relationName: 'tournamentMatchTeam1'
+	}),
+	team2: one(team, {
+		fields: [tournamentMatch.team2Id],
+		references: [team.id],
+		relationName: 'tournamentMatchTeam2'
+	}),
+	winner: one(team, {
+		fields: [tournamentMatch.winnerId],
+		references: [team.id],
+		relationName: 'tournamentMatchWinner'
+	})
+}));
+
+export const tournamentGroupRelations = relations(tournamentGroup, ({ one, many }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentGroup.tournamentId],
+		references: [tournament.id]
+	}),
+	entries: many(tournamentGroupEntry)
+}));
+
+export const tournamentGroupEntryRelations = relations(tournamentGroupEntry, ({ one }) => ({
+	group: one(tournamentGroup, {
+		fields: [tournamentGroupEntry.groupId],
+		references: [tournamentGroup.id]
+	}),
+	team: one(team, { fields: [tournamentGroupEntry.teamId], references: [team.id] })
+}));
+
+export const tournamentQualifierScoreRelations = relations(tournamentQualifierScore, ({ one }) => ({
+	tournament: one(tournament, {
+		fields: [tournamentQualifierScore.tournamentId],
+		references: [tournament.id]
+	}),
+	team: one(team, { fields: [tournamentQualifierScore.teamId], references: [team.id] }),
+	slot: one(mappoolSlot, {
+		fields: [tournamentQualifierScore.mappoolSlotId],
+		references: [mappoolSlot.id]
+	})
 }));

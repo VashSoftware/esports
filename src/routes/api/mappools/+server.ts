@@ -1,11 +1,13 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { mappool } from '$lib/server/db/schema';
+import { requireAuth, requireRole } from '$lib/server/permissions';
+import { createMappoolSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 // List all mappools
 export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requireAuth(locals);
 
 	const mappools = await db.query.mappool.findMany({
 		orderBy: (m, { desc }) => [desc(m.createdAt)]
@@ -14,18 +16,18 @@ export const GET: RequestHandler = async ({ locals }) => {
 	return json(mappools);
 };
 
-// Create a mappool
+// Create a mappool (admin only)
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requireRole(locals, 'admin', 'Only admins can create mappools');
 
-	const { name } = await request.json();
-	if (!name?.trim()) error(400, 'Name is required');
+	const body = await request.json();
+	const { name } = parseBody(createMappoolSchema, body);
 
 	const [created] = await db
 		.insert(mappool)
 		.values({
-			name: name.trim(),
-			createdBy: locals.user.id
+			name,
+			createdBy: locals.user!.id
 		})
 		.returning();
 
