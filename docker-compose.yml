@@ -35,6 +35,7 @@ services:
       OSU_IRC_USERNAME: ${OSU_IRC_USERNAME}
       OSU_IRC_PASSWORD: ${OSU_IRC_PASSWORD}
       PUBLIC_SENTRY_DSN: ${PUBLIC_SENTRY_DSN}
+      ADDRESS_HEADER: CF-Connecting-IP
       NODE_ENV: production
     env_file:
       - .env
