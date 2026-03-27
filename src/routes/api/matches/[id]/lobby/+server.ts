@@ -1,10 +1,15 @@
 // src/routes/api/matches/[id]/lobby/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { moveToLobby } from '$lib/server/match/engine';
+import { requirePermission, GlobalPermission } from '$lib/server/permissions';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requirePermission(
+		locals,
+		GlobalPermission.MATCH_REFEREE,
+		'Only referees or admins can move matches to lobby'
+	);
 
 	const body = await request.json().catch(() => ({}));
 

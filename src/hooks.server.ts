@@ -29,6 +29,14 @@ if (!building) {
 		.then(({ initDMHandler }) => initDMHandler())
 		.catch((err) => log.dm.warn({ err: err.message }, 'DM handler init skipped'));
 
+	import('$lib/server/tournament/scheduler')
+		.then(({ startTournamentScheduler }) => startTournamentScheduler())
+		.catch((err) => log.tournament.warn({ err: err.message }, 'Tournament scheduler init skipped'));
+
+	import('$lib/server/discord/client')
+		.then(({ initDiscordClient }) => initDiscordClient())
+		.catch((err) => log.discord.warn({ err: err.message }, 'Discord client init skipped'));
+
 	process.on('unhandledRejection', (reason) => {
 		log.http.error({ err: reason }, 'Unhandled rejection');
 	});
@@ -36,6 +44,15 @@ if (!building) {
 	process.on('uncaughtException', (err) => {
 		log.http.fatal({ err }, 'Uncaught exception');
 	});
+}
+
+/** Safe IP getter — returns null for internal requests missing the ADDRESS_HEADER */
+function getIp(event: Parameters<Handle>[0]['event']): string | null {
+	try {
+		return event.getClientAddress();
+	} catch {
+		return null;
+	}
 }
 
 // ── Request logging middleware ──
@@ -70,7 +87,7 @@ const handleRequestLogging: Handle = async ({ event, resolve }) => {
 				status,
 				duration,
 				userId: userId ?? null,
-				ip: event.getClientAddress()
+				ip: getIp(event)
 			},
 			`${event.request.method} ${path} ${status} ${duration}ms`
 		);
@@ -87,9 +104,22 @@ const handleRequestLogging: Handle = async ({ event, resolve }) => {
 
 // ── Auth + rate limiting ──
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
-	// Rate limiting for API routes: 600 req/min per IP
+	// Rate limiting for API routes
 	if (event.url.pathname.startsWith('/api/')) {
-		const ip = event.getClientAddress();
+		const ip = getIp(event) ?? 'unknown';
+
+		// Stricter limit for auth endpoints: 10 req/min per IP
+		if (event.url.pathname.startsWith('/api/auth/')) {
+			const { ok, retryAfter } = checkRateLimit(`auth:${ip}`, 10, 60_000);
+			if (!ok) {
+				return new Response('Too Many Requests', {
+					status: 429,
+					headers: { 'Retry-After': String(retryAfter ?? 60), 'Content-Type': 'text/plain' }
+				});
+			}
+		}
+
+		// General API limit: 600 req/min per IP
 		const { ok, retryAfter } = checkRateLimit(`api:${ip}`, 600, 60_000);
 		if (!ok) {
 			return new Response('Too Many Requests', {

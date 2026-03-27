@@ -898,12 +898,10 @@ async function seedMappools(users: UserData[]): Promise<PoolData[]> {
 
 function selectPoolForElo(pools: PoolData[], avgElo: number): PoolData {
 	const targetSr = Math.max(2, Math.min(8, 2 + avgElo / 700));
-	let best = pools[0];
-	let bestDist = Math.abs(best.avgSr - targetSr);
+	let bestDist = Math.abs(pools[0].avgSr - targetSr);
 	for (const p of pools) {
 		const dist = Math.abs(p.avgSr - targetSr);
 		if (dist < bestDist) {
-			best = p;
 			bestDist = dist;
 		}
 	}
@@ -996,8 +994,8 @@ async function seedMatches(
 		let matchState: string;
 		const winnerId: string | null = null;
 		let finishedAt: Date | null = null;
-		let startedAt: Date | null = null;
-		let gamesToPlay = 0;
+		let startedAt: Date | null;
+		let gamesToPlay: number;
 
 		if (state === 'FINISHED') {
 			matchState = 'FINISHED';

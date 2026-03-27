@@ -1,7 +1,8 @@
 // src/routes/(app)/+page.server.ts
 import { db } from '$lib/server/db';
-import { match, team, mappool } from '$lib/server/db/schema';
+import { match, team, mappool, tournament } from '$lib/server/db/schema';
 import { eq, desc, count, inArray } from 'drizzle-orm';
+import { user } from '$lib/server/db/auth.schema';
 import { getQueueStatus } from '$lib/server/match/queue';
 import type { PageServerLoad } from './$types';
 
@@ -12,7 +13,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			authenticated: false as const,
 			recentMatches: [],
 			liveMatches: [],
-			stats: { matches: 0, finished: 0, teams: 0, mappools: 0 }
+			stats: { completed: 0, tournaments: 0, usersAndTeams: 0, mappools: 0 }
 		};
 	}
 
@@ -20,10 +21,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const [
 		recentMatches,
 		liveMatches,
-		[matchCount],
+		[finishedCount],
+		[tournamentCount],
+		[userCount],
 		[teamCount],
 		[poolCount],
-		[finishedCount],
 		queueStatus
 	] = await Promise.all([
 		db.query.match.findMany({
@@ -35,10 +37,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 			with: { participants: { with: { team: true } }, mappool: { with: { slots: true } } },
 			where: inArray(match.state, ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'])
 		}),
-		db.select({ count: count() }).from(match),
+		db.select({ count: count() }).from(match).where(eq(match.state, 'FINISHED')),
+		db.select({ count: count() }).from(tournament),
+		db.select({ count: count() }).from(user),
 		db.select({ count: count() }).from(team),
 		db.select({ count: count() }).from(mappool),
-		db.select({ count: count() }).from(match).where(eq(match.state, 'FINISHED')),
 		getQueueStatus(locals.user.id)
 	]);
 
@@ -49,9 +52,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		hasActiveMatch: !!queueStatus.matchedMatchId,
 		activeMatchId: queueStatus.matchedMatchId ?? null,
 		stats: {
-			matches: matchCount.count,
-			finished: finishedCount.count,
-			teams: teamCount.count,
+			completed: finishedCount.count,
+			tournaments: tournamentCount.count,
+			usersAndTeams: userCount.count + teamCount.count,
 			mappools: poolCount.count
 		}
 	};

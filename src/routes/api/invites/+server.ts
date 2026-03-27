@@ -1,26 +1,27 @@
 import { json, error } from '@sveltejs/kit';
 import { createInvite, getInvitesForUser } from '$lib/server/match/invites';
+import { requireAuth } from '$lib/server/permissions';
+import { createInviteSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
-	const invites = await getInvitesForUser(locals.user.id);
+	const user = requireAuth(locals);
+	const invites = await getInvitesForUser(user.id);
 	return json(invites);
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	const user = requireAuth(locals);
 
 	const body = await request.json();
-	const { creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } = body;
-
-	if (!creatorTeamId || !invitedTeamId || !config || !mappoolId) {
-		error(400, 'Missing required fields');
-	}
+	const { creatorTeamId, invitedTeamId, config, mappoolId, name, message, scheduledAt } = parseBody(
+		createInviteSchema,
+		body
+	);
 
 	try {
 		const invite = await createInvite({
-			createdBy: locals.user.id,
+			createdBy: user.id,
 			creatorTeamId,
 			invitedTeamId,
 			config,

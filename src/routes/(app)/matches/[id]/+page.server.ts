@@ -8,15 +8,13 @@ import { getLobby, getLobbyStatus } from '$lib/server/bancho/client';
 import { error, redirect } from '@sveltejs/kit';
 import { getBeatmap } from '$lib/server/osu/api';
 import { proxyImage } from '$lib/server/storage/r2';
-import { hasRole } from '$lib/server/permissions';
+import { hasPermission, GlobalPermission } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 import { eq } from 'drizzle-orm';
 import type { MatchConfig } from '$lib/server/match/types';
 import { playerRating } from '$lib/server/db/schema';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	if (!locals.user) redirect(302, '/');
-
 	let m;
 	try {
 		m = await getMatchFull(params.id);
@@ -99,7 +97,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		);
 	}
 
-	const isStaff = hasRole(locals.user.role, 'referee');
+	const isStaff = locals.user
+		? hasPermission(locals.user.role, GlobalPermission.MATCH_REFEREE)
+		: false;
 
 	// Fetch player usernames for lobby status display
 	const playerNames: Record<string, string> = {};
@@ -127,7 +127,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	return {
 		match: m,
 		beatmapCache,
-		userId: locals.user.id,
+		userId: locals.user?.id ?? null,
 		isStaff,
 		lobbyStatus,
 		playerNames,
@@ -271,7 +271,7 @@ export const actions: Actions = {
 	forceStart: async ({ params, locals }) => {
 		if (!locals.user) redirect(302, '/');
 		// Only staff can force start
-		if (!hasRole(locals.user.role, 'referee')) {
+		if (!hasPermission(locals.user.role, GlobalPermission.MATCH_REFEREE)) {
 			return { error: 'Only referees and admins can force start' };
 		}
 		await forceStartGame(params.id);
@@ -281,7 +281,7 @@ export const actions: Actions = {
 	cancel: async ({ params, locals }) => {
 		if (!locals.user) redirect(302, '/');
 		// Only staff can cancel matches
-		if (!hasRole(locals.user.role, 'referee')) {
+		if (!hasPermission(locals.user.role, GlobalPermission.MATCH_REFEREE)) {
 			return { error: 'Only referees and admins can cancel matches' };
 		}
 

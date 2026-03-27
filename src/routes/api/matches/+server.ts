@@ -2,10 +2,12 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createMatch } from '$lib/server/match/engine';
+import { requireAuth, requirePermission, GlobalPermission } from '$lib/server/permissions';
+import { createMatchSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requireAuth(locals);
 
 	const matches = await db.query.match.findMany({
 		with: {
@@ -18,14 +20,14 @@ export const GET: RequestHandler = async ({ locals }) => {
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) error(401, 'Not logged in');
+	requirePermission(
+		locals,
+		GlobalPermission.MATCH_CREATE,
+		'Only referees or admins can create matches'
+	);
 
 	const body = await request.json();
-	const { name, config, mappoolId, teams } = body;
-
-	if (!name || !config || !mappoolId || !teams?.length) {
-		error(400, 'Missing required fields');
-	}
+	const { name, config, mappoolId, teams } = parseBody(createMatchSchema, body);
 
 	try {
 		const result = await createMatch({
@@ -33,7 +35,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			config,
 			mappoolId,
 			teams,
-			createdBy: locals.user.id
+			createdBy: locals.user!.id
 		});
 		return json(result, { status: 201 });
 	} catch (e: any) {

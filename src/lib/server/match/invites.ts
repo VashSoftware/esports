@@ -77,7 +77,9 @@ export async function createInvite(opts: {
 			sendDM(
 				u.name,
 				`Match invite: ${title}. Accept/decline at https://esports.vash.software/matches or reply !accept ${invite.id.slice(0, 8)}`
-			).catch(() => {}); // Silent best-effort
+			).catch((err) => {
+				log.invites.warn({ err, username: u.name }, 'Failed to send Bancho DM for invite');
+			});
 		}
 	}
 

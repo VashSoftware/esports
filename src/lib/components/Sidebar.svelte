@@ -6,7 +6,7 @@
 	const activeMatch = $derived(page.data?.activeMatch);
 	const unreadCount = $derived((page.data as any)?.unreadNotificationCount ?? 0);
 
-	let { open = $bindable(false) } = $props();
+	let { open = $bindable(false), guest = false } = $props();
 	let notifOpen = $state(false);
 	let notifications = $state<any[]>([]);
 	let loadingNotifs = $state(false);
@@ -105,6 +105,22 @@
 				width="7"
 				height="7"
 			/><rect x="3" y="14" width="7" height="7" /></svg
+		>
+	{:else if name === 'tournaments'}
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			class="h-4 w-4"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path
+				d="M4 22h16"
+			/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path
+				d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"
+			/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg
 		>
 	{:else if name === 'matches'}
 		<svg
@@ -216,7 +232,7 @@
 			<span class="font-700 text-base font-bold tracking-tight text-text-primary">Vash Esports</span
 			>
 		</a>
-		{#if user}
+		{#if user && !guest}
 			<div class="relative">
 				<button
 					onclick={toggleNotifications}
@@ -314,61 +330,63 @@
 	</div>
 
 	<!-- Queue Button -->
-	<div class="px-3 pb-4">
-		{#if activeMatch && page.url.pathname !== `/matches/${activeMatch.id}`}
-			<a
-				href="/matches/{activeMatch.id}"
-				class="font-600 flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm text-yellow-300 transition-colors hover:bg-yellow-500/20"
-			>
-				<div class="relative h-2 w-2">
-					<div class="absolute inset-0 animate-ping rounded-full bg-yellow-400 opacity-75"></div>
-					<div class="h-2 w-2 rounded-full bg-yellow-400"></div>
-				</div>
-				Go to Match
-			</a>
-		{:else if queue.status?.inQueue}
-			<div class="flex flex-col gap-1.5">
-				<div
-					class="font-600 flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm text-yellow-300"
+	{#if !guest}
+		<div class="px-3 pb-4">
+			{#if activeMatch && page.url.pathname !== `/matches/${activeMatch.id}`}
+				<a
+					href="/matches/{activeMatch.id}"
+					class="font-600 flex w-full items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm text-yellow-300 transition-colors hover:bg-yellow-500/20"
 				>
-					<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400"></span>
-					In Queue ({queue.status.queueSize})
+					<div class="relative h-2 w-2">
+						<div class="absolute inset-0 animate-ping rounded-full bg-yellow-400 opacity-75"></div>
+						<div class="h-2 w-2 rounded-full bg-yellow-400"></div>
+					</div>
+					Go to Match
+				</a>
+			{:else if queue.status?.inQueue}
+				<div class="flex flex-col gap-1.5">
+					<div
+						class="font-600 flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 text-sm text-yellow-300"
+					>
+						<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400"></span>
+						In Queue ({queue.status.queueSize})
+					</div>
+					<button
+						onclick={leaveQueue}
+						disabled={queue.loading}
+						class="flex w-full items-center justify-center rounded-md px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+					>
+						Leave Queue
+					</button>
 				</div>
+			{:else if !activeMatch}
 				<button
-					onclick={leaveQueue}
+					onclick={joinQueue}
 					disabled={queue.loading}
-					class="flex w-full items-center justify-center rounded-md px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+					class="font-600 flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
 				>
-					Leave Queue
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="m13 19 3.5-3.5" /><path
+							d="m16.5 22 5-5"
+						/><path d="M10 5.5 6 2H3v3l4 4" /></svg
+					>
+					{queue.loading ? 'Joining...' : 'Find Match'}
 				</button>
-			</div>
-		{:else if !activeMatch}
-			<button
-				onclick={joinQueue}
-				disabled={queue.loading}
-				class="font-600 flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm text-surface-900 transition-colors hover:bg-accent-hover disabled:opacity-50"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-4 w-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="m13 19 3.5-3.5" /><path
-						d="m16.5 22 5-5"
-					/><path d="M10 5.5 6 2H3v3l4 4" /></svg
-				>
-				{queue.loading ? 'Joining...' : 'Find Match'}
-			</button>
-		{/if}
-	</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Nav -->
 	<nav class="mt-0 flex flex-1 flex-col gap-0.5 px-3">
-		{#each [{ href: '/', label: 'Dashboard', icon: 'dashboard' }, { href: '/matches', label: 'Matches', icon: 'matches' }, { href: '/mappools', label: 'Mappools', icon: 'mappools' }, { href: '/teams', label: 'Teams', icon: 'teams' }, { href: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' }] as item (item.href)}
+		{#each [{ href: '/', label: 'Dashboard', icon: 'dashboard' }, { href: '/tournaments', label: 'Tournaments', icon: 'tournaments' }, { href: '/matches', label: 'Matches', icon: 'matches' }, { href: '/mappools', label: 'Mappools', icon: 'mappools' }, { href: '/teams', label: 'Teams', icon: 'teams' }, { href: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' }] as item (item.href)}
 			<a
 				href={item.href}
 				class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors {isActive(
@@ -471,17 +489,19 @@
 			</a>
 		</div>
 
-		<a
-			href="/settings"
-			class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors {isActive(
-				'/settings'
-			)
-				? 'bg-accent-dim text-accent'
-				: 'text-text-secondary hover:bg-surface-700 hover:text-text-primary'}"
-		>
-			{@render navIcon('settings')}
-			Settings
-		</a>
+		{#if !guest}
+			<a
+				href="/settings"
+				class="font-500 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors {isActive(
+					'/settings'
+				)
+					? 'bg-accent-dim text-accent'
+					: 'text-text-secondary hover:bg-surface-700 hover:text-text-primary'}"
+			>
+				{@render navIcon('settings')}
+				Settings
+			</a>
+		{/if}
 		<div class="mt-2 flex gap-3 px-3 pb-1">
 			<a
 				href="/terms"

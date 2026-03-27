@@ -14,37 +14,68 @@ import {
 	matchParticipantPlayer
 } from '$lib/server/db/schema';
 import { account } from '$lib/server/db/auth.schema';
-import { eq, and, desc, inArray, sql } from 'drizzle-orm';
-import { requireRole, setUserRole, isRootAdmin } from '$lib/server/permissions';
+import { eq, and, inArray, sql } from 'drizzle-orm';
+import {
+	requirePermission,
+	setUserRole,
+	isRootAdmin,
+	GlobalPermission
+} from '$lib/server/permissions';
 import { getUser as getOsuUser } from '$lib/server/osu/api';
+import {
+	parseTableParams,
+	buildSearchFilter,
+	buildOrderBy,
+	buildTableMeta
+} from '$lib/server/table';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	requireRole(locals, 'admin');
+export const load: PageServerLoad = async ({ locals, url }) => {
+	requirePermission(locals, GlobalPermission.ADMIN_VIEW);
 
-	const users = await db.query.user.findMany({
-		orderBy: desc(user.createdAt)
-	});
+	const params = parseTableParams(url, { sortBy: 'createdAt', limit: 25 });
+	const searchFilter = buildSearchFilter(params.search, [user.name, user.email]);
 
-	const usersWithRatings = await Promise.all(
-		users.map(async (u) => {
-			const rating = await db.query.playerRating.findFirst({
-				where: eq(playerRating.userId, u.id)
-			});
-			return {
-				id: u.id,
-				name: u.name,
-				email: u.email,
-				image: u.image,
-				role: u.role ?? 'player',
-				createdAt: u.createdAt,
-				elo: rating?.elo ?? 1000,
-				wins: rating?.wins ?? 0,
-				losses: rating?.losses ?? 0,
-				isRootAdmin: isRootAdmin(u.email)
-			};
-		})
-	);
+	const [rows, countResult] = await Promise.all([
+		db
+			.select({
+				id: user.id,
+				name: user.name,
+				email: user.email,
+				image: user.image,
+				role: user.role,
+				createdAt: user.createdAt,
+				elo: playerRating.elo,
+				wins: playerRating.wins,
+				losses: playerRating.losses
+			})
+			.from(user)
+			.leftJoin(playerRating, eq(user.id, playerRating.userId))
+			.where(searchFilter)
+			.orderBy(
+				buildOrderBy(
+					params.sortBy,
+					params.sortDir,
+					{ name: user.name, createdAt: user.createdAt, elo: playerRating.elo },
+					user.createdAt
+				)
+			)
+			.limit(params.limit)
+			.offset((params.page - 1) * params.limit),
+		db
+			.select({ count: sql<number>`count(*)` })
+			.from(user)
+			.where(searchFilter)
+	]);
+
+	const users = rows.map((u) => ({
+		...u,
+		role: u.role ?? 'player',
+		elo: u.elo ?? 1000,
+		wins: u.wins ?? 0,
+		losses: u.losses ?? 0,
+		isRootAdmin: isRootAdmin(u.email)
+	}));
 
 	const [activeMatches, queueSize, pendingInvites] = await Promise.all([
 		db
@@ -59,7 +90,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	]);
 
 	return {
-		users: usersWithRatings,
+		users,
+		meta: buildTableMeta(params, Number(countResult[0].count)),
 		actorIsRootAdmin: isRootAdmin(locals.user!.email),
 		stats: {
 			activeMatches: Number(activeMatches[0].count),
@@ -71,7 +103,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	setRole: async ({ request, locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_MANAGE_ROLES);
 
 		const form = await request.formData();
 		const userId = form.get('userId')?.toString();
@@ -85,7 +117,6 @@ export const actions: Actions = {
 		try {
 			await setUserRole(locals, userId, role as any);
 		} catch (e: any) {
-			// setUserRole throws SvelteKit errors; extract the message
 			return { error: e.body?.message ?? e.message ?? 'Failed to update role' };
 		}
 
@@ -93,7 +124,7 @@ export const actions: Actions = {
 	},
 
 	cancelAllMatches: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_CANCEL_MATCHES);
 
 		const cancelled = await db
 			.update(match)
@@ -110,7 +141,7 @@ export const actions: Actions = {
 	},
 
 	clearQueue: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_CLEAR_QUEUE);
 		const deleted = await db.delete(matchQueue).returning({ id: matchQueue.id });
 		return {
 			success: true,
@@ -119,7 +150,7 @@ export const actions: Actions = {
 	},
 
 	expireInvites: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_MANAGE_USERS);
 		const expired = await db
 			.update(matchInvite)
 			.set({ status: 'expired' })
@@ -132,7 +163,7 @@ export const actions: Actions = {
 	},
 
 	clearNotifications: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_MANAGE_USERS);
 		const deleted = await db.delete(notification).returning({ id: notification.id });
 		return {
 			success: true,
@@ -141,7 +172,7 @@ export const actions: Actions = {
 	},
 
 	resetRatings: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_RESET_RATINGS);
 
 		const allUsers = await db.query.user.findMany();
 		let updated = 0;
@@ -161,12 +192,10 @@ export const actions: Actions = {
 				// API failure — treat as unranked
 			}
 
-			// Unranked → rank 10,000,000 (yields 0 ELO)
 			const effectiveRank = rank && rank > 0 ? rank : 10_000_000;
 			const rawElo = 3500 - Math.log10(effectiveRank) * 500;
 			const elo = Math.round(Math.max(0, Math.min(3500, rawElo)));
 
-			// Upsert: insert if no rating row exists, update if it does
 			const existing = await db.query.playerRating.findFirst({
 				where: eq(playerRating.userId, u.id)
 			});
@@ -205,7 +234,7 @@ export const actions: Actions = {
 	},
 
 	clearMatchHistory: async ({ locals }) => {
-		requireRole(locals, 'admin');
+		requirePermission(locals, GlobalPermission.ADMIN_CLEAR_DATA);
 
 		await db.delete(matchGameScore);
 		await db.delete(matchGame);

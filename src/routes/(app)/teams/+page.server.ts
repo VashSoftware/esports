@@ -1,36 +1,56 @@
 import { db } from '$lib/server/db';
-import { team, teamMember, user } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
-import { redirect } from '@sveltejs/kit';
+import { team, teamMember } from '$lib/server/db/schema';
+import { eq, sql, and } from 'drizzle-orm';
 import { requireAuth, requireOwnerOrAdmin } from '$lib/server/permissions';
+import {
+	parseTableParams,
+	buildSearchFilter,
+	buildOrderBy,
+	buildTableMeta
+} from '$lib/server/table';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const u = requireAuth(locals);
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const params = parseTableParams(url, { sortBy: 'createdAt', limit: 25 });
+	const searchFilter = buildSearchFilter(params.search, [team.name]);
+	// Combine search filter with non-personal filter
+	const baseFilter = eq(team.isPersonal, false);
+	const where = searchFilter ? and(baseFilter, searchFilter) : baseFilter;
 
-	const teams = await db.query.team.findMany({
-		with: {
-			members: true
-		},
-		orderBy: (t, { desc }) => [desc(t.createdAt)]
-	});
+	const [rows, countResult] = await Promise.all([
+		db
+			.select({
+				id: team.id,
+				name: team.name,
+				isPersonal: team.isPersonal,
+				ownerId: team.ownerId,
+				avatarUrl: team.avatarUrl,
+				createdAt: team.createdAt,
+				memberCount: sql<number>`(SELECT count(*) FROM team_member WHERE team_id = ${team.id})`
+			})
+			.from(team)
+			.where(where)
+			.orderBy(
+				buildOrderBy(
+					params.sortBy,
+					params.sortDir,
+					{ name: team.name, createdAt: team.createdAt },
+					team.createdAt
+				)
+			)
+			.limit(params.limit)
+			.offset((params.page - 1) * params.limit),
+		db
+			.select({ count: sql<number>`count(*)` })
+			.from(team)
+			.where(where)
+	]);
 
-	// Fetch member user details
-	const teamsWithUsers = await Promise.all(
-		teams.map(async (t) => {
-			const membersWithUsers = await Promise.all(
-				t.members.map(async (m) => {
-					const usr = await db.query.user.findFirst({
-						where: eq(user.id, m.userId)
-					});
-					return { ...m, user: usr ? { id: usr.id, name: usr.name, image: usr.image } : null };
-				})
-			);
-			return { ...t, members: membersWithUsers };
-		})
-	);
-
-	return { teams: teamsWithUsers, userId: u.id };
+	return {
+		teams: rows,
+		meta: buildTableMeta(params, Number(countResult[0].count)),
+		userId: locals.user?.id ?? null
+	};
 };
 
 export const actions: Actions = {
@@ -51,7 +71,6 @@ export const actions: Actions = {
 			})
 			.returning();
 
-		// Add creator as captain
 		await db.insert(teamMember).values({
 			teamId: created.id,
 			userId: u.id,
@@ -80,6 +99,7 @@ export const actions: Actions = {
 
 	addMember: async ({ request, locals }) => {
 		requireAuth(locals);
+		const { user } = await import('$lib/server/db/schema');
 
 		const form = await request.formData();
 		const teamId = form.get('teamId')?.toString();
@@ -87,19 +107,16 @@ export const actions: Actions = {
 
 		if (!teamId || !username) return { error: 'Team and username are required' };
 
-		// Only owner or admin can add members
 		const t = await db.query.team.findFirst({ where: eq(team.id, teamId) });
 		if (!t) return { error: 'Team not found' };
 		requireOwnerOrAdmin(locals, t.ownerId);
 
-		// Find user by osu! username
 		const u = await db.query.user.findFirst({
 			where: eq(user.name, username)
 		});
 
 		if (!u) return { error: `User "${username}" not found. They need to log in first.` };
 
-		// Check not already member
 		const existing = await db.query.teamMember.findFirst({
 			where: (m, { and, eq }) => and(eq(m.teamId, teamId), eq(m.userId, u.id))
 		});
@@ -122,7 +139,6 @@ export const actions: Actions = {
 		const memberId = form.get('memberId')?.toString();
 		if (!memberId) return { error: 'Missing member ID' };
 
-		// Look up the member to find the team, then check ownership
 		const member = await db.query.teamMember.findFirst({
 			where: eq(teamMember.id, memberId),
 			with: { team: true }

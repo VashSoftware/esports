@@ -34,6 +34,15 @@ async function getChannel(channelId: string): Promise<TextChannel> {
 	return channel as TextChannel;
 }
 
+export async function initDiscordClient(): Promise<void> {
+	if (!env.DISCORD_BOT_TOKEN) {
+		log.discord.warn('DISCORD_BOT_TOKEN not set, skipping Discord client init');
+		return;
+	}
+	await getDiscordClient();
+	log.discord.info('Discord client connected');
+}
+
 export async function notifyMatchCreated(match: {
 	id: string;
 	name: string | null;
