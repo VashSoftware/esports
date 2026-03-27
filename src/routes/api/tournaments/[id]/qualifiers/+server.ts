@@ -4,10 +4,7 @@ import {
 	getQualifierMappool,
 	submitQualifierScore
 } from '$lib/server/tournament/qualifiers';
-import { db } from '$lib/server/db';
-import { tournamentStaff } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { requireAuth } from '$lib/server/permissions';
+import { requireTournamentStaffOrAdmin, TournamentPermission } from '$lib/server/permissions';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -20,13 +17,7 @@ export const GET: RequestHandler = async ({ params }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
-	const user = requireAuth(locals);
-
-	// only staff can submit qualifier scores (referees run qualifier lobbies)
-	const staff = await db.query.tournamentStaff.findFirst({
-		where: and(eq(tournamentStaff.tournamentId, params.id), eq(tournamentStaff.userId, user.id))
-	});
-	if (!staff) error(403, 'Only tournament staff can submit qualifier scores');
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.REFEREE_MATCHES);
 
 	const body = await request.json();
 	const { teamId, mappoolSlotId, totalScore, accuracy } = body;

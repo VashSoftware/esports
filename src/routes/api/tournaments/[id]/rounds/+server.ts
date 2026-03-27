@@ -1,8 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tournamentRound, tournamentStaff } from '$lib/server/db/schema';
-import { eq, and, asc } from 'drizzle-orm';
-import { requireAuth } from '$lib/server/permissions';
+import { tournamentRound } from '$lib/server/db/schema';
+import { eq, asc } from 'drizzle-orm';
+import { requireTournamentStaffOrAdmin, TournamentPermission } from '$lib/server/permissions';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -15,19 +15,13 @@ export const GET: RequestHandler = async ({ params }) => {
 };
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
-	const user = requireAuth(locals);
-
-	const staff = await db.query.tournamentStaff.findFirst({
-		where: and(eq(tournamentStaff.tournamentId, params.id), eq(tournamentStaff.userId, user.id))
-	});
-	if (!staff) error(403, 'Not a staff member of this tournament');
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.MANAGE_ROUNDS);
 
 	const body = await request.json();
 	const { name, abbreviation, bestOf, mappoolId, bracketType, scheduledAt } = body;
 
 	if (!name || !bestOf) error(400, 'Missing required fields: name, bestOf');
 
-	// get next round order
 	const existing = await db.query.tournamentRound.findMany({
 		where: eq(tournamentRound.tournamentId, params.id)
 	});

@@ -33,6 +33,10 @@ if (!building) {
 		.then(({ startTournamentScheduler }) => startTournamentScheduler())
 		.catch((err) => log.tournament.warn({ err: err.message }, 'Tournament scheduler init skipped'));
 
+	import('$lib/server/discord/client')
+		.then(({ initDiscordClient }) => initDiscordClient())
+		.catch((err) => log.discord.warn({ err: err.message }, 'Discord client init skipped'));
+
 	process.on('unhandledRejection', (reason) => {
 		log.http.error({ err: reason }, 'Unhandled rejection');
 	});

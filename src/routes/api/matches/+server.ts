@@ -2,7 +2,7 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { createMatch } from '$lib/server/match/engine';
-import { requireAuth, requireRole } from '$lib/server/permissions';
+import { requireAuth, requirePermission, GlobalPermission } from '$lib/server/permissions';
 import { createMatchSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
@@ -20,7 +20,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	requireRole(locals, 'referee', 'Only referees or admins can create matches');
+	requirePermission(
+		locals,
+		GlobalPermission.MATCH_CREATE,
+		'Only referees or admins can create matches'
+	);
 
 	const body = await request.json();
 	const { name, config, mappoolId, teams } = parseBody(createMatchSchema, body);

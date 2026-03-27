@@ -4,7 +4,7 @@ import { createTournament } from '$lib/server/tournament/lifecycle';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	requireAuth(locals);
+	if (!locals.user) redirect(302, '/login');
 	return {};
 };
 

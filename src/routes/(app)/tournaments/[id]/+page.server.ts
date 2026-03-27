@@ -16,8 +16,6 @@ import { requireAuth } from '$lib/server/permissions';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	requireAuth(locals);
-
 	const t = await db.query.tournament.findFirst({
 		where: eq(tournament.id, params.id),
 		with: {
@@ -59,17 +57,18 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	});
 
 	// check if current user is staff
-	const isStaff = t.staff.some((s) => s.userId === locals.user!.id);
+	const isStaff = locals.user ? t.staff.some((s) => s.userId === locals.user!.id) : false;
 
 	// check if current user is registered
-	const userTeams = await db.query.teamMember.findMany({
-		where: eq(teamMember.userId, locals.user!.id),
-		with: { team: true }
-	});
-
-	const userRegistration = t.registrations.find((r) =>
-		userTeams.some((ut) => ut.teamId === r.teamId)
-	);
+	const userTeams = locals.user
+		? await db.query.teamMember.findMany({
+				where: eq(teamMember.userId, locals.user.id),
+				with: { team: true }
+			})
+		: [];
+	const userRegistration = locals.user
+		? t.registrations.find((r) => userTeams.some((ut) => ut.teamId === r.teamId))
+		: undefined;
 
 	// load mappools for round config (staff only in DRAFT)
 	let mappools: { id: string; name: string; slotCount: number }[] = [];

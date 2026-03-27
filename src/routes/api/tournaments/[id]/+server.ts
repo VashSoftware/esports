@@ -1,8 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tournament, tournamentStaff } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { requireAuth } from '$lib/server/permissions';
+import { tournament } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { requireTournamentStaffOrAdmin, TournamentPermission } from '$lib/server/permissions';
 import { getTournamentFull } from '$lib/server/tournament/lifecycle';
 import type { RequestHandler } from './$types';
 
@@ -13,8 +13,7 @@ export const GET: RequestHandler = async ({ params }) => {
 };
 
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
-	const user = requireAuth(locals);
-	await requireTournamentStaff(params.id, user.id);
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.MANAGE_SETTINGS);
 
 	const t = await db.query.tournament.findFirst({
 		where: eq(tournament.id, params.id)
@@ -55,8 +54,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 };
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
-	const user = requireAuth(locals);
-	await requireTournamentStaff(params.id, user.id);
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.MANAGE_SETTINGS);
 
 	const t = await db.query.tournament.findFirst({
 		where: eq(tournament.id, params.id)
@@ -73,11 +71,3 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	await cancelTournament(params.id);
 	return json(await getTournamentFull(params.id));
 };
-
-async function requireTournamentStaff(tournamentId: string, userId: string) {
-	const staff = await db.query.tournamentStaff.findFirst({
-		where: and(eq(tournamentStaff.tournamentId, tournamentId), eq(tournamentStaff.userId, userId))
-	});
-	if (!staff) error(403, 'Not a staff member of this tournament');
-	return staff;
-}

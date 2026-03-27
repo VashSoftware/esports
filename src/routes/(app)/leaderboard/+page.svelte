@@ -1,12 +1,27 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import DataTable from '$lib/components/DataTable.svelte';
+
+	function rowClick(href: string) {
+		return () => goto(href);
+	}
+
 	const { data } = $props();
 
-	let activeTab = $state<'players' | 'teams' | 'scores'>('players');
+	const activeTab = $derived(data.tab);
+
+	function setTab(tab: string) {
+		const url = new URL($page.url);
+		url.searchParams.set('tab', tab);
+		url.searchParams.set('page', '1');
+		goto(url.toString(), { keepFocus: true, noScroll: true });
+	}
 
 	const tabs = [
-		{ id: 'players' as const, label: 'Top Players', icon: '👤' },
-		{ id: 'teams' as const, label: 'Top Teams', icon: '⚑' },
-		{ id: 'scores' as const, label: 'High Scores', icon: '🎯' }
+		{ id: 'players', label: 'Top Players', icon: '👤' },
+		{ id: 'teams', label: 'Top Teams', icon: '⚑' },
+		{ id: 'scores', label: 'High Scores', icon: '🎯' }
 	];
 
 	function eloColor(elo: number): string {
@@ -32,6 +47,33 @@
 		FM: 'text-green-400',
 		TB: 'text-pink-400'
 	};
+
+	const playerColumns = [
+		{ key: 'rank', label: '#', class: 'w-10 pl-4 text-center' },
+		{ key: 'avatar', label: '', class: 'w-10' },
+		{ key: 'name', label: 'Player', class: 'px-4 text-left' },
+		{ key: 'elo', label: 'ELO', class: 'w-16 pr-4 text-right' },
+		{ key: 'wl', label: 'W/L', class: 'w-16 pr-4 text-right' },
+		{ key: 'winRate', label: 'Win %', class: 'w-16 pr-4 text-right' }
+	];
+
+	const teamColumns = [
+		{ key: 'rank', label: '#', class: 'w-10 pl-4 text-center' },
+		{ key: 'avatar', label: '', class: 'w-10' },
+		{ key: 'name', label: 'Team', class: 'px-4 text-left' },
+		{ key: 'wins', label: 'Wins', class: 'w-16 pr-4 text-right' },
+		{ key: 'matches', label: 'Matches', class: 'w-20 pr-4 text-right' }
+	];
+
+	const scoreColumns = [
+		{ key: 'rank', label: '#', class: 'w-10 pl-4 text-center' },
+		{ key: 'avatar', label: '', class: 'w-10' },
+		{ key: 'player', label: 'Player', class: 'px-4 text-left' },
+		{ key: 'map', label: 'Map', class: 'w-12 pr-4 text-right' },
+		{ key: 'pp', label: 'PP', class: 'w-16 pr-4 text-right' },
+		{ key: 'score', label: 'Score', class: 'w-24 pr-4 text-right' },
+		{ key: 'acc', label: 'Acc', class: 'w-16 pr-4 text-right' }
+	];
 </script>
 
 <svelte:head>
@@ -53,7 +95,7 @@
 	<div class="mt-6 flex gap-1 rounded-lg border border-border bg-surface-800 p-1">
 		{#each tabs as tab}
 			<button
-				onclick={() => (activeTab = tab.id)}
+				onclick={() => setTab(tab.id)}
 				class="font-600 flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm transition-colors {activeTab ===
 				tab.id
 					? 'bg-accent text-surface-900'
@@ -67,219 +109,161 @@
 
 	<!-- Top Players -->
 	{#if activeTab === 'players'}
-		<div class="mt-6 overflow-x-auto rounded-lg border border-border bg-surface-800">
-			{#if data.topPlayers.length === 0}
-				<div class="py-12 text-center">
-					<p class="text-sm text-text-secondary">No ranked players yet. Play some matches!</p>
-				</div>
-			{:else}
-				<table class="w-full">
-					<thead>
-						<tr class="font-600 border-b border-border text-left text-xs text-text-secondary">
-							<th class="w-10 py-3 pl-4 text-center">#</th>
-							<th class="w-10 py-3"></th>
-							<th class="py-3">Player</th>
-							<th class="w-16 py-3 pr-4 text-right">ELO</th>
-							<th class="w-16 py-3 pr-4 text-right">W/L</th>
-							<th class="w-16 py-3 pr-4 text-right">Win %</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.topPlayers as p}
-							{@const medal = rankBadge(p.rank)}
-							<tr
-								class="border-b border-border/50 last:border-b-0 {p.rank <= 3
-									? 'bg-accent/[0.02]'
-									: ''}"
+		<div class="mt-6">
+			<DataTable data={data.topPlayers} meta={data.meta} columns={playerColumns}>
+				{#snippet row(p, _i)}
+					{@const medal = rankBadge(p.rank)}
+					<tr
+						onclick={rowClick(`/users/${p.userId}`)}
+						class="cursor-pointer border-b border-border/50 transition-colors last:border-b-0 hover:bg-surface-800/50 {p.rank <=
+						3
+							? 'bg-accent/[0.02]'
+							: ''}"
+					>
+						<td
+							class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
+								'text-text-secondary'}"
+						>
+							{medal ? medal.emoji : p.rank}
+						</td>
+						<td class="py-3">
+							{#if p.image}
+								<img src={p.image} alt="" class="h-8 w-8 rounded-full" />
+							{:else}
+								<div
+									class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
+								>
+									{p.name.charAt(0).toUpperCase()}
+								</div>
+							{/if}
+						</td>
+						<td class="font-600 py-3 text-sm">{p.name}</td>
+						<td class="font-700 py-3 pr-4 text-right text-sm tabular-nums {eloColor(p.elo)}"
+							>{p.elo}</td
+						>
+						<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums">
+							<span class="text-green-400">{p.wins}</span>/<span class="text-red-400"
+								>{p.losses}</span
 							>
-								<td
-									class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
-										'text-text-secondary'}"
-								>
-									{medal ? medal.emoji : p.rank}
-								</td>
-								<td class="py-3">
-									{#if p.image}
-										<img src={p.image} alt="" class="h-8 w-8 rounded-full" />
-									{:else}
-										<div
-											class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
-										>
-											{p.name.charAt(0).toUpperCase()}
-										</div>
-									{/if}
-								</td>
-								<td class="font-600 py-3 text-sm">{p.name}</td>
-								<td class="font-700 py-3 pr-4 text-right text-sm tabular-nums {eloColor(p.elo)}"
-									>{p.elo}</td
-								>
-								<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums">
-									<span class="text-green-400">{p.wins}</span>/<span class="text-red-400"
-										>{p.losses}</span
-									>
-								</td>
-								<td
-									class="font-600 py-3 pr-4 text-right text-xs tabular-nums {p.winRate !== '—' &&
-									parseFloat(p.winRate) >= 50
-										? 'text-green-400'
-										: 'text-text-secondary'}"
-								>
-									{p.winRate}{p.winRate !== '—' ? '%' : ''}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{/if}
+						</td>
+						<td
+							class="font-600 py-3 pr-4 text-right text-xs tabular-nums {p.winRate !== '—' &&
+							parseFloat(p.winRate) >= 50
+								? 'text-green-400'
+								: 'text-text-secondary'}"
+						>
+							{p.winRate}{p.winRate !== '—' ? '%' : ''}
+						</td>
+					</tr>
+				{/snippet}
+			</DataTable>
 		</div>
 	{/if}
 
 	<!-- Top Teams -->
 	{#if activeTab === 'teams'}
-		<div class="mt-6 overflow-x-auto rounded-lg border border-border bg-surface-800">
-			{#if data.topTeams.length === 0}
-				<div class="py-12 text-center">
-					<p class="text-sm text-text-secondary">No team results yet.</p>
-				</div>
-			{:else}
-				<table class="w-full">
-					<thead>
-						<tr class="font-600 border-b border-border text-left text-xs text-text-secondary">
-							<th class="w-10 py-3 pl-4 text-center">#</th>
-							<th class="w-10 py-3"></th>
-							<th class="py-3">Team</th>
-							<th class="w-16 py-3 pr-4 text-right">Wins</th>
-							<th class="w-20 py-3 pr-4 text-right">Matches</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.topTeams as t}
-							{@const medal = rankBadge(t.rank)}
-							<tr
-								class="border-b border-border/50 last:border-b-0 {t.rank <= 3
-									? 'bg-accent/[0.02]'
-									: ''}"
-							>
-								<td
-									class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
-										'text-text-secondary'}"
+		<div class="mt-6">
+			<DataTable data={data.topTeams} meta={data.meta} columns={teamColumns}>
+				{#snippet row(t, _i)}
+					{@const medal = rankBadge(t.rank)}
+					<tr
+						onclick={rowClick(`/teams/${t.teamId}`)}
+						class="cursor-pointer border-b border-border/50 transition-colors last:border-b-0 hover:bg-surface-800/50 {t.rank <=
+						3
+							? 'bg-accent/[0.02]'
+							: ''}"
+					>
+						<td
+							class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
+								'text-text-secondary'}"
+						>
+							{medal ? medal.emoji : t.rank}
+						</td>
+						<td class="py-3">
+							{#if t.avatarUrl}
+								<img src={t.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
+							{:else}
+								<div
+									class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
 								>
-									{medal ? medal.emoji : t.rank}
-								</td>
-								<td class="py-3">
-									{#if t.avatarUrl}
-										<img src={t.avatarUrl} alt="" class="h-8 w-8 rounded-full" />
-									{:else}
-										<div
-											class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
-										>
-											{t.name.charAt(0).toUpperCase()}
-										</div>
-									{/if}
-								</td>
-								<td class="py-3">
-									<span class="font-600 text-sm">{t.name}</span>
-									{#if t.isPersonal}
-										<span class="ml-1 text-[10px] text-text-secondary">(solo)</span>
-									{/if}
-									<p class="text-xs text-text-secondary">
-										{t.memberCount} member{t.memberCount !== 1 ? 's' : ''}
-									</p>
-								</td>
-								<td class="font-700 py-3 pr-4 text-right text-sm text-green-400 tabular-nums"
-									>{t.wins}</td
-								>
-								<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums"
-									>{t.totalMatches}</td
-								>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{/if}
+									{t.name.charAt(0).toUpperCase()}
+								</div>
+							{/if}
+						</td>
+						<td class="py-3">
+							<span class="font-600 text-sm">{t.name}</span>
+							<p class="text-xs text-text-secondary">
+								{t.memberCount} member{t.memberCount !== 1 ? 's' : ''}
+							</p>
+						</td>
+						<td class="font-700 py-3 pr-4 text-right text-sm text-green-400 tabular-nums"
+							>{t.wins}</td
+						>
+						<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums"
+							>{t.totalMatches}</td
+						>
+					</tr>
+				{/snippet}
+			</DataTable>
 		</div>
 	{/if}
 
 	<!-- High Scores -->
 	{#if activeTab === 'scores'}
-		<div class="mt-6 overflow-x-auto rounded-lg border border-border bg-surface-800">
-			{#if data.highScores.length === 0}
-				<div class="py-12 text-center">
-					<p class="text-sm text-text-secondary">No scores recorded yet.</p>
-				</div>
-			{:else}
-				<div class="border-b border-border px-4 py-2.5">
-					<p class="text-xs text-text-secondary">
-						Ranked by pp (performance points) when available, then score
-					</p>
-				</div>
-				<table class="w-full">
-					<thead>
-						<tr class="font-600 border-b border-border text-left text-xs text-text-secondary">
-							<th class="w-10 py-3 pl-4 text-center">#</th>
-							<th class="w-10 py-3"></th>
-							<th class="py-3">Player</th>
-							<th class="w-12 py-3 pr-4 text-right">Map</th>
-							<th class="w-16 py-3 pr-4 text-right text-accent">PP</th>
-							<th class="w-24 py-3 pr-4 text-right">Score</th>
-							<th class="w-16 py-3 pr-4 text-right">Acc</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.highScores as s}
-							{@const medal = rankBadge(s.rank)}
-							<tr
-								class="border-b border-border/50 last:border-b-0 {s.rank <= 3
-									? 'bg-accent/[0.02]'
-									: ''}"
-							>
-								<td
-									class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
-										'text-text-secondary'}"
+		<div class="mt-6">
+			<DataTable data={data.highScores} meta={data.meta} columns={scoreColumns}>
+				{#snippet row(s, _i)}
+					{@const medal = rankBadge(s.rank)}
+					<tr
+						onclick={rowClick(`/users/${s.playerUserId}`)}
+						class="cursor-pointer border-b border-border/50 transition-colors last:border-b-0 hover:bg-surface-800/50 {s.rank <=
+						3
+							? 'bg-accent/[0.02]'
+							: ''}"
+					>
+						<td
+							class="font-700 py-3 pl-4 text-center text-sm tabular-nums {medal?.color ??
+								'text-text-secondary'}"
+						>
+							{medal ? medal.emoji : s.rank}
+						</td>
+						<td class="py-3">
+							{#if s.playerImage}
+								<img src={s.playerImage} alt="" class="h-8 w-8 rounded-full" />
+							{:else}
+								<div
+									class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
 								>
-									{medal ? medal.emoji : s.rank}
-								</td>
-								<td class="py-3">
-									{#if s.playerImage}
-										<img src={s.playerImage} alt="" class="h-8 w-8 rounded-full" />
-									{:else}
-										<div
-											class="font-700 flex h-8 w-8 items-center justify-center rounded-full bg-surface-600 text-xs text-text-secondary"
-										>
-											{s.playerName.charAt(0).toUpperCase()}
-										</div>
-									{/if}
-								</td>
-								<td class="py-3">
-									<span class="font-600 text-sm">{s.playerName}</span>
-									<p class="truncate text-xs text-text-secondary">
-										<a href="/matches/{s.matchId}" class="hover:text-accent">{s.matchName}</a>
-									</p>
-								</td>
-								<td
-									class="font-600 py-3 pr-4 text-right text-xs {catColors[s.mapCategory] ??
-										'text-text-secondary'}"
-								>
-									{s.mapCategory}{s.mapOrder}
-								</td>
-								<td
-									class="font-700 py-3 pr-4 text-right text-sm tabular-nums {s.pp != null
-										? 'text-accent'
-										: 'text-text-secondary/40'}"
-								>
-									{s.pp != null ? `${Math.round(s.pp)}pp` : '—'}
-								</td>
-								<td class="font-700 py-3 pr-4 text-right text-sm text-text-primary tabular-nums">
-									{s.score.toLocaleString()}
-								</td>
-								<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums">
-									{s.accuracy > 0 ? `${(s.accuracy * 100).toFixed(1)}%` : '—'}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{/if}
+									{s.playerName.charAt(0).toUpperCase()}
+								</div>
+							{/if}
+						</td>
+						<td class="py-3">
+							<span class="font-600 text-sm">{s.playerName}</span>
+							<p class="truncate text-xs text-text-secondary">{s.matchName}</p>
+						</td>
+						<td
+							class="font-600 py-3 pr-4 text-right text-xs {catColors[s.mapCategory] ??
+								'text-text-secondary'}"
+						>
+							{s.mapCategory}{s.mapOrder}
+						</td>
+						<td
+							class="font-700 py-3 pr-4 text-right text-sm tabular-nums {s.pp != null
+								? 'text-accent'
+								: 'text-text-secondary/40'}"
+						>
+							{s.pp != null ? `${Math.round(s.pp)}pp` : '—'}
+						</td>
+						<td class="font-700 py-3 pr-4 text-right text-sm text-text-primary tabular-nums">
+							{s.score.toLocaleString()}
+						</td>
+						<td class="py-3 pr-4 text-right text-xs text-text-secondary tabular-nums">
+							{s.accuracy > 0 ? `${(s.accuracy * 100).toFixed(1)}%` : '—'}
+						</td>
+					</tr>
+				{/snippet}
+			</DataTable>
 		</div>
 	{/if}
 
