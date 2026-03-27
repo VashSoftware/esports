@@ -1,4 +1,4 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 // Mock the env module before importing permissions
 vi.mock('$env/dynamic/private', () => ({
@@ -10,7 +10,8 @@ vi.mock('$lib/server/db', () => ({
 }));
 
 vi.mock('$lib/server/db/auth.schema', () => ({ user: {} }));
-vi.mock('drizzle-orm', () => ({ eq: vi.fn(() => ({})) }));
+vi.mock('$lib/server/db/schema', () => ({ tournamentStaff: {} }));
+vi.mock('drizzle-orm', () => ({ eq: vi.fn(() => ({})), and: vi.fn(() => ({})) }));
 
 // SvelteKit error function mock — throws an object with status/body like the real one
 vi.mock('@sveltejs/kit', () => ({

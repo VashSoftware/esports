@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import DataTable from '$lib/components/DataTable.svelte';
 
 	const { data } = $props();
 
@@ -45,7 +46,6 @@
 	);
 	const hasMultipleTeams = $derived(nonPersonalUserTeams.length > 0);
 
-	// Auto-select personal team by default
 	$effect(() => {
 		if (!selectedCreatorTeamId && personalTeam) {
 			selectedCreatorTeamId = personalTeam.id;
@@ -53,10 +53,10 @@
 	});
 
 	const selectedCreatorTeam = $derived(
-		(formData ?? data).teams.find((t: any) => t.id === selectedCreatorTeamId)
+		(formData ?? data).teams?.find((t: any) => t.id === selectedCreatorTeamId)
 	);
 	const selectedInvitedTeam = $derived(
-		(formData ?? data).teams.find((t: any) => t.id === selectedInvitedTeamId)
+		(formData ?? data).teams?.find((t: any) => t.id === selectedInvitedTeamId)
 	);
 	const creatorIsPersonal = $derived(selectedCreatorTeam?.isPersonal ?? true);
 
@@ -65,13 +65,12 @@
 
 	const effectiveBestOf = $derived(useCustomBo ? parseInt(customBestOf) || 5 : bestOf);
 
-	// Filter opponent teams for search
 	const filteredOpponentTeams = $derived(
-		(formData ?? data).teams.filter((t: any) => {
+		(formData ?? data).teams?.filter((t: any) => {
 			if (t.id === selectedCreatorTeamId) return false;
 			if (!opponentSearch) return true;
 			return t.name.toLowerCase().includes(opponentSearch.toLowerCase());
-		})
+		}) ?? []
 	);
 
 	function teamDisplayName(t: any): string {
@@ -82,7 +81,6 @@
 		const slots = p.slots ?? [];
 		if (!slots.length) return '0 maps';
 		const avg = slots.reduce((s: number, sl: any) => s + (sl.starRating ?? 0), 0) / slots.length;
-		// Count per category
 		const counts: Record<string, number> = {};
 		for (const sl of slots) {
 			counts[sl.category] = (counts[sl.category] ?? 0) + 1;
@@ -113,22 +111,10 @@
 		CANCELLED: { label: 'Cancelled', color: 'text-red-400 border-red-500/30' }
 	};
 
-	const liveStates = ['LOBBY', 'ROLLING', 'PICKING', 'PLAYING'];
-
-	const liveMatches = $derived(data.matches.filter((m: any) => liveStates.includes(m.state)));
-	const recentMatches = $derived(data.matches.filter((m: any) => !liveStates.includes(m.state)));
-
 	function teamDisplay(m: any) {
 		const p1 = m.participants[0];
 		const p2 = m.participants[1];
 		return { p1, p2 };
-	}
-
-	function avgSR(mappool: any): string | null {
-		const slots = mappool?.slots;
-		if (!slots?.length) return null;
-		const avg = slots.reduce((s: number, sl: any) => s + (sl.starRating ?? 0), 0) / slots.length;
-		return avg.toFixed(2);
 	}
 
 	function timeAgo(date: string | Date) {
@@ -142,6 +128,13 @@
 		const days = Math.floor(hours / 24);
 		return `${days}d ago`;
 	}
+
+	const columns = [
+		{ key: 'teams', label: 'Match' },
+		{ key: 'format', label: 'Format' },
+		{ key: 'state', label: 'State' },
+		{ key: 'createdAt', label: 'Date', sortable: true, class: 'hidden sm:table-cell' }
+	];
 </script>
 
 <svelte:head>
@@ -155,13 +148,13 @@
 
 <div class="mx-auto max-w-5xl">
 	<!-- Header -->
-	<div class="flex items-center justify-between">
+	<div class="mb-6 flex items-center justify-between">
 		<div>
 			<h1 class="font-700 text-2xl tracking-tight">Matches</h1>
 			<p class="mt-1 text-sm text-text-secondary">
-				{data.matches.length} match{data.matches.length !== 1 ? 'es' : ''}
-				{#if liveMatches.length > 0}
-					&middot; <span class="text-green-400">{liveMatches.length} live</span>
+				{data.meta.total} match{data.meta.total !== 1 ? 'es' : ''}
+				{#if data.liveMatches.length > 0}
+					&middot; <span class="text-green-400">{data.liveMatches.length} live</span>
 				{/if}
 			</p>
 		</div>
@@ -211,7 +204,7 @@
 					}
 				};
 			}}
-			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
+			class="mb-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
 		>
 			<h2 class="font-600 text-sm">Create Match</h2>
 
@@ -253,7 +246,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each formData?.teams as t}
+						{#each formData?.teams ?? [] as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
@@ -268,7 +261,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select team...</option>
-						{#each formData?.teams as t}
+						{#each formData?.teams ?? [] as t}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
@@ -283,7 +276,7 @@
 						class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 					>
 						<option value="">Select mappool...</option>
-						{#each formData?.mappools as p}
+						{#each formData?.mappools ?? [] as p}
 							<option value={p.id}>{p.name} ({p.slots.length} maps)</option>
 						{/each}
 					</select>
@@ -327,7 +320,7 @@
 					}
 				};
 			}}
-			class="mt-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
+			class="mb-4 rounded-lg border border-accent/20 bg-surface-800 p-5"
 		>
 			<h2 class="font-600 text-sm">Challenge</h2>
 
@@ -343,7 +336,6 @@
 			<input type="hidden" name="invitedTeamId" value={selectedInvitedTeamId} />
 
 			<div class="mt-4 flex flex-col gap-4">
-				<!-- Your Team (only shown if you have non-personal teams) -->
 				{#if hasMultipleTeams}
 					<div>
 						<label for="inv-myTeam" class="font-500 text-xs text-text-secondary">Your Team</label>
@@ -362,7 +354,6 @@
 					</div>
 				{/if}
 
-				<!-- Opponent (searchable) -->
 				<div>
 					<label for="inv-opponent-search" class="font-500 text-xs text-text-secondary"
 						>Opponent</label
@@ -422,7 +413,6 @@
 					{/if}
 				</div>
 
-				<!-- Best Of -->
 				<div>
 					<span class="font-500 text-xs text-text-secondary">Best Of</span>
 					<div class="mt-1.5 flex flex-wrap gap-1.5">
@@ -457,7 +447,6 @@
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">
-					<!-- Team sizes (only if creator is not personal team) -->
 					{#if !creatorIsPersonal && creatorMaxSize > 1}
 						<div>
 							<label for="inv-ts1" class="font-500 text-xs text-text-secondary"
@@ -496,7 +485,6 @@
 						<input type="hidden" name="teamSize2" value="1" />
 					{/if}
 
-					<!-- Scoring -->
 					<div>
 						<label for="inv-scoring" class="font-500 text-xs text-text-secondary">Scoring</label>
 						<select
@@ -511,7 +499,6 @@
 						</select>
 					</div>
 
-					<!-- Mappool -->
 					<div>
 						<label for="inv-mappool" class="font-500 text-xs text-text-secondary">Mappool</label>
 						<select
@@ -521,14 +508,13 @@
 							class="mt-1 w-full rounded-md border border-border bg-surface-700 px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none"
 						>
 							<option value="">Select mappool...</option>
-							{#each formData?.mappools as p}
+							{#each formData?.mappools ?? [] as p}
 								<option value={p.id}>{p.name} — {mappoolSummary(p)}</option>
 							{/each}
 						</select>
 					</div>
 				</div>
 
-				<!-- ELO toggle (default on) -->
 				<div class="flex items-center gap-3">
 					<label class="flex items-center gap-2 text-xs text-text-secondary">
 						<input
@@ -541,7 +527,6 @@
 					</label>
 				</div>
 
-				<!-- Message + Schedule -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label for="inv-message" class="font-500 text-xs text-text-secondary"
@@ -582,17 +567,17 @@
 	{/if}
 
 	<!-- Live Matches -->
-	{#if liveMatches.length > 0}
-		<div class="mt-6">
+	{#if data.liveMatches.length > 0}
+		<div class="mb-6">
 			<h2 class="font-600 flex items-center gap-2 text-sm">
 				<div class="relative h-2 w-2">
 					<div class="absolute inset-0 animate-ping rounded-full bg-green-400 opacity-75"></div>
 					<div class="relative h-2 w-2 rounded-full bg-green-400"></div>
 				</div>
-				Live Now (max 4 until osu! gives me bot account lol)
+				Live Now
 			</h2>
 			<div class="mt-3 flex flex-col gap-2">
-				{#each liveMatches as m}
+				{#each data.liveMatches as m}
 					{@const { p1, p2 } = teamDisplay(m)}
 					{@const sc = stateConfig[m.state]}
 					<a
@@ -634,22 +619,15 @@
 		</div>
 	{/if}
 
-	<!-- All Matches -->
-	<div class="mt-6">
-		{#if liveMatches.length > 0}
-			<h2 class="font-600 text-sm text-text-secondary">Past Matches</h2>
-		{/if}
-		<div class="mt-3 flex flex-col gap-2">
-			{#each recentMatches as m}
-				{@const { p1, p2 } = teamDisplay(m)}
-				{@const config = m.config as { bestOf: number }}
-				{@const sc = stateConfig[m.state]}
-				<a
-					href="/matches/{m.id}"
-					class="group flex items-center gap-4 rounded-lg border border-border bg-surface-800 p-3 transition-colors hover:border-accent/30 hover:bg-surface-700"
-				>
-					<!-- Match info -->
-					<div class="min-w-0 flex-1">
+	<!-- All Matches Table -->
+	<DataTable data={data.matches} meta={data.meta} {columns} searchPlaceholder="Search matches...">
+		{#snippet row(m, _i)}
+			{@const { p1, p2 } = teamDisplay(m)}
+			{@const config = m.config as { bestOf: number }}
+			{@const sc = stateConfig[m.state]}
+			<tr class="transition-colors hover:bg-surface-800/50">
+				<td class="px-4 py-3">
+					<a href="/matches/{m.id}" class="block hover:text-accent">
 						<div class="flex items-center gap-2">
 							<span class="font-600 text-sm">{p1?.team.name ?? '?'}</span>
 							{#if m.state === 'FINISHED'}
@@ -668,45 +646,28 @@
 								<span class="text-xs text-text-secondary">vs</span>
 							{/if}
 							<span class="font-600 text-sm">{p2?.team.name ?? '?'}</span>
+							{#if m.state === 'FINISHED' && m.winnerId}
+								{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
+								<span class="ml-1 text-xs text-green-400">W: {winner?.team.name}</span>
+							{/if}
 						</div>
-						<p class="mt-0.5 text-xs text-text-secondary">
-							{m.name ? `${m.name} · ` : ''}BO{config.bestOf}{#if m.finishedAt}
-								&middot; {timeAgo(m.finishedAt)}{:else if m.createdAt}
-								&middot; {timeAgo(m.createdAt)}{/if}
-						</p>
-						{#if m.mappool}
-							<p class="text-xs text-text-secondary">
-								{m.mappool.name}{#if avgSR(m.mappool)}
-									({avgSR(m.mappool)}★){/if}
-							</p>
+						{#if m.name}
+							<p class="mt-0.5 text-xs text-text-secondary">{m.name}</p>
 						{/if}
-					</div>
-
-					<!-- Winner indicator -->
-					{#if m.state === 'FINISHED' && m.winnerId}
-						{@const winner = m.participants.find((p: any) => p.teamId === m.winnerId)}
-						<span class="font-500 text-xs text-green-400">🏆 {winner?.team.name}</span>
-					{/if}
-
-					<!-- State -->
+					</a>
+				</td>
+				<td class="px-4 py-3">
+					<span class="text-xs text-text-secondary">BO{config.bestOf}</span>
+				</td>
+				<td class="px-4 py-3">
 					<span class="font-500 rounded border px-2 py-0.5 text-xs {sc?.color ?? 'border-border'}">
 						{sc?.label ?? m.state}
 					</span>
-				</a>
-			{:else}
-				{#if liveMatches.length === 0}
-					<div class="rounded-lg border border-dashed border-border py-12 text-center">
-						<p class="text-sm text-text-secondary">
-							No matches yet.
-							{#if data.canCreateMatch}
-								Create one to get started.
-							{:else}
-								Join the ranked queue from the dashboard!
-							{/if}
-						</p>
-					</div>
-				{/if}
-			{/each}
-		</div>
-	</div>
+				</td>
+				<td class="hidden px-4 py-3 text-sm text-text-secondary sm:table-cell">
+					{timeAgo(m.finishedAt ?? m.createdAt)}
+				</td>
+			</tr>
+		{/snippet}
+	</DataTable>
 </div>

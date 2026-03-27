@@ -1,17 +1,12 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { tournamentRound, tournamentStaff } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { requireAuth } from '$lib/server/permissions';
+import { tournamentRound } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
+import { requireTournamentStaffOrAdmin, TournamentPermission } from '$lib/server/permissions';
 import type { RequestHandler } from './$types';
 
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
-	const user = requireAuth(locals);
-
-	const staff = await db.query.tournamentStaff.findFirst({
-		where: and(eq(tournamentStaff.tournamentId, params.id), eq(tournamentStaff.userId, user.id))
-	});
-	if (!staff) error(403, 'Not a staff member of this tournament');
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.MANAGE_ROUNDS);
 
 	const body = await request.json();
 	const updates: Record<string, unknown> = {};
@@ -38,12 +33,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 };
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
-	const user = requireAuth(locals);
-
-	const staff = await db.query.tournamentStaff.findFirst({
-		where: and(eq(tournamentStaff.tournamentId, params.id), eq(tournamentStaff.userId, user.id))
-	});
-	if (!staff) error(403, 'Not a staff member of this tournament');
+	await requireTournamentStaffOrAdmin(locals, params.id, TournamentPermission.MANAGE_ROUNDS);
 
 	await db.delete(tournamentRound).where(eq(tournamentRound.id, params.roundId));
 	return json({ deleted: true });

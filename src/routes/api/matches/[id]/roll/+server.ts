@@ -1,7 +1,7 @@
 // src/routes/api/matches/[id]/roll/+server.ts
 import { json, error } from '@sveltejs/kit';
 import { submitRoll } from '$lib/server/match/engine';
-import { requireAuth, hasRole } from '$lib/server/permissions';
+import { requireAuth, hasPermission, GlobalPermission } from '$lib/server/permissions';
 import { getMatchFull } from '$lib/server/match/helpers';
 import { submitRollSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	// Find the participant linked to the authenticated user
 	const participant = match.participants.find((p) => p.players.some((pl) => pl.userId === user.id));
 
-	if (!participant && !hasRole(user.role, 'referee')) {
+	if (!participant && !hasPermission(user.role, GlobalPermission.MATCH_REFEREE)) {
 		error(403, 'You are not a participant in this match');
 	}
 

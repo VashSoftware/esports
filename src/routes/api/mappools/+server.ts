@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { mappool } from '$lib/server/db/schema';
-import { requireAuth, requireRole } from '$lib/server/permissions';
+import { requireAuth, requirePermission, GlobalPermission } from '$lib/server/permissions';
 import { createMappoolSchema, parseBody } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
@@ -18,7 +18,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 // Create a mappool (admin only)
 export const POST: RequestHandler = async ({ request, locals }) => {
-	requireRole(locals, 'admin', 'Only admins can create mappools');
+	requirePermission(
+		locals,
+		GlobalPermission.MAPPOOL_CREATE,
+		'Only authorized users can create mappools'
+	);
 
 	const body = await request.json();
 	const { name } = parseBody(createMappoolSchema, body);

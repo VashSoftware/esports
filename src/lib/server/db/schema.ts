@@ -13,6 +13,7 @@ import {
 import { relations } from 'drizzle-orm';
 
 export * from './auth.schema';
+import { user } from './auth.schema';
 
 // ── Teams ───────────────────────────────────────────────────────────────
 export const team = pgTable('team', {
@@ -579,6 +580,30 @@ export const tournamentGroupEntryRelations = relations(tournamentGroupEntry, ({ 
 		references: [tournamentGroup.id]
 	}),
 	team: one(team, { fields: [tournamentGroupEntry.teamId], references: [team.id] })
+}));
+
+// ── Profile Comments ────────────────────────────────────────────────────
+export const profileComment = pgTable(
+	'profile_comment',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		// 'user' or 'team'
+		targetType: text('target_type').notNull(),
+		targetId: text('target_id').notNull(),
+		authorId: text('author_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		content: text('content').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [
+		index('idx_profile_comment_target').on(t.targetType, t.targetId),
+		index('idx_profile_comment_author').on(t.authorId)
+	]
+);
+
+export const profileCommentRelations = relations(profileComment, ({ one }) => ({
+	author: one(user, { fields: [profileComment.authorId], references: [user.id] })
 }));
 
 export const tournamentQualifierScoreRelations = relations(tournamentQualifierScore, ({ one }) => ({

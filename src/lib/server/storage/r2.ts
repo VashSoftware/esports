@@ -77,3 +77,28 @@ export async function proxyImage(osuUrl: string): Promise<string | null> {
 		return null;
 	}
 }
+
+/**
+ * Upload raw image data to R2 under the given key.
+ * Returns the CDN URL or null if R2 is not configured.
+ */
+export async function uploadImage(
+	key: string,
+	data: ArrayBuffer | Uint8Array,
+	contentType: string
+): Promise<string | null> {
+	if (!isConfigured()) return null;
+
+	try {
+		const r2 = await getClient();
+		const file = r2.file(key);
+		await file.write(data, { type: contentType });
+		knownKeys.add(key);
+		const cdnUrl = `${env.R2_PUBLIC_URL}/${key}`;
+		log.r2.info({ key }, 'uploaded');
+		return cdnUrl;
+	} catch (err: unknown) {
+		log.r2.error({ err, key }, 'uploadImage failed');
+		return null;
+	}
+}

@@ -10,8 +10,6 @@ import { categoryToMods, isValidCategory, MOD_REGEX } from '$lib/mods';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	requireAuth(locals);
-
 	const pool = await db.query.mappool.findFirst({
 		where: eq(mappool.id, params.id),
 		with: {
@@ -85,24 +83,35 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		})
 	);
 
-	const isAdmin = locals.user!.role === 'admin';
+	const isAdmin = locals.user?.role === 'admin';
+	const isOwner = locals.user ? pool.createdBy === locals.user.id : false;
+	const isVerified = !!pool.verifiedAt;
+	// Admins can always edit; owners can edit their own unverified pools
+	const canEdit = isAdmin || (isOwner && !isVerified);
 
 	return {
 		pool: { ...pool, slots: slotsWithBeatmaps },
-		canEdit: isAdmin,
-		isAdmin
+		canEdit,
+		isAdmin,
+		isVerified
 	};
 };
 
+/** Check that the user can edit this pool (admin or owner of unverified pool) */
+async function requireCanEdit(locals: App.Locals, poolId: string) {
+	requireAuth(locals);
+	const pool = await db.query.mappool.findFirst({ where: eq(mappool.id, poolId) });
+	if (!pool) error(404, 'Mappool not found');
+	if (pool.verifiedAt) error(403, 'Verified pools cannot be edited');
+	const isAdmin = locals.user!.role === 'admin';
+	const isOwner = pool.createdBy === locals.user!.id;
+	if (!isAdmin && !isOwner) error(403, 'Not authorized to edit this pool');
+	return pool;
+}
+
 export const actions: Actions = {
 	rename: async ({ params, request, locals }) => {
-		requireAuth(locals);
-		if (locals.user!.role !== 'admin') error(403, 'Admins only');
-
-		const pool = await db.query.mappool.findFirst({
-			where: eq(mappool.id, params.id)
-		});
-		if (!pool) error(404, 'Mappool not found');
+		await requireCanEdit(locals, params.id);
 
 		const form = await request.formData();
 		const name = form.get('name')?.toString()?.trim();
@@ -113,8 +122,7 @@ export const actions: Actions = {
 	},
 
 	addSlot: async ({ params, request, locals }) => {
-		requireAuth(locals);
-		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+		await requireCanEdit(locals, params.id);
 
 		const form = await request.formData();
 		let beatmapId = form.get('beatmapId')?.toString()?.trim();
@@ -177,8 +185,7 @@ export const actions: Actions = {
 	},
 
 	removeSlot: async ({ params, request, locals }) => {
-		requireAuth(locals);
-		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+		await requireCanEdit(locals, params.id);
 
 		const form = await request.formData();
 		const slotId = form.get('slotId')?.toString();
@@ -207,8 +214,7 @@ export const actions: Actions = {
 	},
 
 	moveSlot: async ({ params, request, locals }) => {
-		requireAuth(locals);
-		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+		await requireCanEdit(locals, params.id);
 
 		const form = await request.formData();
 		const slotId = form.get('slotId')?.toString();
@@ -275,8 +281,7 @@ export const actions: Actions = {
 	},
 
 	bulkImport: async ({ params, request, locals }) => {
-		requireAuth(locals);
-		if (locals.user!.role !== 'admin') error(403, 'Admins only');
+		await requireCanEdit(locals, params.id);
 
 		const form = await request.formData();
 		const raw = form.get('data')?.toString()?.trim();
