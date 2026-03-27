@@ -46,6 +46,15 @@ if (!building) {
 	});
 }
 
+/** Safe IP getter — returns null for internal requests missing the ADDRESS_HEADER */
+function getIp(event: Parameters<Handle>[0]['event']): string | null {
+	try {
+		return event.getClientAddress();
+	} catch {
+		return null;
+	}
+}
+
 // ── Request logging middleware ──
 // Paths that are too noisy to log every time (healthchecks, polling)
 const SILENT_PATHS = new Set(['/api/health', '/api/queue']);
@@ -78,7 +87,7 @@ const handleRequestLogging: Handle = async ({ event, resolve }) => {
 				status,
 				duration,
 				userId: userId ?? null,
-				ip: event.getClientAddress()
+				ip: getIp(event)
 			},
 			`${event.request.method} ${path} ${status} ${duration}ms`
 		);
@@ -97,7 +106,7 @@ const handleRequestLogging: Handle = async ({ event, resolve }) => {
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	// Rate limiting for API routes
 	if (event.url.pathname.startsWith('/api/')) {
-		const ip = event.getClientAddress();
+		const ip = getIp(event) ?? 'unknown';
 
 		// Stricter limit for auth endpoints: 10 req/min per IP
 		if (event.url.pathname.startsWith('/api/auth/')) {
