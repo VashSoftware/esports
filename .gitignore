@@ -27,3 +27,5 @@ test-results
 
 # Dozzle
 dozzle-users.yml
+
+nvim.log
